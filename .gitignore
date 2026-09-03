@@ -1,0 +1,43 @@
+# Go
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/vendor/
+
+# Node / Vue
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Android
+.gradle/
+.idea/
+local.properties
+*.iml
+captures/
+build/
+.externalNativeBuild/
+.cxx/
+
+# Runtime data and secrets
+data/
+uploads/
+backups/
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+
+# Logs and editor files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
