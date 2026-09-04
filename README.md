@@ -1,6 +1,6 @@
 # Cyberlife
 
-当前实现覆盖工程方案中的**第一阶段**：身份与人生空间基础。
+当前实现覆盖工程方案中的**第一、二阶段**：身份与人生空间基础，以及 Now（现在）页的最小记录闭环。
 
 ## 已实现
 
@@ -11,8 +11,10 @@
 - Admin 为指定人生创建、列出、作废 ReaderKey；作废即提升 key version，使既有会话失效。
 - Writer/Reader 主密钥登录、Admin 独立密码登录、HttpOnly Cookie 会话、登出。
 - SQLite WAL、外键、busy timeout 与 life 月库初始化。
+- Now 垂直切片：书写者可创建心情标签、记录心情/身体、自动保存当日日记、添加及完成当天任务。
+- 现在页通过真实 API 读取上述数据；阅读者内容读取仍待第三阶段 ACL 完成后开放。
 
-> 这一阶段不包含日记、心情、身体、任务、ACL 条目预设或三屏内容功能；它们将在后续阶段建立在已完成的身份/存储边界上。
+> 当前不包含附件上传、删除段落备份、日历跨日任务、条目级权限预设、绝密层、评论和三屏完整导航；这些功能将在后续阶段建立在已完成的身份/存储边界上。
 
 ## 启动
 
@@ -45,6 +47,13 @@ pnpm dev
 | GET/POST | `/api/v1/admin/writers` | 管理员列出/创建 Writer |
 | GET/POST | `/api/v1/admin/writers/:lifeID/reader-keys` | 列出/创建阅读密钥 |
 | POST | `/api/v1/admin/reader-keys/:id/revoke` | 作废阅读密钥 |
+| GET | `/api/v1/now` | 书写者读取今日记录 |
+| GET/POST | `/api/v1/now/mood-tags` | 列出/创建心情标签 |
+| POST | `/api/v1/now/moods` | 按服务端标签值记录心情 |
+| POST | `/api/v1/now/body` | 记录身体评分 |
+| PUT | `/api/v1/now/diary` | 保存当日日记 |
+| POST | `/api/v1/now/tasks` | 创建当天任务 |
+| POST | `/api/v1/now/tasks/:id/done` | 更新任务完成状态 |
 
 ## 安全边界
 

@@ -93,6 +93,13 @@ CREATE TABLE IF NOT EXISTS diary_entries (
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_diary_entries_date ON diary_entries(entry_date);
+CREATE TABLE IF NOT EXISTS mood_tags (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT NOT NULL, value INTEGER NOT NULL CHECK(value > 0), sort_order INTEGER NOT NULL, created_at TEXT NOT NULL, UNIQUE(name));
+CREATE TABLE IF NOT EXISTS mood_records (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, recorded_at TEXT NOT NULL, recorded_date TEXT NOT NULL, value REAL NOT NULL, note TEXT NOT NULL DEFAULT '', tags_json TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_mood_records_date ON mood_records(recorded_date, recorded_at);
+CREATE TABLE IF NOT EXISTS body_records (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, recorded_at TEXT NOT NULL, recorded_date TEXT NOT NULL, score INTEGER NOT NULL CHECK(score BETWEEN 0 AND 100), note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_body_records_date ON body_records(recorded_date, recorded_at);
+CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, task_date TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high')), done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(task_date, done);
 `); err != nil { return fmt.Errorf("migrate life month database: %w", err) }
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = s.global.ExecContext(ctx, `INSERT INTO life_months(life_id, month_key, schema_version, created_at, checked_at)
