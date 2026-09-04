@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { authState, logout, restoreSession } from './stores/auth'
 import LoginView from './views/LoginView.vue'
+import AdminLoginView from './views/AdminLoginView.vue'
 import AdminView from './views/AdminView.vue'
 import NowView from './views/NowView.vue'
 import ReaderView from './views/ReaderView.vue'
@@ -17,12 +18,16 @@ const navPosition = ref<'top'|'left'|'right'|'bottom'>((localStorage.getItem('cy
 const appearance = ref<'dark' | 'light' | 'auto'>((localStorage.getItem('cyberlife-theme') as 'dark' | 'light' | 'auto') || 'dark')
 const secretMode = ref(localStorage.getItem('cyberlife-secret-mode') === 'true')
 const isAdmin = computed(() => authState.actor?.type === 'admin')
+const isAdminPath = window.location.pathname === '/admin'
 const screenTheme = computed(() => `theme-${screen.value === 'settings' ? 'now' : screen.value}`)
 const resolvedAppearance = computed(() => appearance.value === 'auto' ? (new Date().getHours() >= 7 && new Date().getHours() < 18 ? 'light' : 'dark') : appearance.value)
 function navigate(next: Screen) {
   if (next === screen.value) return
+  const current = screen.value === 'settings' ? 'now' : screen.value
+  const target = next === 'settings' ? 'now' : next
   const apply = () => { screen.value = next }
   if ('startViewTransition' in document && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.documentElement.dataset.transition = `from-${current}-to-${target}`
     ;(document as Document & { startViewTransition?: (callback: () => void) => void }).startViewTransition?.(apply)
   } else apply()
 }
@@ -35,6 +40,7 @@ onMounted(restoreSession)
 
 <template>
   <div v-if="authState.loading" class="app-boot" aria-label="加载中"><i /></div>
+  <AdminLoginView v-else-if="!authState.actor && isAdminPath" />
   <LoginView v-else-if="!authState.actor" />
   <div v-else class="app-shell" :class="[screenTheme, resolvedAppearance, `nav-${navPosition}`, { 'secret-mode': secretMode }]" @dragover.prevent @drop="setNavPosition">
     <header class="topbar" draggable="true">
@@ -59,7 +65,7 @@ onMounted(restoreSession)
     <PastView v-else-if="screen === 'past'" />
     <FutureView v-else-if="screen === 'future'" />
     <SettingsView v-else-if="screen === 'settings'" :appearance="appearance" @update:appearance="setAppearance" />
-    <NowView v-else-if="authState.actor.type === 'writer'" />
+    <NowView v-else-if="authState.actor.type === 'writer'" @navigate-future="navigate('future')" />
     <ReaderView v-else />
   </div>
 </template>

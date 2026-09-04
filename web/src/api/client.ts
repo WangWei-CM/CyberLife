@@ -35,6 +35,11 @@ export const api = {
   addMood: (tagIDs: string[], note: string, secret: boolean) => request<MoodRecord>('/api/v1/now/moods', { method: 'POST', body: JSON.stringify({ tag_ids: tagIDs, note, secret }) }),
   addBody: (score: number, note: string, secret: boolean) => request<BodyRecord>('/api/v1/now/body', { method: 'POST', body: JSON.stringify({ score, note, secret }) }),
   uploadAttachment: async (file: File) => { const form = new FormData(); form.append('file', file); const response = await fetch('/api/v1/now/diary/attachments', { method: 'POST', credentials: 'include', body: form }); if (!response.ok) { const body = await response.json().catch(() => null) as ApiError | null; throw new Error(body?.error?.message ?? '上传失败') }; return response.json() as Promise<Attachment> },
+  musicPlaylists: () => request<{ items: Playlist[] }>('/api/v1/now/music/playlists'),
+  replaceMusicPlaylist: (page: PlaylistPage, payload: { name: string; mode: PlaylistMode; volume: number; default_enabled?: boolean }) => request<Playlist>(`/api/v1/now/music/playlists/${page}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteMusicPlaylist: (page: PlaylistPage) => request<void>(`/api/v1/now/music/playlists/${page}`, { method: 'DELETE' }),
+  uploadMusicTrack: async (page: PlaylistPage, file: File) => { const form = new FormData(); form.append('file', file); const response = await fetch(`/api/v1/now/music/playlists/${page}/tracks`, { method: 'POST', credentials: 'include', body: form }); if (!response.ok) { const body = await response.json().catch(() => null) as ApiError | null; throw new Error(body?.error?.message ?? '上传失败') }; return response.json() as Promise<MusicTrack> },
+  deleteMusicTrack: (id: string) => request<void>(`/api/v1/now/music/tracks/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   saveDraft: (content: string) => request<Draft>('/api/v1/now/diary/draft', { method: 'PUT', body: JSON.stringify({ content }) }),
   saveDiary: (content: string) => request<Diary>('/api/v1/now/diary', { method: 'PUT', body: JSON.stringify({ content }) }),
   addTask: (title: string, description: string, priority: string) => request<Task>('/api/v1/now/tasks', { method: 'POST', body: JSON.stringify({ title, description, priority }) }),
@@ -58,6 +63,10 @@ export type BodyRecord = { id: string; recordedAt: string; recordedDate: string;
 export type Diary = { id: string; entryDate: string; content: string; presetId?: string; secret: boolean; commentable: boolean }
 export type Draft = { entryDate: string; content: string; updatedAt: string }
 export type Attachment = { id: string; originalName: string; mimeType: string; byteSize: number }
+export type PlaylistPage = 'now' | 'past' | 'future'
+export type PlaylistMode = 'list' | 'random' | 'single'
+export type MusicTrack = { id: string; title: string; mimeType: string; byteSize: number; sortOrder: number; url: string }
+export type Playlist = { id: string; page: PlaylistPage; name: string; mode: PlaylistMode; volume: number; defaultEnabled: boolean; tracks: MusicTrack[]; updatedAt: string }
 export type PresetRule = { readerKeyId: string; allowed: boolean }
 export type Preset = { id: string; name: string; rules: PresetRule[] }
 export type Comment = { id: string; targetType: string; targetId: string; authorKeyId: string; content: string; createdAt: string }

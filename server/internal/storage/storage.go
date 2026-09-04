@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -87,9 +88,24 @@ CREATE TABLE IF NOT EXISTS life_months (
   life_id TEXT NOT NULL REFERENCES lives(id), month_key TEXT NOT NULL, schema_version INTEGER NOT NULL,
   created_at TEXT NOT NULL, checked_at TEXT NOT NULL, PRIMARY KEY(life_id, month_key)
 );
+CREATE TABLE IF NOT EXISTS music_playlists (
+  id TEXT PRIMARY KEY, life_id TEXT NOT NULL REFERENCES lives(id), page TEXT NOT NULL CHECK(page IN ('now','past','future')),
+  name TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'list' CHECK(mode IN ('list','random','single')),
+  volume INTEGER NOT NULL DEFAULT 70 CHECK(volume BETWEEN 0 AND 100), default_enabled INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(life_id, page)
+);
+CREATE TABLE IF NOT EXISTS music_tracks (
+  id TEXT PRIMARY KEY, playlist_id TEXT NOT NULL REFERENCES music_playlists(id) ON DELETE CASCADE,
+  stored_name TEXT NOT NULL UNIQUE, original_name TEXT NOT NULL, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL,
+  sort_order INTEGER NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_music_tracks_playlist ON music_tracks(playlist_id, sort_order);
 `)
 	if err != nil {
 		return fmt.Errorf("migrate global database: %w", err)
+	}
+	if _, err = s.global.ExecContext(ctx, "ALTER TABLE music_playlists ADD COLUMN default_enabled INTEGER NOT NULL DEFAULT 1"); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		return fmt.Errorf("migrate music playlists: %w", err)
 	}
 	return nil
 }
@@ -181,6 +197,10 @@ func (s *Store) LifeDBPath(lifeID, monthKey string) string {
 }
 func (s *Store) UploadDir(lifeID, monthKey string) string {
 	return filepath.Join(s.dataDir, "uploads", lifeID, "diary", monthKey)
+}
+
+func (s *Store) MusicUploadDir(lifeID string) string {
+	return filepath.Join(s.dataDir, "uploads", lifeID, "music")
 }
 
 func shanghai() *time.Location {

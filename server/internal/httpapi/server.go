@@ -17,6 +17,7 @@ import (
 	"cyberlife/server/internal/future"
 	"cyberlife/server/internal/history"
 	"cyberlife/server/internal/interaction"
+	"cyberlife/server/internal/music"
 	"cyberlife/server/internal/notification"
 	nowservice "cyberlife/server/internal/now"
 )
@@ -26,6 +27,7 @@ type Server struct {
 	auth         *auth.Service
 	admin        *admin.Service
 	now          *nowservice.Service
+	music        *music.Service
 	acl          *acl.Service
 	interaction  *interaction.Service
 	history      *history.Service
@@ -33,8 +35,8 @@ type Server struct {
 	notification *notification.Service
 }
 
-func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, aclService *acl.Service, interactionService *interaction.Service, historyService *history.Service, futureService *future.Service, notificationService *notification.Service) *Server {
-	return &Server{cfg: cfg, auth: authService, admin: adminService, now: nowService, acl: aclService, interaction: interactionService, history: historyService, future: futureService, notification: notificationService}
+func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, musicService *music.Service, aclService *acl.Service, interactionService *interaction.Service, historyService *history.Service, futureService *future.Service, notificationService *notification.Service) *Server {
+	return &Server{cfg: cfg, auth: authService, admin: adminService, now: nowService, music: musicService, acl: aclService, interaction: interactionService, history: historyService, future: futureService, notification: notificationService}
 }
 
 func (s *Server) Router() *gin.Engine {
@@ -66,6 +68,7 @@ func (s *Server) Router() *gin.Engine {
 	protected.GET("/comments", s.listVisibleComments)
 	protected.GET("/milestones", s.listVisibleMilestones)
 	protected.GET("/attachments/:id", s.downloadAttachment)
+	protected.GET("/music/tracks/:id", s.downloadMusicTrack)
 	writer := protected.Group("/now")
 	writer.Use(s.requireWriter())
 	writer.GET("", s.nowToday)
@@ -82,6 +85,11 @@ func (s *Server) Router() *gin.Engine {
 	writer.POST("/moods", s.addMood)
 	writer.POST("/body", s.addBody)
 	writer.POST("/diary/attachments", s.uploadAttachment)
+	writer.GET("/music/playlists", s.listMusicPlaylists)
+	writer.PUT("/music/playlists/:page", s.replaceMusicPlaylist)
+	writer.DELETE("/music/playlists/:page", s.deleteMusicPlaylist)
+	writer.POST("/music/playlists/:page/tracks", s.uploadMusicTrack)
+	writer.DELETE("/music/tracks/:id", s.deleteMusicTrack)
 	writer.PUT("/diary/attachments/:id/access", s.setAttachmentAccess)
 	writer.PUT("/diary/draft", s.saveDraft)
 	writer.PUT("/diary", s.saveDiary)
@@ -103,7 +111,7 @@ func (s *Server) cors() gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Origin", "http://127.0.0.1:5173")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key")
-		c.Header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		if c.Request.Method == http.MethodOptions {
 			c.Status(http.StatusNoContent)
 			c.Abort()
@@ -626,6 +634,93 @@ func (s *Server) addBody(c *gin.Context) {
 	}
 	c.JSON(201, x)
 }
+func (s *Server) listMusicPlaylists(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	items, err := s.music.List(c.Request.Context(), a.LifeID)
+	if err != nil {
+		internal(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (s *Server) replaceMusicPlaylist(c *gin.Context) {
+	var request struct {
+		Name           string `json:"name"`
+		Mode           string `json:"mode"`
+		Volume         int    `json:"volume"`
+		DefaultEnabled *bool  `json:"default_enabled"`
+	}
+	if !bind(c, &request) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	item, err := s.music.Replace(c.Request.Context(), a.LifeID, c.Param("page"), request.Name, request.Mode, request.Volume, request.DefaultEnabled)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "validation_failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, item)
+}
+
+func (s *Server) deleteMusicPlaylist(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	if err := s.music.DeletePlaylist(c.Request.Context(), a.LifeID, c.Param("page")); err != nil {
+		fail(c, http.StatusNotFound, "not_found", err.Error())
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (s *Server) uploadMusicTrack(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, (50<<20)+1024)
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		fail(c, http.StatusBadRequest, "file_rejected", "请选择小于 50MB 的音频文件")
+		return
+	}
+	defer file.Close()
+	a := c.MustGet("actor").(auth.Actor)
+	track, err := s.music.AddTrack(c.Request.Context(), a.LifeID, c.Param("page"), header.Filename, header.Header.Get("Content-Type"), header.Size, file)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "file_rejected", err.Error())
+		return
+	}
+	c.JSON(http.StatusCreated, track)
+}
+
+func (s *Server) deleteMusicTrack(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	if err := s.music.DeleteTrack(c.Request.Context(), a.LifeID, c.Param("id")); err != nil {
+		fail(c, http.StatusNotFound, "not_found", err.Error())
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (s *Server) downloadMusicTrack(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	track, path, err := s.music.TrackForRead(c.Request.Context(), a.LifeID, c.Param("id"))
+	if err != nil {
+		fail(c, http.StatusNotFound, "not_found", err.Error())
+		return
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		fail(c, http.StatusNotFound, "not_found", "音频文件不存在")
+		return
+	}
+	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		internal(c, err)
+		return
+	}
+	c.Header("Content-Type", track.MimeType)
+	c.Header("Content-Disposition", `inline; filename="`+filepath.Base(track.Title)+`"`)
+	http.ServeContent(c.Writer, c.Request, track.Title, stat.ModTime(), file)
+}
+
 func (s *Server) uploadAttachment(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 20<<20+1024)
 	file, header, e := c.Request.FormFile("file")

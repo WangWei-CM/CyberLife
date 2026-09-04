@@ -17,6 +17,7 @@ import (
 	"cyberlife/server/internal/history"
 	"cyberlife/server/internal/httpapi"
 	"cyberlife/server/internal/interaction"
+	"cyberlife/server/internal/music"
 	"cyberlife/server/internal/notification"
 	nowservice "cyberlife/server/internal/now"
 	"cyberlife/server/internal/storage"
@@ -37,7 +38,7 @@ func main() {
 		log.Fatalf("initialize admin: %v", err)
 	}
 	aclService := acl.New(store.Global())
-	server := &http.Server{Addr: cfg.Address, Handler: httpapi.New(cfg, authService, admin.New(store.Global(), store), nowservice.New(store), aclService, interaction.New(store), history.New(store, aclService), future.New(store), notification.New(store)).Router(), ReadHeaderTimeout: 10 * time.Second}
+	server := &http.Server{Addr: cfg.Address, Handler: httpapi.New(cfg, authService, admin.New(store.Global(), store), nowservice.New(store), music.New(store), aclService, interaction.New(store), history.New(store, aclService), future.New(store), notification.New(store)).Router(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		log.Printf("Cyberlife API listening on %s", cfg.Address)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
