@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"cyberlife/server/internal/admin"
+	"cyberlife/server/internal/acl"
 	"cyberlife/server/internal/auth"
 	"cyberlife/server/internal/config"
 	"cyberlife/server/internal/httpapi"
+	"cyberlife/server/internal/interaction"
 	nowservice "cyberlife/server/internal/now"
 	"cyberlife/server/internal/storage"
 )
@@ -25,7 +27,7 @@ func main() {
 	defer store.Close()
 	authService := auth.New(store.Global())
 	if err := authService.EnsureAdmin(context.Background(), cfg.AdminPassword); err != nil { log.Fatalf("initialize admin: %v", err) }
-	server := &http.Server{Addr:cfg.Address, Handler:httpapi.New(cfg,authService,admin.New(store.Global(),store),nowservice.New(store)).Router(), ReadHeaderTimeout:10*time.Second}
+	server := &http.Server{Addr:cfg.Address, Handler:httpapi.New(cfg,authService,admin.New(store.Global(),store),nowservice.New(store),acl.New(store.Global()),interaction.New(store)).Router(), ReadHeaderTimeout:10*time.Second}
 	go func(){log.Printf("Cyberlife API listening on %s",cfg.Address);if err:=server.ListenAndServe();err!=nil&&err!=http.ErrServerClosed{log.Fatalf("serve: %v",err)}}()
 	stop:=make(chan os.Signal,1);signal.Notify(stop,os.Interrupt,syscall.SIGTERM);<-stop
 	ctx,cancel:=context.WithTimeout(context.Background(),10*time.Second);defer cancel();if err:=server.Shutdown(ctx);err!=nil{log.Printf("shutdown: %v",err)}

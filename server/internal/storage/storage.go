@@ -64,6 +64,14 @@ CREATE TABLE IF NOT EXISTS reader_keys (
   key_version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reader_keys_life ON reader_keys(life_id);
+CREATE TABLE IF NOT EXISTS permission_presets (
+  id TEXT PRIMARY KEY, life_id TEXT NOT NULL REFERENCES lives(id), name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  UNIQUE(life_id, name)
+);
+CREATE TABLE IF NOT EXISTS preset_key_rules (
+  preset_id TEXT NOT NULL REFERENCES permission_presets(id), reader_key_id TEXT NOT NULL REFERENCES reader_keys(id),
+  allowed INTEGER NOT NULL CHECK(allowed IN (0,1)), updated_at TEXT NOT NULL, PRIMARY KEY(preset_id, reader_key_id)
+);
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY, token_hash TEXT NOT NULL UNIQUE, actor_type TEXT NOT NULL CHECK(actor_type IN ('admin','writer','reader','mobile')),
   actor_id TEXT NOT NULL, life_id TEXT, key_version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
@@ -103,11 +111,29 @@ CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(task_date, done);
 CREATE TABLE IF NOT EXISTS diary_drafts (entry_date TEXT PRIMARY KEY, content_md TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS content_attachments (id TEXT PRIMARY KEY, entry_date TEXT NOT NULL, original_name TEXT NOT NULL, stored_name TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_attachments_date ON content_attachments(entry_date);
+CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, target_type TEXT NOT NULL CHECK(target_type IN ('diary','task')), target_id TEXT NOT NULL, parent_id TEXT, author_key_id TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, deleted_at TEXT);
+CREATE INDEX IF NOT EXISTS idx_comments_target ON comments(target_type, target_id, created_at);
+CREATE TABLE IF NOT EXISTS milestones (id TEXT PRIMARY KEY, target_type TEXT NOT NULL CHECK(target_type IN ('diary','task')), target_id TEXT NOT NULL UNIQUE, description TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', visibility_preset_id TEXT, secret INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 `); err != nil { return fmt.Errorf("migrate life month database: %w", err) }
+	for _, change := range []struct{ table, column, definition string }{
+		{"diary_entries", "visibility_preset_id", "TEXT"}, {"diary_entries", "commentable", "INTEGER NOT NULL DEFAULT 0"},
+		{"tasks", "visibility_preset_id", "TEXT"}, {"tasks", "commentable", "INTEGER NOT NULL DEFAULT 0"}, {"tasks", "secret", "INTEGER NOT NULL DEFAULT 0"},
+		{"mood_records", "secret", "INTEGER NOT NULL DEFAULT 0"}, {"body_records", "secret", "INTEGER NOT NULL DEFAULT 0"},
+		{"content_attachments", "visibility_preset_id", "TEXT"}, {"content_attachments", "secret", "INTEGER NOT NULL DEFAULT 0"},
+	} { if err := ensureColumn(ctx, db, change.table, change.column, change.definition); err != nil { return err } }
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = s.global.ExecContext(ctx, `INSERT INTO life_months(life_id, month_key, schema_version, created_at, checked_at)
 VALUES (?, ?, 1, ?, ?) ON CONFLICT(life_id, month_key) DO UPDATE SET checked_at=excluded.checked_at`, lifeID, monthKey, now, now)
 	return err
+}
+
+func ensureColumn(ctx context.Context, db *sql.DB, table, column, definition string) error {
+	rows, err := db.QueryContext(ctx, "PRAGMA table_info("+table+")")
+	if err != nil { return err }
+	defer rows.Close()
+	for rows.Next() { var cid int; var name, typ string; var notNull int; var defaultValue any; var pk int; if err := rows.Scan(&cid,&name,&typ,&notNull,&defaultValue,&pk); err != nil { return err }; if name == column { return nil } }
+	if _, err := db.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN "+column+" "+definition); err != nil { return fmt.Errorf("add %s.%s: %w", table, column, err) }
+	return nil
 }
 
 func (s *Store) LifeDBPath(lifeID, monthKey string) string { return filepath.Join(s.dataDir, "lives", lifeID, monthKey+".db") }

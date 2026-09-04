@@ -1,0 +1,19 @@
+package interaction
+
+import (
+ "context"
+ "database/sql"
+ "fmt"
+ "time"
+ "github.com/google/uuid"
+ "cyberlife/server/internal/storage"
+)
+type Service struct{ store *storage.Store }
+func New(store *storage.Store)*Service{return &Service{store}}
+type Comment struct{ID string `json:"id"`; TargetType string `json:"targetType"`; TargetID string `json:"targetId"`; AuthorKeyID string `json:"authorKeyId"`; Content string `json:"content"`; CreatedAt string `json:"createdAt"`}
+type Milestone struct{ID string `json:"id"`; TargetType string `json:"targetType"`; TargetID string `json:"targetId"`; Description string `json:"description"`; Detail string `json:"detail"`; PresetID string `json:"presetId"`; Secret bool `json:"secret"`}
+type TargetAccess struct{Date string; PresetID string; Secret bool; Commentable bool}
+func (s *Service) db(ctx context.Context,life string)(*sql.DB,error){now:=time.Now();if e:=s.store.EnsureLifeMonth(ctx,life,now);e!=nil{return nil,e};return sql.Open("sqlite","file:"+s.store.LifeDBPath(life,now.In(time.FixedZone("CST",28800)).Format("2006-01"))+"?_pragma=foreign_keys(1)")}
+func (s *Service) TargetAccess(ctx context.Context,life,targetType,targetID string)(TargetAccess,error){db,e:=s.db(ctx,life);if e!=nil{return TargetAccess{},e};defer db.Close();var x TargetAccess;var secret,commentable int;if targetType=="diary"{e=db.QueryRowContext(ctx,"SELECT entry_date,COALESCE(visibility_preset_id,''),secret,COALESCE(commentable,0) FROM diary_entries WHERE id=? AND life_id=?",targetID,life).Scan(&x.Date,&x.PresetID,&secret,&commentable)}else if targetType=="task"{e=db.QueryRowContext(ctx,"SELECT task_date,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE id=? AND life_id=?",targetID,life).Scan(&x.Date,&x.PresetID,&secret,&commentable)}else{return x,fmt.Errorf("目标类型无效")};if e!=nil{return x,fmt.Errorf("目标不存在")};x.Secret=secret==1;x.Commentable=commentable==1;return x,nil}
+func (s *Service) AddComment(ctx context.Context,life,actorID,targetType,targetID,content string)(Comment,error){if (targetType!="diary"&&targetType!="task")||targetID==""||content==""{return Comment{},fmt.Errorf("评论参数无效")};db,e:=s.db(ctx,life);if e!=nil{return Comment{},e};defer db.Close();var commentable int;if targetType=="diary"{e=db.QueryRowContext(ctx,"SELECT COALESCE(commentable,0) FROM diary_entries WHERE id=? AND life_id=?",targetID,life).Scan(&commentable)}else{e=db.QueryRowContext(ctx,"SELECT COALESCE(commentable,0) FROM tasks WHERE id=? AND life_id=?",targetID,life).Scan(&commentable)};if e!=nil||commentable!=1{return Comment{},fmt.Errorf("目标不存在或未开启评论")};x:=Comment{ID:uuid.NewString(),TargetType:targetType,TargetID:targetID,AuthorKeyID:actorID,Content:content,CreatedAt:time.Now().UTC().Format(time.RFC3339Nano)};_,e=db.ExecContext(ctx,"INSERT INTO comments(id,target_type,target_id,author_key_id,content,created_at) VALUES(?,?,?,?,?,?)",x.ID,x.TargetType,x.TargetID,x.AuthorKeyID,x.Content,x.CreatedAt);return x,e}
+func (s *Service) AddMilestone(ctx context.Context,life,targetType,targetID,description,detail,presetID string,secret bool)(Milestone,error){if (targetType!="diary"&&targetType!="task")||targetID==""||description==""{return Milestone{},fmt.Errorf("里程碑参数无效")};db,e:=s.db(ctx,life);if e!=nil{return Milestone{},e};defer db.Close();now:=time.Now().UTC().Format(time.RFC3339Nano);x:=Milestone{ID:uuid.NewString(),TargetType:targetType,TargetID:targetID,Description:description,Detail:detail,PresetID:presetID,Secret:secret};_,e=db.ExecContext(ctx,"INSERT INTO milestones(id,target_type,target_id,description,detail,visibility_preset_id,secret,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",x.ID,x.TargetType,x.TargetID,x.Description,x.Detail,x.PresetID,x.Secret,now,now);return x,e}
