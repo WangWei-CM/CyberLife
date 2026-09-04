@@ -29,6 +29,7 @@ build/
 data/
 uploads/
 backups/
+product/runtime-data/
 *.db
 *.db-wal
 *.db-shm

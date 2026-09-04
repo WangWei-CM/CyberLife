@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-type Notice={id:string;type:string;text:string;createdAt:string;read:boolean}
-const notices=ref<Notice[]>(JSON.parse(localStorage.getItem('cyberlife-notices')||'[]'))
+import { computed, onMounted, ref } from 'vue'
+import { api, type Notice } from '../api/client'
+const notices=ref<Notice[]>([])
+const loading=ref(false)
+async function load(){loading.value=true;try{notices.value=(await api.notifications()).items}catch{notices.value=[]}finally{loading.value=false}}
+onMounted(load)
 const open=ref(false)
 const unread=computed(()=>notices.value.filter(x=>!x.read).length)
-function markAll(){notices.value=notices.value.map(x=>({...x,read:true}));persist()}
-function persist(){localStorage.setItem('cyberlife-notices',JSON.stringify(notices.value))}
+async function markAll(){for(const notice of notices.value.filter(x=>!x.read)){await api.markNotificationRead(notice.id)};await load()}
 function toggle(){open.value=!open.value}
 function close(){open.value=false}
 defineExpose({toggle,close})

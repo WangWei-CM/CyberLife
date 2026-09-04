@@ -1,4 +1,5 @@
 export type Actor = { session_id: string; type: 'admin' | 'writer' | 'reader'; id: string; life_id: string }
+export type Notice = { id: string; type: string; refID?: string; text: string; createdAt: string; read: boolean }
 type ApiError = { error: { code: string; message: string } }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -27,6 +28,8 @@ export const api = {
   createPlan: (payload: Pick<Plan, 'name' | 'startDate' | 'endDate' | 'intro'>) => request<Plan>('/api/v1/now/plans', { method: 'POST', body: JSON.stringify({ name: payload.name, start_date: payload.startDate, end_date: payload.endDate, intro: payload.intro }) }),
   setPlanProgress: (id: string, date: string, percent: number) => request<Plan>(`/api/v1/now/plans/${id}/progress`, { method: 'POST', body: JSON.stringify({ date, percent }) }),
   calendar: (from: string, to: string) => request<{ items: FutureTask[] }>(`/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  notifications: () => request<{ items: Notice[] }>('/api/v1/notifications'),
+  markNotificationRead: (id: string) => request<void>(`/api/v1/notifications/${id}/read`, { method: 'POST' }),
   moodTags: () => request<{ items: MoodTag[] }>('/api/v1/now/mood-tags'),
   addMoodTag: (payload: Pick<MoodTag, 'name' | 'emoji' | 'value'>) => request<MoodTag>('/api/v1/now/mood-tags', { method: 'POST', body: JSON.stringify(payload) }),
   addMood: (tagIDs: string[], note: string, secret: boolean) => request<MoodRecord>('/api/v1/now/moods', { method: 'POST', body: JSON.stringify({ tag_ids: tagIDs, note, secret }) }),

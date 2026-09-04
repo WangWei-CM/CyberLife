@@ -13,6 +13,7 @@ type Config struct {
 	SessionCookieName string
 	SecureCookies     bool
 	AdminPassword     string
+	WebDir            string
 }
 
 func Load() (Config, error) {
@@ -31,6 +32,7 @@ func Load() (Config, error) {
 		SessionCookieName: value("CYBERLIFE_SESSION_COOKIE", "cyberlife_session"),
 		SecureCookies:     strings.EqualFold(os.Getenv("CYBERLIFE_SECURE_COOKIES"), "true"),
 		AdminPassword:     adminPassword,
+		WebDir:            value("CYBERLIFE_WEB_DIR", "./web"),
 	}, nil
 }
 

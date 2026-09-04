@@ -23,7 +23,7 @@
 
 ## 启动
 
-需要 Go 1.24+、Node.js 22+、pnpm。
+开发构建需要 Go 1.24+、Node.js 22+、pnpm；最终 Windows 产物运行不需要安装这些开发依赖。
 
 ```powershell
 # API
@@ -40,6 +40,10 @@ pnpm dev
 ```
 
 打开 Vite 给出的本地地址（默认 `http://127.0.0.1:5173`）。Web 开发服务器将 `/api` 代理至 `127.0.0.1:8080`。
+
+### 直接运行最终产物
+
+将 `product/` 整个文件夹复制到另一台 Windows 电脑，双击 `启动 Cyberlife.cmd`。脚本会启动内置 Go 服务、托管已构建的 Web UI，并打开 `http://127.0.0.1:8080/`。首次启动提示管理员密码；数据保存在 `product/runtime-data/`。双击 `停止 Cyberlife.cmd` 可停止服务。
 
 ## 首批 API
 

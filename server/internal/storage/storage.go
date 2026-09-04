@@ -33,14 +33,19 @@ func Open(dataDir string) (*Store, error) {
 	return store, nil
 }
 
-func (s *Store) Close() error { return s.global.Close() }
+func (s *Store) Close() error    { return s.global.Close() }
 func (s *Store) Global() *sql.DB { return s.global }
 
 func openSQLite(path string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)")
-	if err != nil { return nil, fmt.Errorf("open sqlite: %w", err) }
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite: %w", err)
+	}
 	db.SetMaxOpenConns(1)
-	if err := db.Ping(); err != nil { _ = db.Close(); return nil, fmt.Errorf("ping sqlite: %w", err) }
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ping sqlite: %w", err)
+	}
 	return db, nil
 }
 
@@ -83,16 +88,22 @@ CREATE TABLE IF NOT EXISTS life_months (
   created_at TEXT NOT NULL, checked_at TEXT NOT NULL, PRIMARY KEY(life_id, month_key)
 );
 `)
-	if err != nil { return fmt.Errorf("migrate global database: %w", err) }
+	if err != nil {
+		return fmt.Errorf("migrate global database: %w", err)
+	}
 	return nil
 }
 
 func (s *Store) EnsureLifeMonth(ctx context.Context, lifeID string, date time.Time) error {
 	monthKey := date.In(shanghai()).Format("2006-01")
 	lifeDir := filepath.Join(s.dataDir, "lives", lifeID)
-	if err := os.MkdirAll(lifeDir, 0o750); err != nil { return fmt.Errorf("create life directory: %w", err) }
+	if err := os.MkdirAll(lifeDir, 0o750); err != nil {
+		return fmt.Errorf("create life directory: %w", err)
+	}
 	db, err := openSQLite(filepath.Join(lifeDir, monthKey+".db"))
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer db.Close()
 	if _, err = db.ExecContext(ctx, `
 CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
@@ -121,13 +132,19 @@ CREATE INDEX IF NOT EXISTS idx_attachments_date ON content_attachments(entry_dat
 CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, target_type TEXT NOT NULL CHECK(target_type IN ('diary','task')), target_id TEXT NOT NULL, parent_id TEXT, author_key_id TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, deleted_at TEXT);
 CREATE INDEX IF NOT EXISTS idx_comments_target ON comments(target_type, target_id, created_at);
 CREATE TABLE IF NOT EXISTS milestones (id TEXT PRIMARY KEY, target_type TEXT NOT NULL CHECK(target_type IN ('diary','task')), target_id TEXT NOT NULL UNIQUE, description TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', visibility_preset_id TEXT, secret INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-`); err != nil { return fmt.Errorf("migrate life month database: %w", err) }
+`); err != nil {
+		return fmt.Errorf("migrate life month database: %w", err)
+	}
 	for _, change := range []struct{ table, column, definition string }{
 		{"diary_entries", "visibility_preset_id", "TEXT"}, {"diary_entries", "commentable", "INTEGER NOT NULL DEFAULT 0"},
 		{"tasks", "visibility_preset_id", "TEXT"}, {"tasks", "commentable", "INTEGER NOT NULL DEFAULT 0"}, {"tasks", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"mood_records", "secret", "INTEGER NOT NULL DEFAULT 0"}, {"body_records", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"content_attachments", "visibility_preset_id", "TEXT"}, {"content_attachments", "secret", "INTEGER NOT NULL DEFAULT 0"},
-	} { if err := ensureColumn(ctx, db, change.table, change.column, change.definition); err != nil { return err } }
+	} {
+		if err := ensureColumn(ctx, db, change.table, change.column, change.definition); err != nil {
+			return err
+		}
+	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = s.global.ExecContext(ctx, `INSERT INTO life_months(life_id, month_key, schema_version, created_at, checked_at)
 VALUES (?, ?, 1, ?, ?) ON CONFLICT(life_id, month_key) DO UPDATE SET checked_at=excluded.checked_at`, lifeID, monthKey, now, now)
@@ -136,18 +153,40 @@ VALUES (?, ?, 1, ?, ?) ON CONFLICT(life_id, month_key) DO UPDATE SET checked_at=
 
 func ensureColumn(ctx context.Context, db *sql.DB, table, column, definition string) error {
 	rows, err := db.QueryContext(ctx, "PRAGMA table_info("+table+")")
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer rows.Close()
-	for rows.Next() { var cid int; var name, typ string; var notNull int; var defaultValue any; var pk int; if err := rows.Scan(&cid,&name,&typ,&notNull,&defaultValue,&pk); err != nil { return err }; if name == column { return nil } }
-	if _, err := db.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN "+column+" "+definition); err != nil { return fmt.Errorf("add %s.%s: %w", table, column, err) }
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if name == column {
+			return nil
+		}
+	}
+	if _, err := db.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN "+column+" "+definition); err != nil {
+		return fmt.Errorf("add %s.%s: %w", table, column, err)
+	}
 	return nil
 }
 
-func (s *Store) LifeDBPath(lifeID, monthKey string) string { return filepath.Join(s.dataDir, "lives", lifeID, monthKey+".db") }
-func (s *Store) UploadDir(lifeID, monthKey string) string { return filepath.Join(s.dataDir, "uploads", lifeID, "diary", monthKey) }
+func (s *Store) LifeDBPath(lifeID, monthKey string) string {
+	return filepath.Join(s.dataDir, "lives", lifeID, monthKey+".db")
+}
+func (s *Store) UploadDir(lifeID, monthKey string) string {
+	return filepath.Join(s.dataDir, "uploads", lifeID, "diary", monthKey)
+}
 
 func shanghai() *time.Location {
 	location, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil { return time.FixedZone("CST", 8*3600) }
+	if err != nil {
+		return time.FixedZone("CST", 8*3600)
+	}
 	return location
 }
