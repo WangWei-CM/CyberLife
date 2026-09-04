@@ -25,6 +25,8 @@ export const api = {
   addMoodTag: (payload: Pick<MoodTag, 'name' | 'emoji' | 'value'>) => request<MoodTag>('/api/v1/now/mood-tags', { method: 'POST', body: JSON.stringify(payload) }),
   addMood: (tagIDs: string[], note: string) => request<MoodRecord>('/api/v1/now/moods', { method: 'POST', body: JSON.stringify({ tag_ids: tagIDs, note }) }),
   addBody: (score: number, note: string) => request<BodyRecord>('/api/v1/now/body', { method: 'POST', body: JSON.stringify({ score, note }) }),
+  uploadAttachment: async (file: File) => { const form = new FormData(); form.append('file', file); const response = await fetch('/api/v1/now/diary/attachments', { method: 'POST', credentials: 'include', body: form }); if (!response.ok) { const body = await response.json().catch(() => null) as ApiError | null; throw new Error(body?.error?.message ?? '上传失败') }; return response.json() as Promise<Attachment> },
+  saveDraft: (content: string) => request<Draft>('/api/v1/now/diary/draft', { method: 'PUT', body: JSON.stringify({ content }) }),
   saveDiary: (content: string) => request<Diary>('/api/v1/now/diary', { method: 'PUT', body: JSON.stringify({ content }) }),
   addTask: (title: string, description: string, priority: string) => request<Task>('/api/v1/now/tasks', { method: 'POST', body: JSON.stringify({ title, description, priority }) }),
   setTaskDone: (id: string, done: boolean) => request<Task>(`/api/v1/now/tasks/${id}/done`, { method: 'POST', body: JSON.stringify({ done }) }),
@@ -35,5 +37,7 @@ export type MoodTag = { id: string; name: string; emoji: string; value: number; 
 export type MoodRecord = { id: string; recordedAt: string; recordedDate: string; value: number; note: string; tags: MoodTag[] }
 export type BodyRecord = { id: string; recordedAt: string; recordedDate: string; score: number; note: string }
 export type Diary = { id: string; entryDate: string; content: string }
+export type Draft = { entryDate: string; content: string; updatedAt: string }
+export type Attachment = { id: string; originalName: string; mimeType: string; byteSize: number }
 export type Task = { id: string; taskDate: string; title: string; description: string; priority: 'low' | 'normal' | 'high'; done: boolean }
 export type NowData = { diary: Diary; moods: MoodRecord[]; bodies: BodyRecord[]; tasks: Task[] }

@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS body_records (id TEXT PRIMARY KEY, life_id TEXT NOT N
 CREATE INDEX IF NOT EXISTS idx_body_records_date ON body_records(recorded_date, recorded_at);
 CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, task_date TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high')), done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(task_date, done);
+CREATE TABLE IF NOT EXISTS diary_drafts (entry_date TEXT PRIMARY KEY, content_md TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS content_attachments (id TEXT PRIMARY KEY, entry_date TEXT NOT NULL, original_name TEXT NOT NULL, stored_name TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_attachments_date ON content_attachments(entry_date);
 `); err != nil { return fmt.Errorf("migrate life month database: %w", err) }
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = s.global.ExecContext(ctx, `INSERT INTO life_months(life_id, month_key, schema_version, created_at, checked_at)
@@ -108,6 +111,7 @@ VALUES (?, ?, 1, ?, ?) ON CONFLICT(life_id, month_key) DO UPDATE SET checked_at=
 }
 
 func (s *Store) LifeDBPath(lifeID, monthKey string) string { return filepath.Join(s.dataDir, "lives", lifeID, monthKey+".db") }
+func (s *Store) UploadDir(lifeID, monthKey string) string { return filepath.Join(s.dataDir, "uploads", lifeID, "diary", monthKey) }
 
 func shanghai() *time.Location {
 	location, err := time.LoadLocation("Asia/Shanghai")
