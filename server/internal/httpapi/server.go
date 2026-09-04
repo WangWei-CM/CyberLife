@@ -14,11 +14,12 @@ import (
 	"cyberlife/server/internal/auth"
 	"cyberlife/server/internal/config"
 	"cyberlife/server/internal/interaction"
+	"cyberlife/server/internal/history"
 	nowservice "cyberlife/server/internal/now"
 )
 
-type Server struct { cfg config.Config; auth *auth.Service; admin *admin.Service; now *nowservice.Service; acl *acl.Service; interaction *interaction.Service }
-func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, aclService *acl.Service, interactionService *interaction.Service) *Server { return &Server{cfg:cfg,auth:authService,admin:adminService,now:nowService,acl:aclService,interaction:interactionService} }
+type Server struct { cfg config.Config; auth *auth.Service; admin *admin.Service; now *nowservice.Service; acl *acl.Service; interaction *interaction.Service; history *history.Service }
+func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, aclService *acl.Service, interactionService *interaction.Service, historyService *history.Service) *Server { return &Server{cfg:cfg,auth:authService,admin:adminService,now:nowService,acl:aclService,interaction:interactionService,history:historyService} }
 
 func (s *Server) Router() *gin.Engine {
 	r:=gin.New(); r.Use(gin.Logger(),gin.Recovery(),s.cors())
@@ -26,7 +27,7 @@ func (s *Server) Router() *gin.Engine {
 	r.POST("/api/v1/auth/key-login",s.keyLogin);r.POST("/api/v1/admin/auth/login",s.adminLogin);r.POST("/api/v1/auth/logout",s.logout)
 	protected:=r.Group("/api/v1");protected.Use(s.requireActor())
 	protected.GET("/auth/me",s.me)
-	protected.GET("/today",s.visibleToday);protected.POST("/comments",s.addVisibleComment);protected.GET("/comments",s.listVisibleComments);protected.GET("/milestones",s.listVisibleMilestones);protected.GET("/attachments/:id",s.downloadAttachment)
+	protected.GET("/today",s.visibleToday);protected.GET("/history",s.historyRange);protected.POST("/comments",s.addVisibleComment);protected.GET("/comments",s.listVisibleComments);protected.GET("/milestones",s.listVisibleMilestones);protected.GET("/attachments/:id",s.downloadAttachment)
 	writer:=protected.Group("/now");writer.Use(s.requireWriter())
 	writer.GET("",s.nowToday);writer.GET("/mood-tags",s.moodTags);writer.POST("/mood-tags",s.addMoodTag);writer.GET("/reader-keys",s.writerReaderKeys);writer.GET("/presets",s.listPresets);writer.POST("/presets",s.createPreset);writer.PUT("/presets/:id/rules",s.replacePresetRules);writer.POST("/comments",s.addComment);writer.POST("/milestones",s.addMilestone);writer.POST("/moods",s.addMood);writer.POST("/body",s.addBody);writer.POST("/diary/attachments",s.uploadAttachment);writer.PUT("/diary/attachments/:id/access",s.setAttachmentAccess);writer.PUT("/diary/draft",s.saveDraft);writer.PUT("/diary",s.saveDiary);writer.PUT("/diary/access",s.setDiaryAccess);writer.POST("/tasks",s.addTask);writer.POST("/tasks/:id/done",s.setTaskDone);writer.PUT("/tasks/:id/access",s.setTaskAccess)
 	adminGroup:=protected.Group("/admin");adminGroup.Use(s.requireAdmin())
@@ -43,6 +44,7 @@ func (s *Server) createWriter(c *gin.Context){var request struct{Nickname string
 func (s *Server) listReaderKeys(c *gin.Context){items,err:=s.admin.ListReaderKeys(c.Request.Context(),c.Param("lifeID"));if err!=nil{internal(c,err);return};c.JSON(http.StatusOK,gin.H{"items":items})}
 func (s *Server) createReaderKey(c *gin.Context){var request struct{Nickname string `json:"nickname"`;Note string `json:"note"`;ExpiresAt *string `json:"expires_at"`};if !bind(c,&request){return};var expires *time.Time;if request.ExpiresAt!=nil{parsed,err:=time.Parse(time.RFC3339,*request.ExpiresAt);if err!=nil{fail(c,http.StatusBadRequest,"validation_failed","expires_at 必须是 RFC3339 时间");return};expires=&parsed};item,key,err:=s.admin.CreateReaderKey(c.Request.Context(),c.Param("lifeID"),strings.TrimSpace(request.Nickname),strings.TrimSpace(request.Note),expires);if err!=nil{fail(c,http.StatusBadRequest,"validation_failed",err.Error());return};c.JSON(http.StatusCreated,gin.H{"reader_key":item,"key":key})}
 func (s *Server) revokeReaderKey(c *gin.Context){if err:=s.admin.RevokeReaderKey(c.Request.Context(),c.Param("id"));err!=nil{fail(c,http.StatusNotFound,"not_found","阅读密钥不存在或已作废");return};c.Status(http.StatusNoContent)}
+func (s *Server) historyRange(c *gin.Context){from,e:=time.Parse("2006-01-02",c.Query("from"));if e!=nil{fail(c,400,"validation_failed","from 必须为 YYYY-MM-DD");return};to,e:=time.Parse("2006-01-02",c.Query("to"));if e!=nil{fail(c,400,"validation_failed","to 必须为 YYYY-MM-DD");return};a:=c.MustGet("actor").(auth.Actor);x,e:=s.history.Range(c.Request.Context(),a,from,to);if e!=nil{fail(c,400,"validation_failed",e.Error());return};c.JSON(200,x)}
 func (s *Server) downloadAttachment(c *gin.Context){a:=c.MustGet("actor").(auth.Actor);x,entryDate,path,e:=s.now.AttachmentForRead(c.Request.Context(),a.LifeID,c.Param("id"));if e!=nil{fail(c,404,"not_found","附件不存在");return};ok,e:=s.acl.CanRead(c.Request.Context(),a,acl.Resource{LifeID:a.LifeID,Date:entryDate,PresetID:x.PresetID,Secret:x.Secret});if e!=nil{internal(c,e);return};if !ok{fail(c,404,"not_found","附件不存在");return};file,e:=os.Open(path);if e!=nil{fail(c,404,"not_found","附件不存在");return};defer file.Close();c.Header("Content-Type",x.MimeType);c.Header("Content-Disposition",`attachment; filename="`+x.OriginalName+`"`);http.ServeContent(c.Writer,c.Request,file.Name(),time.Now(),file)}
 func (s *Server) writerReaderKeys(c *gin.Context){a:=c.MustGet("actor").(auth.Actor);x,e:=s.admin.ListReaderKeys(c.Request.Context(),a.LifeID);if e!=nil{internal(c,e);return};c.JSON(200,gin.H{"items":x})}
 func (s *Server) listPresets(c *gin.Context){a:=c.MustGet("actor").(auth.Actor);x,e:=s.acl.ListPresets(c.Request.Context(),a.LifeID);if e!=nil{internal(c,e);return};c.JSON(200,gin.H{"items":x})}

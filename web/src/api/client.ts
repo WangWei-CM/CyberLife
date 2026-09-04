@@ -22,6 +22,7 @@ export const api = {
   revokeReaderKey: (id: string) => request<void>(`/api/v1/admin/reader-keys/${id}/revoke`, { method: 'POST' }),
   today: () => request<NowData>('/api/v1/now'),
   visibleToday: () => request<NowData>('/api/v1/today'),
+  history: (from: string, to: string) => request<HistoryRange>(`/api/v1/history?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   moodTags: () => request<{ items: MoodTag[] }>('/api/v1/now/mood-tags'),
   addMoodTag: (payload: Pick<MoodTag, 'name' | 'emoji' | 'value'>) => request<MoodTag>('/api/v1/now/mood-tags', { method: 'POST', body: JSON.stringify(payload) }),
   addMood: (tagIDs: string[], note: string, secret: boolean) => request<MoodRecord>('/api/v1/now/moods', { method: 'POST', body: JSON.stringify({ tag_ids: tagIDs, note, secret }) }),
@@ -56,3 +57,6 @@ export type Comment = { id: string; targetType: string; targetId: string; author
 export type Milestone = { id: string; targetType: string; targetId: string; description: string; detail: string; presetId: string; secret: boolean }
 export type Task = { id: string; taskDate: string; title: string; description: string; priority: 'low' | 'normal' | 'high'; done: boolean }
 export type NowData = { diary: Diary; moods: MoodRecord[]; bodies: BodyRecord[]; tasks: Task[] }
+export type HistoryDay = { date: string; diary: Diary; tasks: Task[]; moodCount: number; bodyCount: number; milestoneCount: number }
+export type TrendPoint = { date: string; mood: number | null; body: number | null }
+export type HistoryRange = { from: string; to: string; days: HistoryDay[]; points: TrendPoint[] }
