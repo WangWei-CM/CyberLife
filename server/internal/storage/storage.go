@@ -108,6 +108,13 @@ CREATE TABLE IF NOT EXISTS body_records (id TEXT PRIMARY KEY, life_id TEXT NOT N
 CREATE INDEX IF NOT EXISTS idx_body_records_date ON body_records(recorded_date, recorded_at);
 CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, task_date TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('low','normal','high')), done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_tasks_date ON tasks(task_date, done);
+CREATE TABLE IF NOT EXISTS playlists (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, page TEXT NOT NULL CHECK(page IN ('now','past','future')), name TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'list' CHECK(mode IN ('list','random','single')), volume INTEGER NOT NULL DEFAULT 70 CHECK(volume BETWEEN 0 AND 100), created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS playlist_tracks (id TEXT PRIMARY KEY, playlist_id TEXT NOT NULL REFERENCES playlists(id), file_path TEXT NOT NULL, title TEXT NOT NULL, sort_order INTEGER NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS inbox_messages (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, recipient_type TEXT NOT NULL, recipient_id TEXT NOT NULL, type TEXT NOT NULL, ref_id TEXT, text TEXT NOT NULL, read_at TEXT, created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_inbox_recipient ON inbox_messages(recipient_id,created_at);
+CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, life_id TEXT NOT NULL, name TEXT NOT NULL, start_date TEXT NOT NULL, end_date TEXT NOT NULL, intro_md TEXT NOT NULL DEFAULT '', secret INTEGER NOT NULL DEFAULT 0, commentable INTEGER NOT NULL DEFAULT 0, visibility_preset_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_plans_end ON plans(end_date);
+CREATE TABLE IF NOT EXISTS plan_progress (id TEXT PRIMARY KEY, plan_id TEXT NOT NULL REFERENCES plans(id), date TEXT NOT NULL, percent REAL NOT NULL CHECK(percent BETWEEN 0 AND 100), created_at TEXT NOT NULL, UNIQUE(plan_id,date));
 CREATE TABLE IF NOT EXISTS diary_drafts (entry_date TEXT PRIMARY KEY, content_md TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS content_attachments (id TEXT PRIMARY KEY, entry_date TEXT NOT NULL, original_name TEXT NOT NULL, stored_name TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL, created_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_attachments_date ON content_attachments(entry_date);

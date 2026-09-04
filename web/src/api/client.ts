@@ -23,6 +23,10 @@ export const api = {
   today: () => request<NowData>('/api/v1/now'),
   visibleToday: () => request<NowData>('/api/v1/today'),
   history: (from: string, to: string) => request<HistoryRange>(`/api/v1/history?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  plans: () => request<{ items: Plan[] }>('/api/v1/plans'),
+  createPlan: (payload: Pick<Plan, 'name' | 'startDate' | 'endDate' | 'intro'>) => request<Plan>('/api/v1/now/plans', { method: 'POST', body: JSON.stringify({ name: payload.name, start_date: payload.startDate, end_date: payload.endDate, intro: payload.intro }) }),
+  setPlanProgress: (id: string, date: string, percent: number) => request<Plan>(`/api/v1/now/plans/${id}/progress`, { method: 'POST', body: JSON.stringify({ date, percent }) }),
+  calendar: (from: string, to: string) => request<{ items: FutureTask[] }>(`/api/v1/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   moodTags: () => request<{ items: MoodTag[] }>('/api/v1/now/mood-tags'),
   addMoodTag: (payload: Pick<MoodTag, 'name' | 'emoji' | 'value'>) => request<MoodTag>('/api/v1/now/mood-tags', { method: 'POST', body: JSON.stringify(payload) }),
   addMood: (tagIDs: string[], note: string, secret: boolean) => request<MoodRecord>('/api/v1/now/moods', { method: 'POST', body: JSON.stringify({ tag_ids: tagIDs, note, secret }) }),
@@ -57,6 +61,8 @@ export type Comment = { id: string; targetType: string; targetId: string; author
 export type Milestone = { id: string; targetType: string; targetId: string; description: string; detail: string; presetId: string; secret: boolean }
 export type Task = { id: string; taskDate: string; title: string; description: string; priority: 'low' | 'normal' | 'high'; done: boolean }
 export type NowData = { diary: Diary; moods: MoodRecord[]; bodies: BodyRecord[]; tasks: Task[] }
+export type Plan = { id: string; name: string; startDate: string; endDate: string; intro: string; progress: number; timeProgress: number }
+export type FutureTask = { id: string; date: string; title: string; priority: string; done: boolean }
 export type HistoryDay = { date: string; diary: Diary; tasks: Task[]; moodCount: number; bodyCount: number; milestoneCount: number }
 export type TrendPoint = { date: string; mood: number | null; body: number | null }
 export type HistoryRange = { from: string; to: string; days: HistoryDay[]; points: TrendPoint[] }

@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.Cyberlife" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#00E5FF</item>
+        <item name="android:navigationBarColor">#07070D</item>
+        <item name="android:statusBarColor">#07070D</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
