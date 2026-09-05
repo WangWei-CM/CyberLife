@@ -27,7 +27,7 @@ async function submit() {
   <main class="login-page" :class="`login-${phase}`">
     <section v-if="phase !== 'greeting'" class="login-form" @submit.prevent="submit">
       <h1 class="glitch-logo" data-text="CYBERLIFE">CYBERLIFE</h1>
-      <form><input class="login-key-input" v-model="credential" autocomplete="current-password" placeholder="粘贴主密钥或阅读密钥" type="password" :disabled="busy" autofocus /><button class="login-submit glow-spot" aria-label="登录" :disabled="busy">进入</button></form>
+      <form><input class="login-key-input" v-model="credential" aria-label="密钥" autocomplete="current-password" placeholder="粘贴主密钥或阅读密钥" type="password" :disabled="busy" autofocus /><button class="login-submit glow-spot" aria-label="登录" :disabled="busy">进入</button></form>
       <p v-if="error" class="login-error" role="alert">{{ error }}</p>
     </section>
     <p v-else class="login-greeting">{{ greeting }}</p>
