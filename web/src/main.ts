@@ -12,5 +12,6 @@ import './styles/editor.css'
 import './styles/now.css'
 import './styles/past.css'
 import './styles/future.css'
+import './styles/settings.css'
 
 createApp(App).directive('glow', vGlow).directive('stagger', vStagger).mount('#app')
