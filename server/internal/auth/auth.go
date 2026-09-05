@@ -16,11 +16,28 @@ import (
 )
 
 // Actor is the authenticated identity supplied to application services.
+// Nickname and LifeCreatedAt are display-only fields filled for writers and readers so the
+// front end can greet by name and anchor the life timeline at the registration day.
 type Actor struct {
-	SessionID string
-	Type      string
-	ID        string
-	LifeID    string
+	SessionID     string `json:"session_id"`
+	Type          string `json:"type"`
+	ID            string `json:"id"`
+	LifeID        string `json:"life_id"`
+	Nickname      string `json:"nickname"`
+	LifeCreatedAt string `json:"life_created_at"`
+}
+
+// enrich fills Nickname and LifeCreatedAt; failures leave the fields empty on purpose.
+func (s *Service) enrich(ctx context.Context, actor *Actor) {
+	switch actor.Type {
+	case "writer":
+		_ = s.db.QueryRowContext(ctx, "SELECT nickname FROM writers WHERE id=?", actor.ID).Scan(&actor.Nickname)
+	case "reader":
+		_ = s.db.QueryRowContext(ctx, "SELECT nickname FROM reader_keys WHERE id=?", actor.ID).Scan(&actor.Nickname)
+	}
+	if actor.LifeID != "" {
+		_ = s.db.QueryRowContext(ctx, "SELECT created_at FROM lives WHERE id=?", actor.LifeID).Scan(&actor.LifeCreatedAt)
+	}
 }
 
 type Service struct{ db *sql.DB }
@@ -149,6 +166,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (Actor, error)
 		return Actor{}, invalidCredentials(err)
 	}
 	_, _ = s.db.ExecContext(ctx, "UPDATE sessions SET last_active_at=? WHERE id=?", time.Now().UTC().Format(time.RFC3339Nano), a.SessionID)
+	s.enrich(ctx, &a)
 	return a, nil
 }
 
@@ -165,7 +183,11 @@ func (s *Service) createSession(ctx context.Context, actor Actor, version int, u
 	actor.SessionID = uuid.NewString()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, err = s.db.ExecContext(ctx, `INSERT INTO sessions(id,token_hash,actor_type,actor_id,life_id,key_version,created_at,last_active_at,user_agent) VALUES(?,?,?,?,?,?,?,?,?)`, actor.SessionID, tokenHash(token), actor.Type, actor.ID, nullIfEmpty(actor.LifeID), version, now, now, userAgent)
-	return token, actor, err
+	if err != nil {
+		return "", Actor{}, err
+	}
+	s.enrich(ctx, &actor)
+	return token, actor, nil
 }
 
 func (s *Service) validateActor(ctx context.Context, actor Actor, version int) error {

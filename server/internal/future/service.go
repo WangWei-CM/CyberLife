@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
+	"sort"
 	"time"
 )
 
@@ -36,41 +37,137 @@ func (s *Service) db(ctx context.Context, life string, t time.Time) (*sql.DB, er
 	}
 	return sql.Open("sqlite", "file:"+s.store.LifeDBPath(life, t.In(location()).Format("2006-01"))+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 }
-func (s *Service) ListPlans(ctx context.Context, life string) ([]Plan, error) {
-	db, e := s.db(ctx, life, time.Now())
+// months lists the month databases registered for a life (newest first), always including the
+// current month so a fresh life works before any month database exists.
+func (s *Service) months(ctx context.Context, life string) ([]string, error) {
+	rows, e := s.store.Global().QueryContext(ctx, "SELECT month_key FROM life_months WHERE life_id=? ORDER BY month_key DESC", life)
 	if e != nil {
 		return nil, e
 	}
-	defer db.Close()
-	rows, e := db.QueryContext(ctx, "SELECT id,name,start_date,end_date,intro_md FROM plans ORDER BY end_date")
-	if e != nil {
-		return nil, e
-	}
-	defer rows.Close()
-	out := []Plan{}
+	out := []string{}
 	for rows.Next() {
-		var x Plan
-		if e = rows.Scan(&x.ID, &x.Name, &x.StartDate, &x.EndDate, &x.Intro); e != nil {
+		var key string
+		if e = rows.Scan(&key); e != nil {
+			rows.Close()
 			return nil, e
 		}
-		x.Progress = s.progress(ctx, db, x.ID)
-		x.TimeProgress = timeProgress(x.StartDate, x.EndDate)
-		out = append(out, x)
+		out = append(out, key)
 	}
-	return out, rows.Err()
+	rows.Close()
+	current := time.Now().In(location()).Format("2006-01")
+	for _, key := range out {
+		if key == current {
+			return out, nil
+		}
+	}
+	return append([]string{current}, out...), nil
 }
-func (s *Service) CreatePlan(ctx context.Context, life, name, start, end, intro string) (Plan, error) {
+
+func (s *Service) monthDB(ctx context.Context, life, month string) (*sql.DB, error) {
+	t, e := time.ParseInLocation("2006-01", month, location())
+	if e != nil {
+		return nil, fmt.Errorf("月份无效")
+	}
+	return s.db(ctx, life, t)
+}
+
+type planScanner interface{ Scan(dest ...any) error }
+
+func scanPlan(row planScanner) (Plan, error) {
+	var x Plan
+	e := row.Scan(&x.ID, &x.Name, &x.StartDate, &x.EndDate, &x.Intro)
+	return x, e
+}
+
+// ListPlans unions the plans of every month database. Plans are written to the month database that is
+// current at creation time, so listing only the present month would hide them after a month rolls over.
+func (s *Service) ListPlans(ctx context.Context, life string) ([]Plan, error) {
+	months, e := s.months(ctx, life)
+	if e != nil {
+		return nil, e
+	}
+	seen := map[string]bool{}
+	out := []Plan{}
+	for _, month := range months {
+		db, e := s.monthDB(ctx, life, month)
+		if e != nil {
+			return nil, e
+		}
+		rows, e := db.QueryContext(ctx, "SELECT id,name,start_date,end_date,intro_md FROM plans")
+		if e != nil {
+			db.Close()
+			return nil, e
+		}
+		batch := []Plan{}
+		for rows.Next() {
+			x, e := scanPlan(rows)
+			if e != nil {
+				rows.Close()
+				db.Close()
+				return nil, e
+			}
+			if seen[x.ID] {
+				continue
+			}
+			seen[x.ID] = true
+			batch = append(batch, x)
+		}
+		rows.Close()
+		for i := range batch {
+			batch[i].Progress = s.progress(ctx, db, batch[i].ID)
+			batch[i].TimeProgress = timeProgress(batch[i].StartDate, batch[i].EndDate)
+		}
+		db.Close()
+		out = append(out, batch...)
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].EndDate < out[j].EndDate })
+	return out, nil
+}
+
+// findPlan locates the month database holding the plan; the caller closes the returned handle.
+func (s *Service) findPlan(ctx context.Context, life, id string) (*sql.DB, Plan, error) {
+	months, e := s.months(ctx, life)
+	if e != nil {
+		return nil, Plan{}, e
+	}
+	for _, month := range months {
+		db, e := s.monthDB(ctx, life, month)
+		if e != nil {
+			return nil, Plan{}, e
+		}
+		x, e := scanPlan(db.QueryRowContext(ctx, "SELECT id,name,start_date,end_date,intro_md FROM plans WHERE id=?", id))
+		if e == nil {
+			x.Progress = s.progress(ctx, db, x.ID)
+			x.TimeProgress = timeProgress(x.StartDate, x.EndDate)
+			return db, x, nil
+		}
+		db.Close()
+		if e != sql.ErrNoRows {
+			return nil, Plan{}, e
+		}
+	}
+	return nil, Plan{}, fmt.Errorf("规划不存在")
+}
+
+func validatePlan(name, start, end string) error {
 	if name == "" || start == "" || end == "" {
-		return Plan{}, fmt.Errorf("规划名称和起止日期不能为空")
+		return fmt.Errorf("规划名称和起止日期不能为空")
 	}
 	if _, e := time.Parse("2006-01-02", start); e != nil {
-		return Plan{}, fmt.Errorf("开始日期无效")
+		return fmt.Errorf("开始日期无效")
 	}
 	if _, e := time.Parse("2006-01-02", end); e != nil {
-		return Plan{}, fmt.Errorf("截止日期无效")
+		return fmt.Errorf("截止日期无效")
 	}
 	if start > end {
-		return Plan{}, fmt.Errorf("截止日期不能早于开始日期")
+		return fmt.Errorf("截止日期不能早于开始日期")
+	}
+	return nil
+}
+
+func (s *Service) CreatePlan(ctx context.Context, life, name, start, end, intro string) (Plan, error) {
+	if e := validatePlan(name, start, end); e != nil {
+		return Plan{}, e
 	}
 	db, e := s.db(ctx, life, time.Now())
 	if e != nil {
@@ -82,11 +179,34 @@ func (s *Service) CreatePlan(ctx context.Context, life, name, start, end, intro 
 	_, e = db.ExecContext(ctx, "INSERT INTO plans(id,life_id,name,start_date,end_date,intro_md,secret,commentable,created_at,updated_at) VALUES(?,?,?,?,?,?,0,0,?,?)", x.ID, life, x.Name, x.StartDate, x.EndDate, x.Intro, now, now)
 	return x, e
 }
+
+// UpdatePlan edits name, dates and the Markdown intro of an existing plan.
+func (s *Service) UpdatePlan(ctx context.Context, life, id, name, start, end, intro string) (Plan, error) {
+	if e := validatePlan(name, start, end); e != nil {
+		return Plan{}, e
+	}
+	db, x, e := s.findPlan(ctx, life, id)
+	if e != nil {
+		return Plan{}, e
+	}
+	defer db.Close()
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, e = db.ExecContext(ctx, "UPDATE plans SET name=?,start_date=?,end_date=?,intro_md=?,updated_at=? WHERE id=?", name, start, end, intro, now, id); e != nil {
+		return Plan{}, e
+	}
+	x.Name, x.StartDate, x.EndDate, x.Intro = name, start, end, intro
+	x.TimeProgress = timeProgress(start, end)
+	return x, nil
+}
+
 func (s *Service) SetProgress(ctx context.Context, life, id, date string, percent float64) (Plan, error) {
 	if percent < 0 || percent > 100 {
 		return Plan{}, fmt.Errorf("进度必须在 0 到 100 之间")
 	}
-	db, e := s.db(ctx, life, time.Now())
+	if _, e := time.Parse("2006-01-02", date); e != nil {
+		return Plan{}, fmt.Errorf("标记日期无效")
+	}
+	db, x, e := s.findPlan(ctx, life, id)
 	if e != nil {
 		return Plan{}, e
 	}
@@ -95,16 +215,8 @@ func (s *Service) SetProgress(ctx context.Context, life, id, date string, percen
 	if e != nil {
 		return Plan{}, e
 	}
-	plans, e := s.ListPlans(ctx, life)
-	if e != nil {
-		return Plan{}, e
-	}
-	for _, x := range plans {
-		if x.ID == id {
-			return x, nil
-		}
-	}
-	return Plan{}, fmt.Errorf("规划不存在")
+	x.Progress = s.progress(ctx, db, id)
+	return x, nil
 }
 func (s *Service) Calendar(ctx context.Context, life, from, to string) ([]Task, error) {
 	start, e := time.Parse("2006-01-02", from)

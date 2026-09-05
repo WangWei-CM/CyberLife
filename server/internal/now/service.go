@@ -236,7 +236,9 @@ func (s *Service) SetAttachmentAccess(ctx context.Context, life, id, presetID st
 	x := Attachment{ID: id, PresetID: presetID, Secret: secret}
 	return x, nil
 }
-func (s *Service) SaveDraft(ctx context.Context, life, content string) (Draft, error) {
+// SaveDraft stores today's draft. The secret layer keeps its own draft row; diary_drafts is keyed by
+// entry_date alone, so the secret draft is stored under "<date>#secret".
+func (s *Service) SaveDraft(ctx context.Context, life, content string, secret bool) (Draft, error) {
 	now := time.Now().UTC()
 	x := Draft{EntryDate: date(now), Content: content, UpdatedAt: now.Format(time.RFC3339Nano)}
 	db, e := s.db(ctx, life, now)
@@ -244,28 +246,55 @@ func (s *Service) SaveDraft(ctx context.Context, life, content string) (Draft, e
 		return x, e
 	}
 	defer db.Close()
-	_, e = db.ExecContext(ctx, "INSERT INTO diary_drafts(entry_date,content_md,updated_at) VALUES(?,?,?) ON CONFLICT(entry_date) DO UPDATE SET content_md=excluded.content_md,updated_at=excluded.updated_at", x.EntryDate, x.Content, x.UpdatedAt)
+	key := x.EntryDate
+	if secret {
+		key += "#secret"
+	}
+	_, e = db.ExecContext(ctx, "INSERT INTO diary_drafts(entry_date,content_md,updated_at) VALUES(?,?,?) ON CONFLICT(entry_date) DO UPDATE SET content_md=excluded.content_md,updated_at=excluded.updated_at", key, x.Content, x.UpdatedAt)
 	return x, e
 }
-func (s *Service) SaveDiary(ctx context.Context, life, content string) (Diary, error) {
+
+// SaveDiary upserts today's diary for one layer: the public entry (secret=false) or the writer-only
+// secret entry (secret=true). Both layers may coexist on the same day.
+func (s *Service) SaveDiary(ctx context.Context, life, content string, secret bool) (Diary, error) {
 	now := time.Now().UTC()
-	x := Diary{EntryDate: date(now), Content: content}
+	x := Diary{EntryDate: date(now), Content: content, Secret: secret}
 	db, e := s.db(ctx, life, now)
 	if e != nil {
 		return x, e
 	}
 	defer db.Close()
-	e = db.QueryRowContext(ctx, "SELECT id FROM diary_entries WHERE entry_date=? AND secret=0", x.EntryDate).Scan(&x.ID)
+	var commentable int
+	e = db.QueryRowContext(ctx, "SELECT id,COALESCE(visibility_preset_id,''),COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? AND secret=? LIMIT 1", x.EntryDate, secret).Scan(&x.ID, &x.PresetID, &commentable)
 	if e == sql.ErrNoRows {
 		x.ID = uuid.NewString()
-		_, e = db.ExecContext(ctx, "INSERT INTO diary_entries(id,life_id,entry_date,content_md,secret,created_at,updated_at) VALUES(?,?,?,?,0,?,?)", x.ID, life, x.EntryDate, x.Content, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+		_, e = db.ExecContext(ctx, "INSERT INTO diary_entries(id,life_id,entry_date,content_md,secret,created_at,updated_at) VALUES(?,?,?,?,?,?,?)", x.ID, life, x.EntryDate, x.Content, secret, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 		return x, e
 	}
 	if e != nil {
 		return x, e
 	}
+	x.Commentable = commentable == 1
 	_, e = db.ExecContext(ctx, "UPDATE diary_entries SET content_md=?,updated_at=? WHERE id=?", x.Content, now.Format(time.RFC3339Nano), x.ID)
 	return x, e
+}
+
+// SecretDiary returns today's secret-layer diary; ID is empty when the layer has not been written.
+func (s *Service) SecretDiary(ctx context.Context, life string) (Diary, error) {
+	now := time.Now().UTC()
+	db, e := s.db(ctx, life, now)
+	if e != nil {
+		return Diary{}, e
+	}
+	defer db.Close()
+	d := Diary{EntryDate: date(now), Secret: true}
+	var commentable int
+	e = db.QueryRowContext(ctx, "SELECT id,content_md,COALESCE(visibility_preset_id,''),COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? AND secret=1 LIMIT 1", d.EntryDate).Scan(&d.ID, &d.Content, &d.PresetID, &commentable)
+	if e == sql.ErrNoRows {
+		return d, nil
+	}
+	d.Commentable = commentable == 1
+	return d, e
 }
 func (s *Service) SetDiaryAccess(ctx context.Context, life, presetID string, secret, commentable bool) (Diary, error) {
 	now := time.Now().UTC()
@@ -274,7 +303,8 @@ func (s *Service) SetDiaryAccess(ctx context.Context, life, presetID string, sec
 		return Diary{}, e
 	}
 	defer db.Close()
-	_, e = db.ExecContext(ctx, "UPDATE diary_entries SET visibility_preset_id=?,secret=?,commentable=?,updated_at=? WHERE life_id=? AND entry_date=?", nullString(presetID), secret, commentable, now.Format(time.RFC3339Nano), life, date(now))
+	// Access settings apply to the public layer; the secret layer is always writer-only.
+	_, e = db.ExecContext(ctx, "UPDATE diary_entries SET visibility_preset_id=?,secret=?,commentable=?,updated_at=? WHERE life_id=? AND entry_date=? AND secret=0", nullString(presetID), secret, commentable, now.Format(time.RFC3339Nano), life, date(now))
 	if e != nil {
 		return Diary{}, e
 	}
@@ -313,16 +343,34 @@ func nullString(value string) any {
 	}
 	return value
 }
-func (s *Service) AddTask(ctx context.Context, life, title, description, priority string) (Task, error) {
+// taskMoment resolves an optional YYYY-MM-DD task date (Beijing time) to the instant used to pick the
+// month database; an empty date means today.
+func taskMoment(taskDate string) (time.Time, error) {
+	if taskDate == "" {
+		return time.Now().UTC(), nil
+	}
+	parsed, e := time.ParseInLocation("2006-01-02", taskDate, time.FixedZone("CST", 28800))
+	if e != nil {
+		return time.Time{}, fmt.Errorf("任务日期无效")
+	}
+	return parsed, nil
+}
+
+// AddTask creates a task on the given date (any day, past or future); an empty date means today.
+func (s *Service) AddTask(ctx context.Context, life, title, description, priority, taskDate string) (Task, error) {
 	if title == "" {
 		return Task{}, fmt.Errorf("任务标题不能为空")
 	}
 	if priority != "low" && priority != "normal" && priority != "high" {
 		priority = "normal"
 	}
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return Task{}, e
+	}
 	now := time.Now().UTC()
-	x := Task{ID: uuid.NewString(), TaskDate: date(now), Title: title, Description: description, Priority: priority}
-	db, e := s.db(ctx, life, now)
+	x := Task{ID: uuid.NewString(), TaskDate: date(at), Title: title, Description: description, Priority: priority}
+	db, e := s.db(ctx, life, at)
 	if e != nil {
 		return x, e
 	}
@@ -330,14 +378,20 @@ func (s *Service) AddTask(ctx context.Context, life, title, description, priorit
 	_, e = db.ExecContext(ctx, "INSERT INTO tasks(id,life_id,task_date,title,description,priority,done,created_at,updated_at) VALUES(?,?,?,?,?,?,0,?,?)", x.ID, life, x.TaskDate, x.Title, x.Description, x.Priority, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 	return x, e
 }
-func (s *Service) SetTaskDone(ctx context.Context, life, id string, done bool) (Task, error) {
-	now := time.Now().UTC()
-	db, e := s.db(ctx, life, now)
+
+// SetTaskDone toggles completion. Tasks live in the month database of their date, so callers pass the
+// task date to locate it; an empty date falls back to the current month.
+func (s *Service) SetTaskDone(ctx context.Context, life, id string, done bool, taskDate string) (Task, error) {
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return Task{}, e
+	}
+	db, e := s.db(ctx, life, at)
 	if e != nil {
 		return Task{}, e
 	}
 	defer db.Close()
-	result, e := db.ExecContext(ctx, "UPDATE tasks SET done=?,updated_at=? WHERE id=? AND life_id=?", done, now.Format(time.RFC3339Nano), id, life)
+	result, e := db.ExecContext(ctx, "UPDATE tasks SET done=?,updated_at=? WHERE id=? AND life_id=?", done, time.Now().UTC().Format(time.RFC3339Nano), id, life)
 	if e != nil {
 		return Task{}, e
 	}
@@ -345,19 +399,20 @@ func (s *Service) SetTaskDone(ctx context.Context, life, id string, done bool) (
 	if n != 1 {
 		return Task{}, fmt.Errorf("任务不存在")
 	}
-	d, m, b, t, e := s.Today(ctx, life)
-	_ = d
-	_ = m
-	_ = b
+	return readTask(ctx, db, id)
+}
+
+func readTask(ctx context.Context, db *sql.DB, id string) (Task, error) {
+	var x Task
+	var done, secret, commentable int
+	e := db.QueryRowContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE id=?", id).Scan(&x.ID, &x.TaskDate, &x.Title, &x.Description, &x.Priority, &done, &x.PresetID, &secret, &commentable)
 	if e != nil {
-		return Task{}, e
+		return Task{}, fmt.Errorf("任务不存在")
 	}
-	for _, x := range t {
-		if x.ID == id {
-			return x, nil
-		}
-	}
-	return Task{}, fmt.Errorf("任务不存在")
+	x.Done = done == 1
+	x.Secret = secret == 1
+	x.Commentable = commentable == 1
+	return x, nil
 }
 func (s *Service) Today(ctx context.Context, life string) (Diary, []MoodRecord, []BodyRecord, []Task, error) {
 	now := time.Now().UTC()
@@ -368,7 +423,7 @@ func (s *Service) Today(ctx context.Context, life string) (Diary, []MoodRecord, 
 	defer db.Close()
 	d := Diary{EntryDate: date(now)}
 	var diarySecret, diaryCommentable int
-	_ = db.QueryRowContext(ctx, "SELECT id,content_md,COALESCE(visibility_preset_id,''),secret,COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? LIMIT 1", d.EntryDate).Scan(&d.ID, &d.Content, &d.PresetID, &diarySecret, &diaryCommentable)
+	_ = db.QueryRowContext(ctx, "SELECT id,content_md,COALESCE(visibility_preset_id,''),secret,COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? AND secret=0 LIMIT 1", d.EntryDate).Scan(&d.ID, &d.Content, &d.PresetID, &diarySecret, &diaryCommentable)
 	d.Secret = diarySecret == 1
 	d.Commentable = diaryCommentable == 1
 	moods := []MoodRecord{}

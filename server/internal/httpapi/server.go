@@ -74,6 +74,7 @@ func (s *Server) Router() *gin.Engine {
 	writer.GET("", s.nowToday)
 	writer.POST("/plans", s.createPlan)
 	writer.POST("/plans/:id/progress", s.setPlanProgress)
+	writer.PUT("/plans/:id", s.updatePlan)
 	writer.GET("/mood-tags", s.moodTags)
 	writer.POST("/mood-tags", s.addMoodTag)
 	writer.GET("/reader-keys", s.writerReaderKeys)
@@ -251,6 +252,24 @@ func (s *Server) createPlan(c *gin.Context) {
 		return
 	}
 	c.JSON(201, x)
+}
+func (s *Server) updatePlan(c *gin.Context) {
+	var r struct {
+		Name      string `json:"name"`
+		StartDate string `json:"start_date"`
+		EndDate   string `json:"end_date"`
+		Intro     string `json:"intro"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.future.UpdatePlan(c.Request.Context(), a.LifeID, c.Param("id"), strings.TrimSpace(r.Name), r.StartDate, r.EndDate, r.Intro)
+	if e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, x)
 }
 func (s *Server) setPlanProgress(c *gin.Context) {
 	var r struct {
@@ -531,7 +550,12 @@ func (s *Server) visibleToday(c *gin.Context) {
 		return
 	}
 	if a.Type == "writer" {
-		c.JSON(200, gin.H{"diary": d, "moods": m, "bodies": b, "tasks": t})
+		secretDiary, e := s.now.SecretDiary(c.Request.Context(), a.LifeID)
+		if e != nil {
+			internal(c, e)
+			return
+		}
+		c.JSON(200, gin.H{"diary": d, "secretDiary": secretDiary, "moods": m, "bodies": b, "tasks": t})
 		return
 	}
 	if a.Type != "reader" {
@@ -756,12 +780,13 @@ func (s *Server) setAttachmentAccess(c *gin.Context) {
 func (s *Server) saveDraft(c *gin.Context) {
 	var r struct {
 		Content string `json:"content"`
+		Secret  bool   `json:"secret"`
 	}
 	if !bind(c, &r) {
 		return
 	}
 	a := c.MustGet("actor").(auth.Actor)
-	x, e := s.now.SaveDraft(c.Request.Context(), a.LifeID, r.Content)
+	x, e := s.now.SaveDraft(c.Request.Context(), a.LifeID, r.Content, r.Secret)
 	if e != nil {
 		internal(c, e)
 		return
@@ -771,12 +796,13 @@ func (s *Server) saveDraft(c *gin.Context) {
 func (s *Server) saveDiary(c *gin.Context) {
 	var r struct {
 		Content string `json:"content"`
+		Secret  bool   `json:"secret"`
 	}
 	if !bind(c, &r) {
 		return
 	}
 	a := c.MustGet("actor").(auth.Actor)
-	x, e := s.now.SaveDiary(c.Request.Context(), a.LifeID, r.Content)
+	x, e := s.now.SaveDiary(c.Request.Context(), a.LifeID, r.Content, r.Secret)
 	if e != nil {
 		internal(c, e)
 		return
@@ -805,12 +831,13 @@ func (s *Server) addTask(c *gin.Context) {
 		Title       string `json:"title"`
 		Description string `json:"description"`
 		Priority    string `json:"priority"`
+		Date        string `json:"date"`
 	}
 	if !bind(c, &r) {
 		return
 	}
 	a := c.MustGet("actor").(auth.Actor)
-	x, e := s.now.AddTask(c.Request.Context(), a.LifeID, strings.TrimSpace(r.Title), strings.TrimSpace(r.Description), r.Priority)
+	x, e := s.now.AddTask(c.Request.Context(), a.LifeID, strings.TrimSpace(r.Title), strings.TrimSpace(r.Description), r.Priority, strings.TrimSpace(r.Date))
 	if e != nil {
 		fail(c, 400, "validation_failed", e.Error())
 		return
@@ -836,13 +863,14 @@ func (s *Server) setTaskAccess(c *gin.Context) {
 }
 func (s *Server) setTaskDone(c *gin.Context) {
 	var r struct {
-		Done bool `json:"done"`
+		Done bool   `json:"done"`
+		Date string `json:"date"`
 	}
 	if !bind(c, &r) {
 		return
 	}
 	a := c.MustGet("actor").(auth.Actor)
-	x, e := s.now.SetTaskDone(c.Request.Context(), a.LifeID, c.Param("id"), r.Done)
+	x, e := s.now.SetTaskDone(c.Request.Context(), a.LifeID, c.Param("id"), r.Done, strings.TrimSpace(r.Date))
 	if e != nil {
 		fail(c, 404, "not_found", e.Error())
 		return

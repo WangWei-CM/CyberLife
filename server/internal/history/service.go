@@ -29,6 +29,7 @@ type Point struct {
 type Day struct {
 	Date           string            `json:"date"`
 	Diary          nowservice.Diary  `json:"diary"`
+	SecretDiary    *nowservice.Diary `json:"secretDiary,omitempty"`
 	Tasks          []nowservice.Task `json:"tasks"`
 	MoodCount      int               `json:"moodCount"`
 	BodyCount      int               `json:"bodyCount"`
@@ -87,7 +88,7 @@ func (s *Service) day(ctx context.Context, actor auth.Actor, date time.Time) (Da
 	value := Day{Date: date.Format("2006-01-02"), Tasks: []nowservice.Task{}}
 	var diary nowservice.Diary
 	var secret, commentable int
-	e = db.QueryRowContext(ctx, "SELECT id,entry_date,content_md,COALESCE(visibility_preset_id,''),secret,COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? LIMIT 1", value.Date).Scan(&diary.ID, &diary.EntryDate, &diary.Content, &diary.PresetID, &secret, &commentable)
+	e = db.QueryRowContext(ctx, "SELECT id,entry_date,content_md,COALESCE(visibility_preset_id,''),secret,COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? AND secret=0 LIMIT 1", value.Date).Scan(&diary.ID, &diary.EntryDate, &diary.Content, &diary.PresetID, &secret, &commentable)
 	if e == nil {
 		diary.Secret = secret == 1
 		diary.Commentable = commentable == 1
@@ -97,6 +98,21 @@ func (s *Service) day(ctx context.Context, actor auth.Actor, date time.Time) (Da
 		}
 		if ok {
 			value.Diary = diary
+		}
+	}
+	// The secret layer is a separate entry on the same day; CanRead only passes it for the writer.
+	var secretDiary nowservice.Diary
+	var secretCommentable int
+	if scanErr := db.QueryRowContext(ctx, "SELECT id,entry_date,content_md,COALESCE(visibility_preset_id,''),COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? AND secret=1 LIMIT 1", value.Date).Scan(&secretDiary.ID, &secretDiary.EntryDate, &secretDiary.Content, &secretDiary.PresetID, &secretCommentable); scanErr == nil {
+		secretDiary.Secret = true
+		secretDiary.Commentable = secretCommentable == 1
+		ok, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: value.Date, PresetID: secretDiary.PresetID, Secret: true})
+		if err != nil {
+			return value, err
+		}
+		if ok {
+			layer := secretDiary
+			value.SecretDiary = &layer
 		}
 	}
 	rows, e := db.QueryContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE task_date=? ORDER BY done,created_at", value.Date)
