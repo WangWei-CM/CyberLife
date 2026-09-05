@@ -3,13 +3,21 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { MdEditor } from 'md-editor-v3'
-import 'md-editor-v3/lib/style.css'
-import MetricLine from '../components/MetricLine.vue'
-import { api, type MoodTag, type NowData, type Plan } from '../api/client'
+import MetricLine, { type MetricPoint } from '../components/MetricLine.vue'
+import PlanCarousel from '../components/PlanCarousel.vue'
+import DiaryEditor from '../components/DiaryEditor.vue'
+import EmptyState from '../components/EmptyState.vue'
+import AppIcon from '../components/AppIcon.vue'
+import { api, type MoodTag, type NowData, type Plan, type Task, type TrendPoint } from '../api/client'
+import { authState } from '../stores/auth'
+import { useCountUp } from '../lib/motion'
+import { addDaysISO, beijingNow, lunarLabel, monthDayLabel, timeLabel, todayISO, weekdayLabel } from '../lib/dates'
 
+const props = defineProps<{ secret: boolean }>()
 const emit = defineEmits<{ (event: 'navigate-future'): void }>()
+
 const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, moods: [], bodies: [], tasks: [] })
+const trend = ref<TrendPoint[]>([])
 const tags = ref<MoodTag[]>([])
 const plans = ref<Plan[]>([])
 const selectedTags = ref<string[]>([])
@@ -17,70 +25,189 @@ const moodNote = ref('')
 const bodyNote = ref('')
 const bodyScore = ref(70)
 const savedAt = ref('')
-const now = ref(new Date())
+const saving = ref(false)
+const now = ref(beijingNow())
 const leftWidth = ref(Number(localStorage.getItem('now-left-width') || 45))
 const dragging = ref(false)
 const error = ref('')
-const activePlan = ref(0)
-const carouselPaused = ref(false)
-const carouselInterval = ref(Number(localStorage.getItem('now-plan-carousel-ms') || 6000))
-let timer: number | undefined
+const newTask = ref('')
+const newTagOpen = ref(false)
+const newTag = ref({ emoji: '🙂', name: '', value: 60 })
+const calendarView = ref<'dayGridMonth' | 'dayGridDay'>('dayGridMonth')
+const carouselInterval = Number(localStorage.getItem('now-plan-carousel-ms') || 6000)
+const theme = computed(() => (document.querySelector('.app-shell')?.classList.contains('light') ? 'light' : 'dark') as 'light' | 'dark')
+let saveTimer: number | undefined
 let clock: number | undefined
-let carouselTimer: number | undefined
 
-const lunar = computed(() => new Intl.DateTimeFormat('zh-CN-u-ca-chinese', { month: 'long', day: 'numeric' }).format(now.value))
-const dateLabel = computed(() => new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(now.value))
-const timeLabel = computed(() => now.value.toLocaleTimeString('zh-CN', { hour12: false }))
-const moodValues = computed(() => data.value.moods.map(x => x.value))
-const bodyValues = computed(() => data.value.bodies.slice(-7).map(x => x.score))
-const events = computed(() => data.value.tasks.map(x => ({ id: x.id, title: x.title, date: x.taskDate, classNames: x.done ? ['fc-task-done'] : [] })))
-const activePlans = computed(() => {
-  const today = new Date().toISOString().slice(0, 10)
-  return plans.value.filter(plan => plan.startDate <= today && today <= plan.endDate && plan.progress < 100)
-})
-const currentPlan = computed(() => activePlans.value[activePlan.value] ?? null)
-const calendarOptions = computed(() => ({ plugins: [dayGridPlugin, interactionPlugin], initialView: 'dayGridDay', initialDate: new Date(), headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridDay,dayGridMonth' }, height: 'auto', events: events.value, dateClick: (info: { dateStr: string }) => { bodyNote.value = `${info.dateStr} 的待办` } }))
+const today = todayISO()
+const dateLabel = computed(() => monthDayLabel(now.value))
+const weekday = computed(() => weekdayLabel(now.value))
+const lunar = computed(() => lunarLabel(now.value))
+const hhmm = computed(() => timeLabel(now.value))
+const seconds = computed(() => String(now.value.getSeconds()).padStart(2, '0'))
+const activePlans = computed(() => plans.value.filter(plan => plan.startDate <= today && today <= plan.endDate && plan.progress < 100).sort((a, b) => a.endDate.localeCompare(b.endDate)))
+const bodyPoints = computed<MetricPoint[]>(() => trend.value.map((point, index) => ({ x: index, y: point.body, label: monthDayLabel(point.date) })))
+const moodPoints = computed<MetricPoint[]>(() => data.value.moods.map(record => { const at = new Date(record.recordedAt); return { x: at.getTime(), y: record.value, label: `${timeLabel(record.recordedAt)} ${record.tags.map(tag => tag.emoji).join('')}` } }).sort((a, b) => a.x - b.x))
+const pendingCount = computed(() => data.value.tasks.filter(task => !task.done).length)
+const pendingDisplay = useCountUp(() => pendingCount.value, 400)
+const sortedTasks = computed(() => [...data.value.tasks].sort((a, b) => Number(a.done) - Number(b.done)))
+const events = computed(() => data.value.tasks.map(task => ({ id: task.id, title: task.title, date: task.taskDate, classNames: [task.done ? 'fc-task-done' : 'fc-task-open', `fc-priority-${task.priority}`] })))
+const calendarOptions = computed(() => ({
+  plugins: [dayGridPlugin, interactionPlugin], initialView: calendarView.value, initialDate: today, now: today, locale: 'zh-cn', firstDay: 1,
+  headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridDay,dayGridMonth' }, buttonText: { day: '今日', month: '本月' },
+  height: 'auto', fixedWeekCount: false, dayMaxEventRows: 3, events: events.value,
+  viewDidMount: (info: { view: { type: string } }) => { calendarView.value = info.view.type as 'dayGridMonth' | 'dayGridDay' },
+}))
+const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today}`)
 
 async function load() {
   try {
-    const [today, tagData, planData] = await Promise.all([api.today(), api.moodTags(), api.plans()])
-    data.value = today
+    const [todayData, tagData, planData, history] = await Promise.all([api.today(), api.moodTags(), api.plans(), api.history(addDaysISO(today, -6), today)])
+    data.value = todayData
     tags.value = tagData.items
     plans.value = planData.items
-    activePlan.value = Math.min(activePlan.value, Math.max(activePlans.value.length - 1, 0))
+    trend.value = history.points
+    if (todayData.bodies.length) bodyScore.value = todayData.bodies[todayData.bodies.length - 1].score
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' }
 }
-async function recordMood() { try { await api.addMood(selectedTags.value, moodNote.value, false); selectedTags.value = []; moodNote.value = ''; await load() } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } }
-async function recordBody() { try { await api.addBody(bodyScore.value, bodyNote.value, false); bodyNote.value = ''; await load() } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } }
-async function toggleTask(id: string, done: boolean) { try { await api.setTaskDone(id, done); await load() } catch (cause) { error.value = cause instanceof Error ? cause.message : '更新失败' } }
-function saveDiary() { if (timer) clearTimeout(timer); timer = window.setTimeout(async () => { try { await api.saveDraft(data.value.diary.content); await api.saveDiary(data.value.diary.content); savedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } }, 700) }
-function startResize(event: PointerEvent) { dragging.value = true; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId); const move = (next: PointerEvent) => { leftWidth.value = Math.max(32, Math.min(68, next.clientX / window.innerWidth * 100)); localStorage.setItem('now-left-width', String(leftWidth.value)) }; const up = () => { dragging.value = false; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up) }
-function choosePlan(index: number) { activePlan.value = index; restartCarousel() }
-function restartCarousel() { if (carouselTimer) clearInterval(carouselTimer); if (!carouselPaused.value && activePlans.value.length > 1) carouselTimer = window.setInterval(() => { activePlan.value = (activePlan.value + 1) % activePlans.value.length }, carouselInterval.value) }
-function pauseCarousel(paused: boolean) { carouselPaused.value = paused; restartCarousel() }
-watch([activePlans, carouselInterval], restartCarousel)
-onMounted(() => { clock = window.setInterval(() => now.value = new Date(), 1000); load(); restartCarousel() })
-onBeforeUnmount(() => { if (clock) clearInterval(clock); if (timer) clearTimeout(timer); if (carouselTimer) clearInterval(carouselTimer) })
+async function refreshToday() { try { data.value = await api.today() } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' } }
+async function recordMood() {
+  if (!selectedTags.value.length) return
+  try { await api.addMood(selectedTags.value, moodNote.value.trim(), props.secret); selectedTags.value = []; moodNote.value = ''; await refreshToday() } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
+}
+async function recordBody() {
+  try {
+    await api.addBody(bodyScore.value, bodyNote.value.trim(), props.secret)
+    bodyNote.value = ''
+    const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today, -6), today)])
+    data.value = todayData
+    trend.value = history.points
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
+}
+async function addTag() {
+  if (!newTag.value.name.trim()) return
+  try { await api.addMoodTag({ name: newTag.value.name.trim(), emoji: newTag.value.emoji.trim() || '🙂', value: newTag.value.value }); tags.value = (await api.moodTags()).items; newTag.value = { emoji: '🙂', name: '', value: 60 }; newTagOpen.value = false } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
+}
+async function toggleTask(task: Task) {
+  const next = !task.done
+  task.done = next
+  try { await api.setTaskDone(task.id, next) } catch (cause) { task.done = !next; error.value = cause instanceof Error ? cause.message : '更新失败' }
+}
+async function addTask() {
+  const title = newTask.value.trim()
+  if (!title) return
+  try { await api.addTask(title, '', 'normal'); newTask.value = ''; await refreshToday() } catch (cause) { error.value = cause instanceof Error ? cause.message : '添加失败' }
+}
+function toggleTag(id: string) { selectedTags.value = selectedTags.value.includes(id) ? selectedTags.value.filter(item => item !== id) : [...selectedTags.value, id] }
+function scheduleSave() {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = window.setTimeout(async () => {
+    saving.value = true
+    try { await api.saveDraft(data.value.diary.content); await api.saveDiary(data.value.diary.content); savedAt.value = timeLabel(new Date()) } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { saving.value = false }
+  }, 700)
+}
+function startResize(event: PointerEvent) {
+  dragging.value = true
+  document.body.classList.add('resizing-col')
+  const move = (next: PointerEvent) => { leftWidth.value = Math.max(32, Math.min(68, (next.clientX / window.innerWidth) * 100)) }
+  const up = () => { dragging.value = false; document.body.classList.remove('resizing-col'); localStorage.setItem('now-left-width', String(leftWidth.value)); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+  window.addEventListener('pointermove', move)
+  window.addEventListener('pointerup', up)
+  event.preventDefault()
+}
+watch(() => props.secret, () => { error.value = '' })
+onMounted(() => { clock = window.setInterval(() => { now.value = beijingNow() }, 1000); load() })
+onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTimeout(saveTimer) })
 </script>
 
 <template>
   <main class="page now-page">
-    <p v-if="error" class="error">{{ error }}</p>
+    <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
     <section class="now-layout" :style="{ '--left-width': `${leftWidth}%` }">
-      <div class="now-left">
-        <section class="now-clock"><strong>{{ dateLabel }}</strong><span>{{ lunar }}</span><time><span>{{ timeLabel.slice(0, 5) }}</span><small :key="timeLabel.slice(5)" class="clock-seconds">{{ timeLabel.slice(5) }}</small></time></section>
-        <section v-if="currentPlan" class="plan-carousel" @mouseenter="pauseCarousel(true)" @mouseleave="pauseCarousel(false)" @focusin="pauseCarousel(true)" @focusout="pauseCarousel(false)">
-          <Transition name="carousel" mode="out-in"><button :key="currentPlan.id" class="plan-banner" @click="emit('navigate-future')"><b>{{ currentPlan.name }}</b><span class="banner-bar"><i :style="{ width: `${currentPlan.timeProgress}%` }" /></span><span class="banner-bar plan"><i :style="{ width: `${currentPlan.progress}%` }" /></span></button></Transition>
-          <div v-if="activePlans.length > 1" class="carousel-dots" aria-label="进行中规划">
-            <button v-for="(_, index) in activePlans" :key="index" :class="{ active: index === activePlan }" :aria-label="`第 ${index + 1} 项规划`" @click="choosePlan(index)" />
-          </div>
+      <div v-stagger class="now-left">
+        <section class="now-clock" aria-live="off">
+          <Transition name="fade" mode="out-in"><strong :key="dateLabel" class="clock-date">{{ dateLabel }}</strong></Transition>
+          <span class="clock-week">{{ weekday }}</span>
+          <Transition name="fade" mode="out-in"><span :key="lunar" class="clock-lunar">{{ lunar }}</span></Transition>
+          <time class="clock-time mono" :datetime="now.toISOString()">{{ hhmm }}<Transition name="fade" mode="out-in"><small :key="seconds" class="clock-seconds">{{ seconds }}</small></Transition></time>
         </section>
-        <article class="now-card metric-card"><div class="metric-chart"><MetricLine :values="bodyValues" /><span>近七日</span></div><form @submit.prevent="recordBody"><h2>身体</h2><output>{{ bodyScore }}</output><input v-model.number="bodyScore" type="range" min="0" max="100" /><input v-model="bodyNote" placeholder="备注" /><button class="primary">记录</button></form></article>
-        <article class="now-card metric-card"><div class="metric-chart"><MetricLine :values="moodValues" /><span>今日</span></div><form @submit.prevent="recordMood"><h2>心情</h2><div class="tag-grid"><button v-for="tag in tags" :key="tag.id" type="button" class="tag-item glow-spot" :class="{ selected: selectedTags.includes(tag.id) }" @click="selectedTags.includes(tag.id) ? selectedTags = selectedTags.filter(x => x !== tag.id) : selectedTags.push(tag.id)"><i>{{ tag.emoji }}</i><span>{{ tag.name }}</span></button></div><input v-model="moodNote" placeholder="备注" /><button class="primary" :disabled="!selectedTags.length">记录</button></form></article>
-        <article class="now-card diary-card"><header><h2>日记</h2><small v-if="savedAt">已保存 {{ savedAt }}</small></header><MdEditor v-model="data.diary.content" language="zh-CN" :preview="true" @onChange="saveDiary" @onSave="saveDiary" /></article>
+
+        <PlanCarousel v-if="activePlans.length" :plans="activePlans" :interval="carouselInterval" @select="emit('navigate-future')" />
+
+        <article class="card now-card body-card">
+          <div class="now-chart">
+            <h2 class="card-title">身体<small>近七日</small></h2>
+            <MetricLine :points="bodyPoints" :min="0" :max="100" :height="128" empty="这七天还没有身体记录" />
+          </div>
+          <form class="now-form" @submit.prevent="recordBody">
+            <div class="score-row"><span class="faint">今天的状态</span><output class="score mono">{{ bodyScore }}</output></div>
+            <input v-model.number="bodyScore" type="range" min="0" max="100" aria-label="身体评分" :style="{ '--range-fill': `${bodyScore}%` }" />
+            <input v-model="bodyNote" placeholder="备注（可选）" maxlength="200" />
+            <button class="primary" type="submit">记录</button>
+          </form>
+        </article>
+
+        <article class="card now-card mood-card">
+          <div class="now-chart">
+            <h2 class="card-title">心情<small>今天 {{ data.moods.length ? `${data.moods.length} 次` : '' }}</small></h2>
+            <MetricLine :points="moodPoints" :min="0" :max="100" :height="128" empty="今天还没有心情记录" />
+          </div>
+          <form class="now-form" @submit.prevent="recordMood">
+            <div class="tag-head">
+              <span class="faint">选择标签</span>
+              <div class="tag-manage">
+                <button type="button" class="text-button" :aria-expanded="newTagOpen" @click="newTagOpen = !newTagOpen"><AppIcon name="plus" :size="14" />新标签</button>
+                <Transition name="popover">
+                  <div v-if="newTagOpen" class="popover tag-popover">
+                    <div class="form-row"><input v-model="newTag.emoji" class="tag-emoji-input" maxlength="4" aria-label="emoji" /><input v-model="newTag.name" placeholder="名称" maxlength="8" aria-label="名称" /></div>
+                    <label class="field"><span>情绪值 <b class="mono">{{ newTag.value }}</b></span><input v-model.number="newTag.value" type="range" min="1" max="100" :style="{ '--range-fill': `${newTag.value}%` }" /></label>
+                    <div class="form-row"><button type="button" class="primary" @click="addTag">添加</button><button type="button" class="text-button" @click="newTagOpen = false">取消</button></div>
+                  </div>
+                </Transition>
+              </div>
+            </div>
+            <div class="tag-grid" role="group" aria-label="心情标签">
+              <button v-for="tag in tags" :key="tag.id" v-glow type="button" class="tag-item" :class="{ selected: selectedTags.includes(tag.id) }" :aria-pressed="selectedTags.includes(tag.id)" @click="toggleTag(tag.id)"><i>{{ tag.emoji }}</i><span>{{ tag.name }}</span></button>
+            </div>
+            <EmptyState v-if="!tags.length" icon="smile" text="先添加几个心情标签" compact />
+            <input v-model="moodNote" placeholder="备注（可选）" maxlength="200" />
+            <button class="primary" type="submit" :disabled="!selectedTags.length">记录</button>
+          </form>
+        </article>
+
+        <article class="card diary-card">
+          <header class="card-head">
+            <h2>日记<span v-if="secret" class="secret-badge">绝密模式</span></h2>
+            <Transition name="fade" mode="out-in"><small :key="savedAt + String(saving)" class="faint mono">{{ saving ? '' : savedAt ? `已保存 ${savedAt}` : '' }}</small></Transition>
+          </header>
+          <DiaryEditor v-model="data.diary.content" :theme="theme" :vault-key="vaultKey" :secret="secret" placeholder="今天……" @change="scheduleSave" />
+        </article>
       </div>
-      <div class="now-divider" :class="{ dragging }" @pointerdown="startResize" />
-      <aside class="now-right"><section class="task-head"><h2>待办</h2><span>{{ data.tasks.filter(task => !task.done).length }} 项</span></section><FullCalendar :options="calendarOptions" /><ul class="today-tasks"><li v-for="task in data.tasks" :key="task.id"><label><input type="checkbox" :checked="task.done" @change="toggleTask(task.id, !task.done)" /><span :class="{ done: task.done }">{{ task.title }}</span></label></li></ul></aside>
+
+      <div class="divider-v now-divider" :class="{ dragging }" role="separator" aria-orientation="vertical" aria-label="拖动调整左右栏宽度" @pointerdown="startResize" />
+
+      <aside v-stagger class="now-right">
+        <section class="task-head">
+          <h2 class="card-title">待办<small>{{ Math.round(pendingDisplay) }} 项未完成</small></h2>
+          <form class="task-add" @submit.prevent="addTask"><input v-model="newTask" placeholder="添加今天的待办，回车保存" maxlength="120" aria-label="新待办" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
+        </section>
+        <section class="card calendar-card"><FullCalendar :options="calendarOptions" /></section>
+        <section class="card tasks-card">
+          <TransitionGroup v-if="sortedTasks.length" name="list" tag="ul" class="today-tasks">
+            <li v-for="task in sortedTasks" :key="task.id" :class="{ done: task.done, [`priority-${task.priority}`]: true }">
+              <label class="task-row">
+                <input type="checkbox" :checked="task.done" @change="toggleTask(task)" />
+                <span class="task-body">
+                  <span class="task-title" :class="{ done: task.done }">{{ task.title }}</span>
+                  <small v-if="task.description" class="faint">{{ task.description }}</small>
+                </span>
+                <i class="task-priority" :title="task.priority === 'high' ? '高优先级' : task.priority === 'low' ? '低优先级' : '普通'" />
+              </label>
+            </li>
+          </TransitionGroup>
+          <EmptyState v-else icon="check" text="今天还没有待办" />
+        </section>
+      </aside>
     </section>
   </main>
 </template>

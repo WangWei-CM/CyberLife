@@ -1,0 +1,118 @@
+/* ============================================================
+   现在页 · 蓝白 / 蓝黑 扁平 · 两栏密铺 + 可拖拽分隔
+   ============================================================ */
+.now-page { background: var(--bg); }
+.page-error { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 12px; border-radius: var(--radius); background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+.page-error .text-button { margin-left: auto; padding: 2px; color: inherit; }
+.now-layout { display: grid; grid-template-columns: var(--left-width, 45%) 6px minmax(0, 1fr); gap: 0 12px; align-items: start; min-height: calc(100vh - var(--topbar-h) - var(--page-pad) * 2); }
+.now-left { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
+.now-right { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
+
+/* ---------- 时间区 ---------- */
+.now-clock { display: flex; align-items: baseline; gap: 14px; padding: 4px 0 2px; flex-wrap: wrap; }
+.clock-date { font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.clock-week, .clock-lunar { color: var(--text-dim); }
+.clock-lunar { color: var(--text-faint); }
+.clock-time { margin-left: auto; display: inline-flex; align-items: baseline; gap: 2px; font-size: 18px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.clock-seconds { display: inline-block; min-width: 1.6em; font-size: .7em; opacity: .75; animation: clock-tick .2s var(--ease-out); }
+.clock-seconds::before { content: ":"; }
+.secret-mode .clock-date { color: var(--secret); text-shadow: 0 0 18px var(--accent-glow); }
+
+/* ---------- 规划横幅轮播 ---------- */
+.plan-carousel { display: grid; gap: 8px; }
+.carousel-stage { position: relative; min-height: 76px; }
+.plan-banner {
+  display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 1.4fr) auto; gap: 16px; align-items: center;
+  width: 100%; padding: 12px 16px; text-align: left;
+  background: var(--surface); color: var(--text); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.banner-head { display: grid; gap: 4px; min-width: 0; }
+.banner-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.banner-dates { color: var(--text-faint); font-size: 11px; }
+.banner-bars { display: grid; gap: 6px; min-width: 0; }
+.banner-row { display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: center; }
+.banner-row small { color: var(--text-faint); font-size: 11px; }
+.banner-arrow { color: var(--text-faint); transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast); }
+.plan-banner:hover .banner-arrow { transform: translateX(3px); color: var(--accent); }
+.carousel-dots { display: flex; justify-content: center; gap: 8px; }
+.carousel-dots button { width: 6px; height: 6px; padding: 0; border-radius: 3px; background: var(--text-faint); opacity: .5; transition: width var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out), opacity var(--dur-mid), box-shadow var(--dur-mid); }
+.carousel-dots button:hover { opacity: .9; }
+.carousel-dots button.active { width: 18px; background: var(--accent); opacity: 1; box-shadow: 0 0 8px var(--accent-glow); }
+
+/* ---------- 身体 / 心情 卡片：左右两半 ---------- */
+.now-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.now-chart { display: grid; align-content: start; gap: 4px; min-width: 0; }
+.now-form { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.now-form .primary { justify-self: end; }
+.score-row { display: flex; align-items: baseline; justify-content: space-between; }
+.score { font-size: 26px; font-weight: 600; color: var(--accent); line-height: 1; transition: color var(--dur-slow); }
+.tag-head { display: flex; align-items: center; justify-content: space-between; }
+.tag-manage { position: relative; }
+.tag-popover { width: 260px; display: grid; gap: 10px; }
+.tag-emoji-input { width: 56px; flex: 0 0 56px; text-align: center; font-size: 18px; }
+
+/* ---------- 曲线 ---------- */
+.metric { position: relative; width: 100%; color: var(--accent); transition: color var(--dur-slow); }
+.metric-svg { width: 100%; height: 100%; overflow: visible; }
+.metric-base { stroke: var(--divider); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.metric-path { fill: none; stroke: currentColor; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.metric-draw .metric-path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: metric-draw var(--draw, .6s) var(--ease-out) forwards; --path-length: 1; }
+.metric-draw .metric-area { animation: vt-fade-in var(--draw, .6s) var(--ease-out) both; }
+.metric-dot { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--bg); box-shadow: 0 0 0 2px currentColor, 0 0 12px var(--accent-glow); pointer-events: none; animation: notice-pop var(--dur-fast) var(--ease-spring); }
+.metric-point { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px var(--accent-glow); pointer-events: none; animation: notice-pop var(--dur-mid) var(--ease-spring); }
+.metric-tip { position: absolute; top: -2px; transform: translateX(-50%); padding: 2px 8px; border-radius: var(--radius); background: var(--surface-3); color: var(--text-dim); font-size: 11px; font-family: var(--font-mono); white-space: nowrap; pointer-events: none; box-shadow: var(--shadow); animation: clock-tick var(--dur-fast) var(--ease-out); }
+.metric-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-faint); font-size: 12px; animation: empty-in var(--dur-mid) var(--ease-out); }
+
+/* ---------- 日记 ---------- */
+.diary-card { display: grid; gap: 4px; }
+.secret-badge { display: inline-flex; align-items: center; margin-left: 10px; padding: 1px 8px; border-radius: 10px; background: color-mix(in srgb, var(--secret) 14%, transparent); color: var(--secret); font-size: 11px; letter-spacing: .1em; }
+
+/* ---------- 右栏：待办即日历 ---------- */
+.task-head { display: grid; gap: 8px; }
+.task-add { display: flex; gap: 6px; }
+.task-add .icon-button { flex: 0 0 36px; }
+.calendar-card { padding: 12px 14px; }
+.tasks-card { padding: 6px 18px; }
+.today-tasks { position: relative; }
+.today-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
+.today-tasks li:last-child { box-shadow: none; }
+.task-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; cursor: pointer; }
+.task-row input[type="checkbox"]:checked { animation: check-pop var(--dur-fast) var(--ease-spring); }
+.task-body { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.task-title { position: relative; display: inline; color: var(--text); transition: color var(--dur-mid) var(--ease-out); background: linear-gradient(currentColor, currentColor) left 55% / 0% 1px no-repeat; transition: color var(--dur-mid) var(--ease-out), background-size var(--dur-mid) var(--ease-out); }
+.task-title.done { color: var(--text-faint); background-size: 100% 1px; }
+.task-priority { width: 6px; height: 6px; border-radius: 50%; background: transparent; flex: 0 0 auto; transition: background var(--dur-mid); }
+.priority-high .task-priority { background: var(--warn); box-shadow: 0 0 8px color-mix(in srgb, var(--warn) 50%, transparent); }
+.priority-low .task-priority { background: var(--text-faint); }
+.today-tasks li.done .task-priority { opacity: .3; }
+
+/* ---------- FullCalendar 融入主题：去白描边，文字按钮 + 发光 ---------- */
+.fc { --fc-border-color: transparent; --fc-page-bg-color: transparent; --fc-neutral-bg-color: var(--surface-2); --fc-today-bg-color: var(--accent-soft); --fc-event-bg-color: var(--accent); --fc-event-border-color: var(--accent); --fc-event-text-color: #fff; --fc-list-event-hover-bg-color: var(--surface-2); color: var(--text); font-family: var(--font-ui); font-size: 13px; }
+.fc .fc-toolbar { gap: 8px; margin-bottom: 8px !important; }
+.fc .fc-toolbar-title { font-size: 14px; font-weight: 600; letter-spacing: .04em; color: var(--text); }
+.fc .fc-button { border: 0 !important; background: transparent !important; color: var(--text-dim) !important; box-shadow: none !important; padding: 4px 8px !important; border-radius: var(--radius) !important; font-size: 12px; text-transform: none; transition: color var(--dur-fast) var(--ease-out), text-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out) !important; }
+.fc .fc-button:hover, .fc .fc-button:focus-visible { color: var(--accent) !important; text-shadow: 0 0 12px var(--accent-glow); background: var(--accent-soft) !important; }
+.fc .fc-button-primary:not(:disabled).fc-button-active { color: var(--accent) !important; background: var(--accent-soft) !important; }
+.fc .fc-button .fc-icon { font-size: 16px; }
+.fc .fc-scrollgrid, .fc-theme-standard td, .fc-theme-standard th, .fc-theme-standard .fc-scrollgrid { border-color: transparent !important; }
+.fc .fc-col-header-cell { padding: 4px 0; color: var(--text-faint); font-weight: 500; font-size: 11px; }
+.fc .fc-daygrid-day { border-radius: var(--radius); transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.fc .fc-daygrid-day:hover { background: var(--accent-soft); box-shadow: 0 0 16px var(--accent-soft); }
+.fc .fc-daygrid-day-number { color: var(--text-dim); font-size: 12px; padding: 4px 6px; }
+.fc .fc-day-today { background: var(--accent-soft) !important; }
+.fc .fc-day-today .fc-daygrid-day-number { color: var(--accent); font-weight: 700; }
+.fc .fc-day-other .fc-daygrid-day-number { color: var(--text-faint); opacity: .5; }
+.fc .fc-daygrid-event { border: 0; border-radius: var(--radius); padding: 1px 6px; font-size: 11px; box-shadow: inset 2px 0 0 var(--accent); background: var(--accent-soft); color: var(--text); transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
+.fc .fc-daygrid-event:hover { transform: translateY(-1px); box-shadow: inset 2px 0 0 var(--accent), 0 0 12px var(--accent-soft); }
+.fc .fc-task-done { opacity: .45; text-decoration: line-through; }
+.fc .fc-priority-high { box-shadow: inset 2px 0 0 var(--warn); }
+.fc .fc-daygrid-more-link { color: var(--accent); font-size: 11px; }
+.fc .fc-popover { background: var(--surface-3); border: 0; box-shadow: var(--shadow-lift); border-radius: var(--radius); }
+.fc .fc-popover-header { background: var(--surface-2); }
+.fc .fc-dayGridDay-view .fc-daygrid-day-frame { min-height: 160px; }
+
+@media (max-width: 900px) {
+  .now-layout { grid-template-columns: 1fr; }
+  .now-divider { display: none; }
+  .now-card { grid-template-columns: 1fr; }
+}
