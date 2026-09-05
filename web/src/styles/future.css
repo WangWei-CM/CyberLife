@@ -128,11 +128,17 @@
 .cal-today { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); pointer-events: none; }
 
 .day-panel { display: grid; gap: 10px; }
+.day-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
+.day-col { display: grid; gap: 8px; min-width: 0; }
 .day-tasks { display: grid; }
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .day-tasks li:last-child { box-shadow: none; }
 .day-tasks .task-row { padding: 8px 0; }
-.day-plans { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.day-plan-list { display: grid; gap: 6px; }
+.day-plan { display: grid; gap: 5px; width: 100%; padding: 10px 12px; text-align: left; background: var(--surface-2); color: var(--text); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.day-plan b { font-size: 12px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day-plan:hover { background: var(--surface-3); box-shadow: 0 0 12px var(--accent-soft); transform: translateX(2px); }
+.day-plan.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 .reader-future { min-height: 240px; display: grid; place-items: center; }
 
 /* ---------- 未来页：全 UI 等宽、零圆角、发光代替阴影 ---------- */
@@ -146,5 +152,11 @@
 @media (max-width: 900px) {
   .future-top { grid-template-columns: 1fr; height: auto !important; }
   .future-top .divider-v { display: none; }
+  .future-list { max-height: 360px; }
   .dual-row { grid-template-columns: 80px 1fr 40px; }
+  .day-columns { grid-template-columns: 1fr; }
+  .zoom-toolbar { flex-wrap: wrap; gap: 6px 12px; }
+  .zoom-actions { margin-left: 0; }
+  .detail-head { flex-wrap: wrap; }
+  .cyber-head { flex-wrap: wrap; }
 }

@@ -12,6 +12,8 @@ import { addDaysISO, dayIndex, diffDays, fullDateLabel, monthDayLabel, relativeD
 
 const today = todayISO()
 const selected = ref(today)
+const dock = ref<'left' | 'right'>(localStorage.getItem('past-axis-dock') === 'right' ? 'right' : 'left')
+function toggleDock() { dock.value = dock.value === 'left' ? 'right' : 'left'; localStorage.setItem('past-axis-dock', dock.value) }
 const visible = ref<{ from: string; to: string }>({ from: addDaysISO(today, -13), to: today })
 const days = ref(new Map<string, HistoryDay>())
 const points = ref(new Map<string, TrendPoint>())
@@ -82,8 +84,8 @@ watch(selected, () => { ensure(selected.value, selected.value) })
   <main class="page past-page">
     <div class="past-dust" aria-hidden="true"><i v-for="n in 7" :key="n" /></div>
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
-    <section class="past-layout">
-      <LifeAxis v-model:selected="selected" :today="today" :milestones="milestoneDates" @range="onRange" />
+    <section class="past-layout" :class="`dock-${dock}`">
+      <LifeAxis v-model:selected="selected" :today="today" :milestones="milestoneDates" :mirror="dock === 'right'" @range="onRange" @toggle-dock="toggleDock" />
       <section v-stagger class="past-content" :class="{ loading: loading > 0 }">
         <header class="past-head">
           <div class="chapter" :data-year="chapterYear"><span class="chapter-year">{{ chapterYear }}</span><h1 class="chapter-title">{{ selectedLabel.replace(/^\d+年/, '') }}<small>{{ selectedWeekday }} · {{ relativeDayLabel(selected) }}</small></h1></div>

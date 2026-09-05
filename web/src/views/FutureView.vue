@@ -177,13 +177,23 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
         <ZoomCalendar v-model:selected="selectedDate" :tasks="taskList" :plans="plans" :selected-plan="selectedPlanId" :today="today" @range="onRange" @select-plan="choosePlanById" />
         <Transition name="fade-slide" mode="out-in">
           <section :key="selectedDate" class="day-panel">
-            <header class="cyber-head"><span class="cyber-heading"><AppIcon name="calendar" :size="14" />{{ selectedDate }}</span><small class="faint">{{ relativeDayLabel(selectedDate) }}</small></header>
-            <form v-if="selectedDate === today" class="task-add" @submit.prevent="addTask"><input v-model="newTask" placeholder="为今天添加待办，回车保存" maxlength="120" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
-            <ul v-if="dayTasks.length" class="day-tasks">
-              <li v-for="task in dayTasks" :key="task.id" :class="{ done: task.done }"><label class="task-row"><input type="checkbox" :checked="task.done" @change="toggleTask(task)" /><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><i v-if="task.priority === 'high'" class="task-priority high" title="高优先级" /></label></li>
-            </ul>
-            <EmptyState v-else icon="check" :text="selectedDate === today ? '今天还没有待办' : '这一天没有待办'" compact />
-            <div v-if="dayPlans.length" class="day-plans"><span class="cyber-heading">进行中的规划</span><button v-for="plan in dayPlans" :key="plan.id" class="text-button" @click="choose(plan)"><AppIcon name="target" :size="12" />{{ plan.name }}</button></div>
+            <header class="cyber-head"><span class="cyber-heading"><AppIcon name="calendar" :size="14" />{{ selectedDate }}</span><small class="faint">{{ relativeDayLabel(selectedDate) }}</small><small v-if="dayTasks.length" class="faint mono">{{ dayTasks.filter(task => task.done).length }} / {{ dayTasks.length }}</small></header>
+            <div class="day-columns">
+              <div class="day-col">
+                <form v-if="selectedDate === today" class="task-add" @submit.prevent="addTask"><input v-model="newTask" placeholder="为今天添加待办，回车保存" maxlength="120" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
+                <ul v-if="dayTasks.length" class="day-tasks">
+                  <li v-for="task in dayTasks" :key="task.id" :class="{ done: task.done }"><label class="task-row"><input type="checkbox" :checked="task.done" @change="toggleTask(task)" /><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><i v-if="task.priority === 'high'" class="task-priority high" title="高优先级" /></label></li>
+                </ul>
+                <EmptyState v-else icon="check" :text="selectedDate === today ? '今天还没有待办' : '这一天没有待办'" compact />
+              </div>
+              <div class="day-col day-plans">
+                <span class="cyber-heading">当天进行中的规划</span>
+                <ul v-if="dayPlans.length" class="day-plan-list">
+                  <li v-for="plan in dayPlans" :key="plan.id"><button class="day-plan" :class="{ active: plan.id === selectedPlanId }" @click="choose(plan)"><b>{{ plan.name }}</b><ProgressBar :value="plan.timeProgress" :height="3" /><ProgressBar :value="plan.progress" tone="accent-2" :height="3" /></button></li>
+                </ul>
+                <EmptyState v-else icon="target" text="这一天没有进行中的规划" compact />
+              </div>
+            </div>
           </section>
         </Transition>
       </section>

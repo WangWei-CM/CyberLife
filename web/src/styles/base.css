@@ -63,7 +63,7 @@ button:focus:not(:focus-visible) { outline: 0; }
 
 /* ---------- 按钮体系：主按钮有底色，其余一律文字按钮（去框线专项） ---------- */
 .btn, .primary {
-  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
   border-radius: var(--radius);
   padding: 8px 16px;
   background: var(--accent);
@@ -76,7 +76,7 @@ button:focus:not(:focus-visible) { outline: 0; }
 .btn:hover, .primary:hover { background: var(--accent-hover, var(--accent)); box-shadow: 0 0 16px var(--accent-soft); transform: translateY(-1px); }
 .btn:active, .primary:active { transform: scale(.97); }
 .text-button {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
   padding: 6px 10px;
   border-radius: var(--radius);
   color: var(--text-dim);

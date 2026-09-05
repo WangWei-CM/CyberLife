@@ -137,7 +137,7 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
           <span class="icon-morph"><AppIcon name="lock" :class="{ on: secretMode }" /><AppIcon name="unlock" :class="{ on: !secretMode }" /></span>
         </button>
         <span class="actor-name">{{ roleLabel }}</span>
-        <button v-glow class="text-button" @click="logout"><AppIcon name="logout" :size="16" />登出</button>
+        <button v-glow class="text-button" aria-label="登出" @click="logout"><AppIcon name="logout" :size="16" /><span>登出</span></button>
       </div>
     </header>
     <div class="screen">

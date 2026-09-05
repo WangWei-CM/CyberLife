@@ -22,10 +22,12 @@
 .past-dust i:nth-child(1) { left: 12%; animation-delay: 0s; } .past-dust i:nth-child(2) { left: 28%; animation-delay: 3s; width: 2px; height: 2px; } .past-dust i:nth-child(3) { left: 41%; animation-delay: 6s; } .past-dust i:nth-child(4) { left: 57%; animation-delay: 1.5s; width: 2px; height: 2px; } .past-dust i:nth-child(5) { left: 68%; animation-delay: 8s; } .past-dust i:nth-child(6) { left: 81%; animation-delay: 4.5s; width: 2px; height: 2px; } .past-dust i:nth-child(7) { left: 92%; animation-delay: 10s; }
 
 .past-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 28px; align-items: start; }
+.past-layout.dock-right { grid-template-columns: minmax(0, 1fr) 200px; }
+.past-layout.dock-right .life-axis { order: 2; }
 .past-content { display: grid; gap: var(--gap); min-width: 0; transition: opacity var(--dur-mid) var(--ease-out); }
 .past-content.loading .metric { opacity: .55; }
-.past-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 4px 0 6px; }
-.chapter { position: relative; display: flex; align-items: baseline; gap: 14px; }
+.past-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 16px; padding: 4px 0 6px; flex-wrap: wrap; }
+.chapter { position: relative; display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
 .chapter-year { font-family: var(--font-serif); font-size: 28px; font-weight: 700; letter-spacing: .12em; color: var(--gold); line-height: 1.1; text-shadow: 1px 1px 0 rgba(0, 0, 0, .35), -.5px -.5px 0 var(--gold-hi); }
 .chapter-title { display: flex; align-items: baseline; gap: 10px; font-family: var(--font-serif); font-size: 20px; font-weight: 700; color: var(--text); }
 .chapter-title small { font-family: var(--font-sans); font-size: 12px; font-weight: 400; color: var(--text-dim); letter-spacing: .04em; }
@@ -104,9 +106,29 @@
 .axis-medal.selected { transform: translateY(-50%) scale(1.25); box-shadow: 0 0 18px var(--gold), inset 0 0 3px rgba(0, 0, 0, .35); }
 .axis-range { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: baseline; padding: 6px 30px 4px 0; font-size: 10px; color: var(--text-faint); background: linear-gradient(180deg, transparent, var(--bg) 60%); pointer-events: none; }
 .axis-range small { color: var(--text-faint); }
+.axis-dock { position: absolute; top: 6px; left: 6px; z-index: 3; width: 26px; height: 26px; color: var(--text-faint); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out); }
+.life-axis:hover .axis-dock, .axis-dock:focus-visible { opacity: 1; }
+.axis-dock:hover { color: var(--gold); filter: drop-shadow(0 0 6px var(--accent-glow)); }
+
+/* ---------- 停靠右侧时镜像：轨道与标签换到左边 ---------- */
+.life-axis.mirror { background: linear-gradient(90deg, rgba(212, 175, 55, .03), transparent); }
+.life-axis.mirror .axis-track { right: auto; left: 28px; }
+.life-axis.mirror .tick { justify-content: flex-start; }
+.life-axis.mirror .tick-mark { right: auto; left: 22px; }
+.life-axis.mirror .tick-label { right: auto; left: 44px; }
+.life-axis.mirror .axis-selected { background: linear-gradient(270deg, transparent, var(--accent-soft) 60%, rgba(212, 175, 55, .28)); box-shadow: inset 2px 0 0 var(--gold); }
+.life-axis.mirror .axis-today { right: auto; left: 16px; }
+.life-axis.mirror .axis-today em { right: auto; left: 30px; }
+.life-axis.mirror .axis-medal { right: auto; left: 20px; }
+.life-axis.mirror .axis-range { padding: 6px 0 4px 30px; }
+.life-axis.mirror .axis-dock { left: auto; right: 6px; }
 
 @media (max-width: 900px) {
-  .past-layout { grid-template-columns: 1fr; }
+  .past-layout, .past-layout.dock-right { grid-template-columns: 1fr; gap: var(--gap); }
+  .past-layout.dock-right .life-axis { order: 0; }
   .life-axis { height: 260px; }
+  .axis-dock { display: none; }
   .past-trends, .past-day { grid-template-columns: 1fr; }
+  .chapter-year { font-size: 22px; }
+  .chapter-title { font-size: 18px; }
 }

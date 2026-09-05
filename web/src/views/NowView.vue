@@ -16,6 +16,8 @@ import { addDaysISO, beijingNow, lunarLabel, monthDayLabel, timeLabel, todayISO,
 const props = defineProps<{ secret: boolean }>()
 const emit = defineEmits<{ (event: 'navigate-future'): void }>()
 
+type CardKey = 'body' | 'mood' | 'diary'
+const DEFAULT_ORDER: CardKey[] = ['body', 'mood', 'diary']
 const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, moods: [], bodies: [], tasks: [] })
 const trend = ref<TrendPoint[]>([])
 const tags = ref<MoodTag[]>([])
@@ -34,6 +36,8 @@ const newTask = ref('')
 const newTagOpen = ref(false)
 const newTag = ref({ emoji: '🙂', name: '', value: 60 })
 const calendarView = ref<'dayGridMonth' | 'dayGridDay'>('dayGridMonth')
+const cardOrder = ref<CardKey[]>(readOrder())
+const dragCard = ref<CardKey | null>(null)
 const carouselInterval = Number(localStorage.getItem('now-plan-carousel-ms') || 6000)
 const theme = computed(() => (document.querySelector('.app-shell')?.classList.contains('light') ? 'light' : 'dark') as 'light' | 'dark')
 let saveTimer: number | undefined
@@ -45,6 +49,7 @@ const weekday = computed(() => weekdayLabel(now.value))
 const lunar = computed(() => lunarLabel(now.value))
 const hhmm = computed(() => timeLabel(now.value))
 const seconds = computed(() => String(now.value.getSeconds()).padStart(2, '0'))
+const dayProgress = computed(() => ((now.value.getHours() * 60 + now.value.getMinutes()) / 1440) * 100)
 const activePlans = computed(() => plans.value.filter(plan => plan.startDate <= today && today <= plan.endDate && plan.progress < 100).sort((a, b) => a.endDate.localeCompare(b.endDate)))
 const bodyPoints = computed<MetricPoint[]>(() => trend.value.map((point, index) => ({ x: index, y: point.body, label: monthDayLabel(point.date) })))
 const moodPoints = computed<MetricPoint[]>(() => data.value.moods.map(record => { const at = new Date(record.recordedAt); return { x: at.getTime(), y: record.value, label: `${timeLabel(record.recordedAt)} ${record.tags.map(tag => tag.emoji).join('')}` } }).sort((a, b) => a.x - b.x))
@@ -59,6 +64,25 @@ const calendarOptions = computed(() => ({
   viewDidMount: (info: { view: { type: string } }) => { calendarView.value = info.view.type as 'dayGridMonth' | 'dayGridDay' },
 }))
 const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today}`)
+
+function readOrder(): CardKey[] {
+  try { const stored = JSON.parse(localStorage.getItem('now-card-order') || '[]') as CardKey[]; const valid = stored.filter(key => DEFAULT_ORDER.includes(key)); return valid.length === DEFAULT_ORDER.length ? valid : DEFAULT_ORDER } catch { return DEFAULT_ORDER }
+}
+/** 卡片顺序可拖拽（规格书 5.8）：拖动卡片标题旁的手柄，经过另一张卡片时实时换位。 */
+function cardStyle(key: CardKey) { return { order: cardOrder.value.indexOf(key) + 2 } }
+function onCardDragStart(key: CardKey, event: DragEvent) { dragCard.value = key; event.dataTransfer?.setData('text/plain', `card:${key}`); if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move' }
+function onCardDragOver(key: CardKey, event: DragEvent) {
+  if (!dragCard.value || dragCard.value === key) return
+  event.preventDefault()
+  const from = cardOrder.value.indexOf(dragCard.value)
+  const to = cardOrder.value.indexOf(key)
+  if (from < 0 || to < 0 || from === to) return
+  const next = [...cardOrder.value]
+  next.splice(from, 1)
+  next.splice(to, 0, dragCard.value)
+  cardOrder.value = next
+}
+function onCardDragEnd() { dragCard.value = null; localStorage.setItem('now-card-order', JSON.stringify(cardOrder.value)) }
 
 async function load() {
   try {
@@ -103,7 +127,7 @@ function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = window.setTimeout(async () => {
     saving.value = true
-    try { await api.saveDraft(data.value.diary.content); await api.saveDiary(data.value.diary.content); savedAt.value = timeLabel(new Date()) } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { saving.value = false }
+    try { await api.saveDraft(data.value.diary.content); await api.saveDiary(data.value.diary.content); savedAt.value = timeLabel(beijingNow()) } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { saving.value = false }
   }, 700)
 }
 function startResize(event: PointerEvent) {
@@ -124,19 +148,22 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
   <main class="page now-page">
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
     <section class="now-layout" :style="{ '--left-width': `${leftWidth}%` }">
-      <div v-stagger class="now-left">
-        <section class="now-clock" aria-live="off">
-          <Transition name="fade" mode="out-in"><strong :key="dateLabel" class="clock-date">{{ dateLabel }}</strong></Transition>
-          <span class="clock-week">{{ weekday }}</span>
-          <Transition name="fade" mode="out-in"><span :key="lunar" class="clock-lunar">{{ lunar }}</span></Transition>
-          <time class="clock-time mono" :datetime="now.toISOString()">{{ hhmm }}<Transition name="fade" mode="out-in"><small :key="seconds" class="clock-seconds">{{ seconds }}</small></Transition></time>
+      <div v-stagger class="now-left" :class="{ reordering: dragCard }">
+        <section class="now-clock" aria-live="off" style="order: 0">
+          <div class="clock-row">
+            <Transition name="fade" mode="out-in"><strong :key="dateLabel" class="clock-date">{{ dateLabel }}</strong></Transition>
+            <span class="clock-week">{{ weekday }}</span>
+            <Transition name="fade" mode="out-in"><span :key="lunar" class="clock-lunar">{{ lunar }}</span></Transition>
+            <time class="clock-time mono" :datetime="now.toISOString()">{{ hhmm }}<Transition name="fade" mode="out-in"><small :key="seconds" class="clock-seconds">{{ seconds }}</small></Transition></time>
+          </div>
+          <i class="day-progress" :title="`今天已过去 ${Math.round(dayProgress)}%`" aria-hidden="true"><b :style="{ width: `${dayProgress}%` }" /></i>
         </section>
 
-        <PlanCarousel v-if="activePlans.length" :plans="activePlans" :interval="carouselInterval" @select="emit('navigate-future')" />
+        <PlanCarousel v-if="activePlans.length" style="order: 1" :plans="activePlans" :interval="carouselInterval" @select="emit('navigate-future')" />
 
-        <article class="card now-card body-card">
+        <article class="card now-card body-card" :class="{ 'drag-source': dragCard === 'body' }" :style="cardStyle('body')" @dragover="onCardDragOver('body', $event)" @drop.prevent="onCardDragEnd">
           <div class="now-chart">
-            <h2 class="card-title">身体<small>近七日</small></h2>
+            <h2 class="card-title"><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('body', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>身体</span><small>近七日</small></h2>
             <MetricLine :points="bodyPoints" :min="0" :max="100" :height="128" empty="这七天还没有身体记录" />
           </div>
           <form class="now-form" @submit.prevent="recordBody">
@@ -147,9 +174,9 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
           </form>
         </article>
 
-        <article class="card now-card mood-card">
+        <article class="card now-card mood-card" :class="{ 'drag-source': dragCard === 'mood' }" :style="cardStyle('mood')" @dragover="onCardDragOver('mood', $event)" @drop.prevent="onCardDragEnd">
           <div class="now-chart">
-            <h2 class="card-title">心情<small>今天 {{ data.moods.length ? `${data.moods.length} 次` : '' }}</small></h2>
+            <h2 class="card-title"><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('mood', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>心情</span><small>今天 {{ data.moods.length ? `${data.moods.length} 次` : '' }}</small></h2>
             <MetricLine :points="moodPoints" :min="0" :max="100" :height="128" empty="今天还没有心情记录" />
           </div>
           <form class="now-form" @submit.prevent="recordMood">
@@ -175,9 +202,9 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
           </form>
         </article>
 
-        <article class="card diary-card">
+        <article class="card diary-card" :class="{ 'drag-source': dragCard === 'diary' }" :style="cardStyle('diary')" @dragover="onCardDragOver('diary', $event)" @drop.prevent="onCardDragEnd">
           <header class="card-head">
-            <h2>日记<span v-if="secret" class="secret-badge">绝密模式</span></h2>
+            <h2><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('diary', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>日记</span><span v-if="secret" class="secret-badge">绝密模式</span></h2>
             <Transition name="fade" mode="out-in"><small :key="savedAt + String(saving)" class="faint mono">{{ saving ? '' : savedAt ? `已保存 ${savedAt}` : '' }}</small></Transition>
           </header>
           <DiaryEditor v-model="data.diary.content" :theme="theme" :vault-key="vaultKey" :secret="secret" placeholder="今天……" @change="scheduleSave" />

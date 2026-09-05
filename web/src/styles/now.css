@@ -9,7 +9,19 @@
 .now-right { display: grid; gap: var(--gap); align-content: start; min-width: 0; }
 
 /* ---------- 时间区 ---------- */
-.now-clock { display: flex; align-items: baseline; gap: 14px; padding: 4px 0 2px; flex-wrap: wrap; }
+.now-clock { display: grid; gap: 8px; padding: 4px 0 2px; }
+.clock-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.day-progress { display: block; height: 2px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+.day-progress b { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent-soft), var(--accent)); box-shadow: 0 0 8px var(--accent-glow); transition: width var(--dur-slow) var(--ease-out), background var(--dur-slow); }
+
+/* ---------- 卡片顺序拖拽 ---------- */
+.card-title-main { display: inline-flex; align-items: center; gap: 6px; }
+.card-grip { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: -4px; border-radius: var(--radius); color: var(--text-faint); cursor: grab; opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), background var(--dur-fast); }
+.card:hover .card-grip, .card-grip:focus-visible, .reordering .card-grip { opacity: 1; }
+.card-grip:hover { color: var(--accent); background: var(--accent-soft); }
+.card-grip:active { cursor: grabbing; }
+.card.drag-source { opacity: .55; box-shadow: var(--glow); }
+.reordering .card { transition: box-shadow var(--dur-mid) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
 .clock-date { font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .clock-week, .clock-lunar { color: var(--text-dim); }
 .clock-lunar { color: var(--text-faint); }
@@ -112,7 +124,11 @@
 .fc .fc-dayGridDay-view .fc-daygrid-day-frame { min-height: 160px; }
 
 @media (max-width: 900px) {
-  .now-layout { grid-template-columns: 1fr; }
+  .now-layout { grid-template-columns: 1fr; gap: var(--gap); min-height: 0; }
   .now-divider { display: none; }
   .now-card { grid-template-columns: 1fr; }
+  .card-grip { opacity: 1; }
+  .clock-time { margin-left: 0; width: 100%; }
+  .plan-banner { grid-template-columns: 1fr; gap: 10px; }
+  .banner-arrow { display: none; }
 }
