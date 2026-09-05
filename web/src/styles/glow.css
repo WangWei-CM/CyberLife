@@ -1,0 +1,25 @@
+/* ============================================================
+   悬浮光效系统 · 三期 §1.5
+   三种形态：跟随光斑 .glow-spot（v-glow）｜边缘发光 .glow-edge｜文字辉光 .text-glow
+   三屏各用主题色：现在=蓝 / 过去=金 / 未来=霓虹青（绝密统一转红）
+   ============================================================ */
+.glow-spot { position: relative; isolation: isolate; overflow: hidden; }
+.glow-spot::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), var(--accent-soft), transparent 70%);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.glow-spot:hover::before, .glow-spot:focus-visible::before { opacity: 1; }
+.glow-spot:active { transform: scale(.97); }
+
+.glow-edge { transition: box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out), background-color var(--dur-mid) var(--ease-out); }
+.glow-edge:hover, .glow-edge:focus-visible, .glow-edge.lit { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 16px var(--accent-soft), 0 0 32px var(--accent-soft); }
+
+.text-glow { transition: color var(--dur-fast) var(--ease-out), text-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.text-glow:hover, .text-glow:focus-visible { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); }
+.theme-future .text-glow:hover, .theme-future .text-glow:focus-visible { text-shadow: 0 0 12px var(--accent-glow), 0 0 28px var(--accent-soft); }
+.theme-future h1.text-glow:hover, .theme-future h2.text-glow:hover { animation: glitch-shift var(--glitch-duration) steps(2, end) infinite; }
+
+/* 图标类按钮的辉光走 filter，保证 SVG 描边一起发光 */
+.icon-glow { transition: color var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.icon-glow:hover, .icon-glow:focus-visible { color: var(--accent); filter: drop-shadow(0 0 6px var(--accent-glow)); }
