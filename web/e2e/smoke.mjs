@@ -17,17 +17,18 @@ try {
   await b.goto(`${base}/`, 1000)
   await b.logoutApi().catch(() => {})
   await b.goto(`${base}/`, 1000)
-  check(await b.exists('.glitch-logo'), '登录页缺少 glitch logo')
+  check(await b.exists('.login-logo'), '登录页缺少 CyberLife logo')
+  check(await b.exists('.login-canvas'), '登录页缺少轨道场景画布')
   check(await b.exists('.login-key-input'), '登录页缺少密钥输入框')
   await b.shot('login')
 
   // 登录序列
   await b.type('.login-key-input', key)
   await b.click('.login-submit')
-  await b.sleep(1600)
-  check(await b.exists('.login-greeting'), '登录后没有出现问候语')
-  await b.sleep(2600)
-  check(await b.exists('.app-shell'), '登录后没有进入面板')
+  await b.sleep(1400)
+  check((await b.text('.login-stage-label')).includes('CYBERLIFE NODE') || (await b.text('.login-stage-label')).includes('LIFE OPERATING SYSTEM'), '登录后没有进入节点阶段')
+  await b.sleep(3000)
+  check(await b.exists('.app-shell'), '节点转场完成后没有进入面板')
 
   // 现在页
   await b.sleep(1200)

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { authState, displayName, isAdmin, isWriter, logout, restoreSession } from './stores/auth'
+import { authState, displayName, isAdmin, isWriter, logout, restoreSession, signIn } from './stores/auth'
 import { ui } from './stores/ui'
-import type { Notice } from './api/client'
+import { type Actor, type Notice } from './api/client'
 import { DUR, reducedMotion, transitionTheme } from './lib/motion'
 import { isDaytime } from './lib/dates'
 import AppIcon from './components/AppIcon.vue'
@@ -94,6 +94,10 @@ function onKey(event: KeyboardEvent) {
   if (event.altKey && event.key === 'ArrowLeft') step(-1)
   if (event.altKey && event.key === 'ArrowRight') step(1)
 }
+function onLoginTransitionComplete(actor: Actor) {
+  signIn(actor)
+}
+
 
 watch(appearance, value => localStorage.setItem('cyberlife-theme', value))
 watch(secretMode, value => localStorage.setItem('cyberlife-secret-mode', String(value)))
@@ -122,7 +126,7 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
 <template>
   <div v-if="authState.loading" class="app-boot" aria-label="加载中"><i /></div>
   <AdminLoginView v-else-if="!authState.actor && isAdminPath" />
-  <LoginView v-else-if="!authState.actor" />
+  <LoginView v-else-if="!authState.actor" @authenticated="onLoginTransitionComplete" />
   <div v-else ref="shell" class="app-shell" :class="shellClass" @dragover.prevent @dragleave="dropTarget = false" @drop.prevent="onDrop">
     <header class="topbar">
       <span class="topbar-grip" draggable="true" title="拖到屏幕边缘可改变位置" @dragstart="onGripDrag" @dragend="dropTarget = false"><AppIcon name="grip" :size="16" /></span>

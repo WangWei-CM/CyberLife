@@ -1,85 +1,76 @@
-/* ============================================================
-   登录页 · 纯黑 + glitch logo + 赛博渐变框（三期 §2）
-   ============================================================ */
-.login-page {
-  min-height: 100vh; display: grid; place-items: center;
-  background: #000; color: #fff;
-  --cyan: #00E5FF; --magenta: #FF00E5;
+/* CyberLife orbital login and transition scene. */
+.login-transition {
+  position: relative; min-height: 100vh; overflow: hidden; display: grid; place-items: center;
+  isolation: isolate; background: #02050a; color: #ecfffb;
+  --login-accent: #76ded2; --login-muted: rgba(202, 231, 229, .62); --login-line: rgba(118, 222, 210, .34);
 }
-.login-stage { width: min(380px, calc(100vw - 48px)); display: grid; gap: 36px; justify-items: center; }
-
-/* ---------- glitch logo：主层白 + 红/青偏移层（规格书 3.9） ---------- */
-.glitch-logo {
-  position: relative; margin: 0;
-  font: 700 34px/1 var(--font-mono); letter-spacing: .2em; padding-left: .2em;
-  color: #fff; white-space: nowrap;
-  animation: glitch-flicker 2s steps(1, end) infinite, glitch-shift 2s steps(2, end) infinite;
+.login-canvas, .login-scanlines, .login-vignette { position: absolute; inset: 0; width: 100%; height: 100%; }
+.login-canvas { z-index: -3; display: block; }
+.login-scanlines { z-index: -2; pointer-events: none; opacity: .18; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(190, 255, 244, .04) 4px, transparent 5px); mix-blend-mode: screen; }
+.login-vignette { z-index: -1; pointer-events: none; background: radial-gradient(ellipse at center, transparent 18%, rgba(0, 3, 8, .16) 58%, rgba(0, 2, 5, .82) 100%); }
+.login-corner { position: absolute; z-index: 1; width: 56px; height: 56px; border-color: var(--login-line); pointer-events: none; }
+.login-corner-tl { top: 28px; left: 28px; border-top: 1px solid; border-left: 1px solid; }
+.login-corner-br { right: 28px; bottom: 28px; border-right: 1px solid; border-bottom: 1px solid; }
+.login-interface {
+  position: relative; z-index: 2; width: min(470px, calc(100vw - 40px)); display: grid; justify-items: center; gap: 14px;
+  margin-top: -8vh; text-align: center; text-shadow: 0 2px 18px rgba(0, 0, 0, .65);
+  transition: opacity .55s var(--ease-out), transform .8s var(--ease-out);
 }
-.glitch-logo::before, .glitch-logo::after {
-  content: attr(data-text); position: absolute; inset: 0; padding-left: inherit;
-  pointer-events: none; mix-blend-mode: screen;
+.login-transition.transition-started .login-interface { transform: translateY(-3vh) scale(.94); opacity: .28; pointer-events: none; }
+.login-kicker, .login-stage-label, .login-footnote, .login-node-caption { font-family: var(--font-mono); letter-spacing: .18em; }
+.login-kicker { color: var(--login-accent); font-size: 10px; font-weight: 600; }
+.login-logo {
+  position: relative; margin: 4px 0 8px; color: #effffb; font: 700 clamp(30px, 6vw, 54px)/1 var(--font-mono); letter-spacing: .18em; padding-left: .18em;
 }
-.glitch-logo::before { color: #FF0080; transform: translate(-2px, 0); clip-path: inset(0 0 55% 0); animation: glitch-1 2s infinite steps(1); }
-.glitch-logo::after { color: #00FFF0; transform: translate(2px, 0); clip-path: inset(58% 0 0 0); animation: glitch-2 2s infinite steps(1); }
-
-/* ---------- 密钥输入框：渐变描边，聚焦时从正中向两侧点亮 ---------- */
-.login-form { display: flex; width: 100%; gap: 8px; }
-.login-key { position: relative; display: block; flex: 1; min-width: 0; border-radius: 2px; }
+.login-logo::before, .login-logo::after { content: attr(data-text); position: absolute; inset: 0; padding-left: inherit; pointer-events: none; opacity: .32; mix-blend-mode: screen; }
+.login-logo::before { color: #8ee8df; transform: translate(-2px, 1px); clip-path: inset(0 0 57% 0); animation: cyber-glitch 4s steps(1, end) infinite; }
+.login-logo::after { color: #d8b98b; transform: translate(2px, -1px); clip-path: inset(62% 0 0 0); animation: cyber-glitch 4s 1.7s steps(1, end) infinite; }
+.login-stage-label { min-height: 16px; color: var(--login-muted); font-size: 10px; transition: color .25s var(--ease-out); }
+.login-stage-label.loading { color: #f0d29b; }
+.login-form-orbital { width: min(360px, 100%); margin-top: 12px; }
+.login-key { position: relative; display: block; flex: 1; min-width: 0; }
 .login-key-input {
-  width: 100%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .04));
-  border: 1px solid transparent; border-radius: 2px;
-  padding: 12px 14px;
-  color: #fff; caret-color: var(--cyan);
-  font-family: var(--font-mono); letter-spacing: .04em;
-  transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out);
+  width: 100%; border: 0; border-bottom: 1px solid rgba(185, 226, 220, .42); border-radius: 0; padding: 14px 10px; background: rgba(1, 8, 14, .38);
+  color: #f4fffc; caret-color: var(--login-accent); font-family: var(--font-mono); font-size: 13px; letter-spacing: .08em; text-align: center;
+  transition: border-color .3s var(--ease-out), box-shadow .3s var(--ease-out), opacity .3s var(--ease-out);
 }
-.login-key-input::placeholder { color: #ffffff40; font-family: var(--font-sans); letter-spacing: 0; }
-.login-key-input:focus { outline: 0; box-shadow: 0 0 18px rgba(0, 229, 255, .25), 0 0 44px rgba(255, 0, 229, .1); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .05)); }
-.login-key-ring, .login-key-ring::after {
-  position: absolute; inset: 0; border-radius: 2px; padding: 1px; pointer-events: none;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-}
-/* 未聚焦：低饱和、偏灰的渐变环 */
-.login-key-ring { background: linear-gradient(90deg, #00E5FF1A, #FF00E540, #00E5FF1A); transition: opacity var(--dur-mid) var(--ease-out); }
-/* 聚焦：亮渐变环的 background-size 从 0% 展开到 100%，中点先亮、向两侧烧过去 */
-.login-key-ring::after {
-  content: ""; inset: 0; padding: 1px;
-  background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--cyan)) center / 0% 100% no-repeat;
-  transition: background-size .45s var(--ease-out);
-}
-.login-key:focus-within .login-key-ring::after { background-size: 100% 100%; }
-.login-key:focus-within .login-key-ring { opacity: .5; }
-
-/* ---------- 登录按钮：唯一保留描边的按钮（渐变描边 + 发光 + 按下缩放） ---------- */
+.login-key-input::placeholder { color: rgba(202, 231, 229, .46); font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em; }
+.login-key-input:focus { outline: 0; border-color: var(--login-accent); box-shadow: 0 8px 18px -12px rgba(118, 222, 210, .75); }
+.login-key-ring { position: absolute; right: 0; bottom: -1px; left: 0; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--login-accent), transparent); transform: scaleX(0); transform-origin: center; transition: transform .45s var(--ease-out); }
+.login-key:focus-within .login-key-ring { transform: scaleX(1); }
 .login-submit {
-  display: inline-grid; place-items: center; width: 48px; flex: 0 0 48px; border-radius: 2px;
-  border: 1px solid transparent; color: #fff;
-  background: linear-gradient(#000, #000) padding-box, linear-gradient(90deg, #00E5FF66, #FF00E599, #00E5FF66) border-box;
-  transition: box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  display: inline-grid; place-items: center; width: 48px; height: 48px; flex: 0 0 48px; border: 1px solid rgba(118, 222, 210, .48); border-radius: 50%; color: var(--login-accent);
+  background: rgba(6, 24, 30, .58); transition: box-shadow .3s var(--ease-out), background .3s var(--ease-out), transform .15s var(--ease-out), color .15s;
 }
-.login-submit:hover:not(:disabled), .login-submit:focus-visible { box-shadow: 0 0 16px rgba(0, 229, 255, .35), 0 0 32px rgba(255, 0, 229, .12); color: var(--cyan); }
-.login-submit:active:not(:disabled) { transform: scale(.98); }
-.login-submit:disabled { opacity: .35; }
-.login-submit.glow-spot::before { background: radial-gradient(90px circle at var(--mx, 50%) var(--my, 50%), rgba(0, 229, 255, .35), transparent 70%); }
-.login-error { min-height: 18px; margin: -18px 0 0; font-size: 12px; color: #FF2A6D; text-align: center; transition: opacity var(--dur-mid); }
-.login-error:empty { opacity: 0; }
+.login-submit:hover:not(:disabled), .login-submit:focus-visible { color: #f2fffc; background: rgba(38, 92, 91, .5); box-shadow: 0 0 0 5px rgba(118, 222, 210, .07), 0 0 26px rgba(118, 222, 210, .38); }
+.login-submit:active:not(:disabled) { transform: scale(.94); }
+.login-submit:disabled { opacity: .4; }
+.login-spinner { width: 16px; height: 16px; border: 1px solid rgba(236, 255, 251, .32); border-top-color: var(--login-accent); border-radius: 50%; animation: spin .65s linear infinite; }
+.login-error { min-height: 18px; margin: 0; color: #e8aa86; font: 11px/1.5 var(--font-mono); }
+.login-footnote, .login-node-caption { color: rgba(202, 231, 229, .42); font-size: 9px; }
+.login-node-caption { color: rgba(240, 210, 155, .72); animation: login-caption-in .6s var(--ease-out) both; }
+.login-fallback { position: absolute; z-index: 5; bottom: 42px; left: 50%; transform: translateX(-50%); padding: 9px 16px; border: 1px solid var(--login-line); color: var(--login-accent); background: rgba(3, 15, 20, .8); font: 11px var(--font-mono); letter-spacing: .08em; }
+.login-fallback:hover, .login-fallback:focus-visible { background: rgba(38, 92, 91, .55); }
 
-/* ---------- 动画序列：离开 → 问候 ---------- */
-.phase-leaving .glitch-logo { animation: leave var(--dur-slow) var(--ease-out) forwards; }
-.phase-leaving .glitch-logo::before, .phase-leaving .glitch-logo::after { animation: none; }
-.phase-leaving .login-form, .phase-leaving .login-error { opacity: 0; transition: opacity .5s var(--ease-out); }
-.login-greeting {
-  margin: 0; font-size: 22px; font-weight: 500; letter-spacing: .08em; color: #fff;
-  opacity: 0; transform: translateY(6px);
-  transition: opacity var(--greet-fade, .5s) var(--ease-out), transform var(--greet-fade, .5s) var(--ease-out);
-}
-.login-greeting.show { opacity: 1; transform: none; }
-
-/* ---------- 管理员独立登录（/admin，与主登录页隔离） ---------- */
+/* ---------- administrator login remains a separate, non-orbital flow ---------- */
 .admin-login-page { min-height: 100vh; display: grid; place-items: center; background: #0B1220; color: #E8EEF9; padding: 24px; --accent: #4D8AFF; --accent-soft: rgba(77, 138, 255, .16); --accent-glow: rgba(77, 138, 255, .4); --surface: #111B2E; --surface-2: #16233A; --surface-3: #1C2C47; --text: #E8EEF9; --text-dim: #8FA3C0; --text-faint: #566985; --border: #1F2E47; --radius: 4px; --danger: #F87171; --bg: #0B1220; --shadow: 0 2px 8px rgba(0, 0, 0, .35); }
 .admin-login-form { display: grid; gap: 16px; width: min(360px, 100%); padding: 28px 24px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
 .admin-login-form h1 { font-size: 20px; font-weight: 700; }
 .admin-login-form p.hint { font-size: 12px; color: var(--text-dim); }
+
+@keyframes cyber-glitch { 0%, 89%, 100% { opacity: .25; } 90% { opacity: .7; transform: translate(-4px, 1px); } 92% { opacity: .15; transform: translate(3px, -1px); } 94% { opacity: .42; } }
+@keyframes login-caption-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 600px) {
+  .login-interface { width: min(390px, calc(100vw - 32px)); margin-top: -12vh; }
+  .login-logo { font-size: clamp(27px, 9vw, 42px); letter-spacing: .13em; padding-left: .13em; }
+  .login-form-orbital { width: min(330px, 100%); }
+  .login-corner { width: 34px; height: 34px; }
+  .login-corner-tl { top: 18px; left: 18px; }
+  .login-corner-br { right: 18px; bottom: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-scanlines, .login-logo::before, .login-logo::after, .login-spinner { animation: none; }
+  .login-transition.transition-started .login-interface { transform: none; }
+}
