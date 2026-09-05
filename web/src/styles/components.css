@@ -1,0 +1,111 @@
+/* ============================================================
+   通用组件 · popover / 通知 / 音乐 / 进度条 / 空状态 / 标签网格
+   ============================================================ */
+.popover {
+  position: absolute; z-index: 60; top: calc(100% + 8px); right: 0;
+  min-width: 260px; padding: 14px;
+  background: var(--surface-3, var(--surface)); color: var(--text);
+  border-radius: var(--radius); box-shadow: var(--shadow-lift);
+}
+.theme-future .popover { background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: var(--glow); }
+.theme-past .popover { box-shadow: var(--shadow-lift), inset 0 0 18px rgba(212, 175, 55, .05); }
+.nav-left .popover { right: auto; left: calc(100% + 8px); top: 0; }
+.nav-right .popover { right: calc(100% + 8px); top: 0; }
+.nav-bottom .popover { top: auto; bottom: calc(100% + 8px); }
+.popover-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.popover-head b { font-size: 13px; letter-spacing: .04em; }
+
+/* ---------- 通知中心 ---------- */
+.notice-wrap { position: relative; }
+.notice-button { position: relative; }
+.notice-dot {
+  position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; border-radius: 8px;
+  background: var(--secret); color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--secret) 60%, transparent);
+  animation: notice-pop var(--dur-mid) var(--ease-spring);
+}
+.notice-popover { width: 340px; max-height: 460px; overflow: auto; }
+.notice-list { display: grid; }
+.notice-item { display: grid; gap: 4px; width: 100%; padding: 10px 8px 10px 12px; text-align: left; border-radius: var(--radius); border-left: 2px solid transparent; transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-mid) var(--ease-out); }
+.notice-item:hover { background: var(--accent-soft); }
+.notice-list li.unread .notice-item { border-left-color: var(--accent); }
+.notice-list li.unread .notice-type { color: var(--accent); }
+.notice-list li + li .notice-item { box-shadow: inset 0 1px 0 var(--divider); }
+.notice-type { font-size: 11px; letter-spacing: .08em; color: var(--text-faint); transition: color var(--dur-mid); }
+.notice-item p { color: var(--text); line-height: 1.5; }
+.notice-item small { color: var(--text-faint); font-family: var(--font-mono); font-size: 11px; }
+
+/* ---------- 音乐 ---------- */
+.music-control { position: relative; display: flex; align-items: center; }
+.music-control.playing .music-toggle { color: var(--accent); }
+.music-control.playing .music-more::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; animation: pulse-dot 2.4s var(--ease-out) infinite; pointer-events: none; }
+.music-popover { width: 300px; display: grid; gap: 12px; }
+.music-now { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.music-status { width: 6px; height: 6px; border-radius: 50%; background: var(--text-faint); flex: 0 0 auto; transition: background var(--dur-mid), box-shadow var(--dur-mid); }
+.music-status.live { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+.music-skip { display: flex; margin-left: auto; }
+.music-skip .icon-button { width: 28px; height: 28px; }
+.marquee { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 13px; color: var(--text); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
+.marquee span { display: inline-block; padding-right: 40px; }
+.marquee.run span { animation: marquee 12s linear infinite; }
+.music-volume { display: flex; align-items: center; gap: 10px; color: var(--text-dim); }
+.music-volume b { font-size: 12px; min-width: 36px; text-align: right; color: var(--text-dim); }
+
+/* ---------- 进度条：宽度 0.6s 过渡 + 数值插值 ---------- */
+.progress-wrap { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.progress { flex: 1; display: block; height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
+.theme-future .progress { border-radius: 0; background: var(--accent-soft); }
+.progress > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width var(--dur-slow) var(--ease-out), background-color var(--dur-slow) var(--ease-out); }
+.theme-future .progress > i { box-shadow: 0 0 8px var(--accent); }
+.tone-accent-2 .progress { background: var(--accent-2-soft, var(--surface-3)); }
+.tone-accent-2 .progress > i { background: var(--accent-2); }
+.theme-future .tone-accent-2 .progress > i { box-shadow: 0 0 8px var(--accent-2); }
+.tone-dim .progress > i { background: var(--text-faint); box-shadow: none; }
+.progress-label { font-size: 12px; color: var(--text-dim); min-width: 38px; text-align: right; }
+
+/* ---------- 空状态 ---------- */
+.empty-state { animation: empty-in var(--dur-mid) var(--ease-out) both; }
+.empty-state.compact { min-height: 72px; gap: 6px; }
+@keyframes empty-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- 标签网格（心情） ---------- */
+.tag-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.tag-item {
+  display: grid; place-items: center; gap: 2px; padding: 7px 2px;
+  background: var(--surface-2); color: var(--text-dim); font-size: 11px; border-radius: var(--radius);
+  transition: transform var(--dur-fast) var(--ease-spring), background var(--dur-mid) var(--ease-out), color var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out);
+}
+.tag-item i { font-style: normal; font-size: 20px; line-height: 1.2; filter: saturate(.7); transition: filter var(--dur-fast), transform var(--dur-fast) var(--ease-spring); }
+.tag-item:hover, .tag-item:focus-visible { color: var(--text); transform: translateY(-1px); box-shadow: 0 0 16px var(--accent-soft); }
+.tag-item:hover i { filter: saturate(1); }
+.tag-item.selected { color: var(--text); background: var(--accent-soft); transform: scale(1.05); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent), 0 0 14px var(--accent-soft); }
+.tag-item.selected i { filter: saturate(1); transform: scale(1.08); }
+
+/* ---------- 里程碑徽章（磨损纹理，规格书 2.3） ---------- */
+.milestone-badge {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 12px; border-radius: 20px;
+  color: var(--gold, var(--accent)); font-size: 12px; font-weight: 600; letter-spacing: .04em;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold, var(--accent)) 55%, transparent), 0 0 12px color-mix(in srgb, var(--gold, var(--accent)) 25%, transparent);
+  isolation: isolate;
+}
+.milestone-badge::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: .14; background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(0, 0, 0, .35) 2px, rgba(0, 0, 0, .35) 3px); }
+
+/* ---------- 键盘提示 ---------- */
+.kbd { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+
+/* ---------- 可拖拽分隔线 ---------- */
+.divider-v { width: 6px; cursor: col-resize; border-radius: 3px; background: transparent; position: relative; transition: background var(--dur-fast) var(--ease-out); }
+.divider-v::before { content: ""; position: absolute; top: 0; bottom: 0; left: 2px; width: 2px; border-radius: 2px; background: var(--divider); transition: background var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
+.divider-v:hover::before, .divider-v.dragging::before { background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+.divider-h { height: 6px; cursor: row-resize; border-radius: 3px; position: relative; transition: background var(--dur-fast) var(--ease-out); }
+.divider-h::before { content: ""; position: absolute; left: 0; right: 0; top: 2px; height: 2px; border-radius: 2px; background: var(--divider); transition: background var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
+.divider-h:hover::before, .divider-h.dragging::before { background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+body.resizing-col { cursor: col-resize; user-select: none; }
+body.resizing-row { cursor: row-resize; user-select: none; }
+
+@media (max-width: 760px) {
+  .tag-grid { grid-template-columns: repeat(4, 1fr); }
+  .notice-popover, .music-popover { width: min(340px, calc(100vw - 24px)); }
+}

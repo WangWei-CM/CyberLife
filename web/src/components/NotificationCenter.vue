@@ -1,15 +1,58 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api, type Notice } from '../api/client'
-const notices=ref<Notice[]>([])
-const loading=ref(false)
-async function load(){loading.value=true;try{notices.value=(await api.notifications()).items}catch{notices.value=[]}finally{loading.value=false}}
-onMounted(load)
-const open=ref(false)
-const unread=computed(()=>notices.value.filter(x=>!x.read).length)
-async function markAll(){for(const notice of notices.value.filter(x=>!x.read)){await api.markNotificationRead(notice.id)};await load()}
-function toggle(){open.value=!open.value}
-function close(){open.value=false}
-defineExpose({toggle,close})
+import { timeLabel } from '../lib/dates'
+import AppIcon from './AppIcon.vue'
+import EmptyState from './EmptyState.vue'
+
+const notices = ref<Notice[]>([])
+const open = ref(false)
+const busy = ref(false)
+const root = ref<HTMLElement>()
+let poll: number | undefined
+
+const unread = computed(() => notices.value.filter(item => !item.read).length)
+const typeLabel: Record<string, string> = { comment: '评论', key_expired: '密钥过期', plan_due: '规划到期', life_status: '状态变化', secret_opened: '绝密解除' }
+const sorted = computed(() => [...notices.value].sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+
+async function load() { try { notices.value = (await api.notifications()).items } catch { /* 通知不可用时保持静默 */ } }
+async function markAll() {
+  if (busy.value) return
+  busy.value = true
+  try { await Promise.all(notices.value.filter(item => !item.read).map(item => api.markNotificationRead(item.id))); await load() } finally { busy.value = false }
+}
+async function markOne(notice: Notice) { if (notice.read) return; try { await api.markNotificationRead(notice.id); notice.read = true } catch { /* ignore */ } }
+function toggle() { open.value = !open.value }
+function close() { open.value = false }
+function onDocumentClick(event: MouseEvent) { if (open.value && root.value && !root.value.contains(event.target as Node)) close() }
+function onKey(event: KeyboardEvent) { if (event.key === 'Escape') close() }
+function dateLabel(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : `${date.getMonth() + 1}月${date.getDate()}日 ${timeLabel(date)}` }
+
+onMounted(() => { load(); poll = window.setInterval(load, 60_000); document.addEventListener('click', onDocumentClick); document.addEventListener('keydown', onKey) })
+onBeforeUnmount(() => { if (poll) clearInterval(poll); document.removeEventListener('click', onDocumentClick); document.removeEventListener('keydown', onKey) })
+defineExpose({ toggle, close, load })
 </script>
-<template><div class="notice-wrap"><button class="notice-button glow-spot text-glow" aria-label="通知中心" @click="toggle">铃铛<span v-if="unread" class="notice-dot">{{unread>99?'99+':unread}}</span></button><Transition name="popover"><section v-if="open" class="notice-popover"><header><b>通知中心</b><button class="text-button" @click="markAll">全部已读</button></header><p v-if="!notices.length" class="empty">暂无通知</p><article v-for="notice in notices" :key="notice.id" :class="{unread:!notice.read}"><b>{{notice.type}}</b><p>{{notice.text}}</p><small>{{notice.createdAt}}</small></article></section></Transition></div></template>
+
+<template>
+  <div ref="root" class="notice-wrap">
+    <button v-glow class="icon-button notice-button" :class="{ active: open }" aria-label="通知中心" :aria-expanded="open" @click="toggle">
+      <AppIcon name="bell" />
+      <Transition name="pop"><span v-if="unread" class="notice-dot" :key="unread">{{ unread > 99 ? '99+' : unread }}</span></Transition>
+    </button>
+    <Transition name="popover">
+      <section v-if="open" class="popover notice-popover" aria-label="通知列表">
+        <header class="popover-head"><b>通知</b><button v-if="unread" class="text-button" :disabled="busy" @click="markAll"><AppIcon name="check" :size="14" />全部已读</button></header>
+        <EmptyState v-if="!sorted.length" icon="inbox" text="还没有通知" compact />
+        <ul v-else class="notice-list">
+          <li v-for="notice in sorted" :key="notice.id" :class="{ unread: !notice.read }">
+            <button class="notice-item" @click="markOne(notice)">
+              <span class="notice-type">{{ typeLabel[notice.type] ?? notice.type }}</span>
+              <p>{{ notice.text }}</p>
+              <small>{{ dateLabel(notice.createdAt) }}</small>
+            </button>
+          </li>
+        </ul>
+      </section>
+    </Transition>
+  </div>
+</template>

@@ -1,0 +1,189 @@
+/* ============================================================
+   Base · reset、排版、通用控件、滚动条
+   原则：能不加框就不加框；层级用背景色差 + 单方向分隔线 + 留白表达。
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg, #000);
+  color: var(--text, #e8eef9);
+  font: 14px/1.6 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+#app { min-height: 100vh; }
+h1, h2, h3, h4, p, ul, ol, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+img, svg { display: block; max-width: 100%; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+a { color: var(--accent); text-decoration: none; }
+::selection { background: var(--accent-soft); }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius); }
+button:focus:not(:focus-visible) { outline: 0; }
+
+/* ---------- 滚动条：三屏统一走变量 ---------- */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; transition: background var(--dur-fast) var(--ease-out); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ---------- 页面容器 ---------- */
+.page { max-width: var(--page-max); margin: 0 auto; padding: var(--page-pad); position: relative; }
+.page-narrow { max-width: 1100px; }
+
+/* ---------- 卡片：无边框，背景 + 阴影 表达层级 ---------- */
+.card {
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  min-width: 0;
+  transition: box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out), background-color var(--dur-mid) var(--ease-out);
+}
+.card-title, h2.card-title {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.card-title small { font-weight: 400; color: var(--text-faint); letter-spacing: 0; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.card-head h2 { font-size: 13px; font-weight: 600; letter-spacing: .04em; color: var(--text-dim); }
+.muted { color: var(--text-dim); }
+.faint { color: var(--text-faint); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.error { color: var(--danger); font-size: 12px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- 按钮体系：主按钮有底色，其余一律文字按钮（去框线专项） ---------- */
+.btn, .primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  line-height: 1.3;
+  transition: background var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out), color var(--dur-fast);
+}
+.theme-now .btn, .theme-now .primary { color: #fff; }
+.btn:hover, .primary:hover { background: var(--accent-hover, var(--accent)); box-shadow: 0 0 16px var(--accent-soft); transform: translateY(-1px); }
+.btn:active, .primary:active { transform: scale(.97); }
+.text-button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  transition: color var(--dur-fast) var(--ease-out), text-shadow var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.text-button:hover, .text-button:focus-visible { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); }
+.text-button:active { transform: scale(.97); }
+.text-button.danger:hover { color: var(--danger); text-shadow: 0 0 12px color-mix(in srgb, var(--danger) 50%, transparent); }
+.icon-button {
+  display: inline-grid; place-items: center;
+  width: 36px; height: 36px;
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out);
+}
+.icon-button:hover, .icon-button:focus-visible { color: var(--accent); filter: drop-shadow(0 0 6px var(--accent-glow)); }
+.icon-button:active { transform: scale(.94); }
+.icon-button.active { color: var(--accent); }
+
+/* ---------- 输入类：细线 + 聚焦发光（"可编辑"语义保留边框） ---------- */
+.input, .textarea, .select,
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  line-height: 1.4;
+  transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out);
+}
+input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus, textarea:focus, select:focus,
+.input:focus, .textarea:focus, .select:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft), 0 0 14px var(--accent-soft);
+}
+input::placeholder, textarea::placeholder { color: var(--text-faint); }
+textarea { resize: vertical; min-height: 72px; }
+select { appearance: none; padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%); background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+input[type="checkbox"] {
+  appearance: none; width: 16px; height: 16px; margin: 0; flex: 0 0 auto;
+  border: 1.5px solid var(--text-faint); border-radius: var(--radius);
+  display: inline-grid; place-items: center; cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
+}
+input[type="checkbox"]::after { content: ""; width: 9px; height: 5px; border: 2px solid var(--bg); border-top: 0; border-right: 0; transform: rotate(-45deg) scale(0); transition: transform var(--dur-fast) var(--ease-spring); }
+input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+input[type="checkbox"]:checked::after { transform: rotate(-45deg) scale(1); }
+input[type="range"] {
+  appearance: none; width: 100%; height: 22px; background: transparent; margin: 0; cursor: pointer;
+  --range-fill: 50%;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) var(--range-fill), var(--surface-3) var(--range-fill));
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  transition: box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-spring);
+}
+input[type="range"]:hover::-webkit-slider-thumb, input[type="range"]:active::-webkit-slider-thumb { box-shadow: 0 0 0 6px var(--accent-soft), 0 0 14px var(--accent-glow); transform: scale(1.1); }
+input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: var(--surface-3); }
+input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--accent); }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--accent); }
+.field { display: grid; gap: 6px; }
+.field > span { font-size: 12px; color: var(--text-dim); }
+.form-row { display: flex; gap: 8px; align-items: center; }
+.form-row > * { min-width: 0; }
+
+/* ---------- 分段控件：细线容器 + 滑动选中块 ---------- */
+.segmented {
+  position: relative; display: inline-flex; padding: 3px; gap: 2px;
+  background: var(--surface-2); border-radius: calc(var(--radius) + 2px);
+  isolation: isolate;
+}
+.segmented button {
+  position: relative; z-index: 1; flex: 1;
+  padding: 7px 14px; border-radius: var(--radius); white-space: nowrap;
+  color: var(--text-dim); font-weight: 500;
+  transition: color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.segmented button:hover { color: var(--text); }
+.segmented button.active { color: var(--accent); }
+.segmented .segmented-thumb {
+  position: absolute; top: 3px; bottom: 3px; left: 0; z-index: 0;
+  width: var(--thumb-w, 0px); transform: translateX(var(--thumb-x, 0px));
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow), 0 0 0 1px var(--accent-soft);
+  transition: transform var(--dur-mid) var(--ease-out), width var(--dur-mid) var(--ease-out), background var(--dur-mid);
+}
+
+/* ---------- 列表项：只保留单方向分隔线 ---------- */
+.list { display: grid; }
+.list > li, .list-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider); }
+.list > li:last-child, .list-row:last-child { border-bottom: 0; }
+
+/* ---------- 空状态：图标 + 一句克制说明 ---------- */
+.empty { display: grid; place-items: center; gap: 10px; min-height: 120px; padding: 16px; color: var(--text-dim); text-align: center; }
+.empty svg { color: var(--text-faint); }
+.empty p { font-size: 13px; }
+
+/* ---------- 引导/加载 ---------- */
+.app-boot { height: 100vh; display: grid; place-items: center; background: #000; }
+.app-boot i { width: 18px; height: 18px; border: 2px solid #4d8aff; border-top-color: transparent; border-radius: 50%; animation: spin .6s linear infinite; }
+
+@media (max-width: 760px) {
+  :root { --page-pad: 16px; }
+}

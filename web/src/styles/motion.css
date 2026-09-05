@@ -1,0 +1,111 @@
+/* ============================================================
+   Motion · 三期动效基建
+   所有时长/缓动只引用 tokens.css 中的令牌。
+   ============================================================ */
+
+/* ---------- 卡片 stagger 入场（JS 按索引写 transition-delay） ---------- */
+.card-enter { opacity: 0; transform: translateY(12px); transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-out); }
+.card-enter.visible { opacity: 1; transform: translateY(0); }
+
+/* ---------- 登录 → 面板：现在页以页面正中为原点缩放淡入 ---------- */
+.shell-enter { animation: shell-enter var(--dur-slow) var(--ease-out) both; transform-origin: 50% 50%; }
+@keyframes shell-enter { from { opacity: 0; transform: scale(1.03); } to { opacity: 1; transform: scale(1); } }
+
+/* ---------- 主题/绝密切换：整页颜色迁移 ≥ 400ms ---------- */
+.theme-shift, .theme-shift *, .theme-shift *::before, .theme-shift *::after {
+  transition: background-color var(--dur-slow) var(--ease-out), color var(--dur-slow) var(--ease-out), border-color var(--dur-slow) var(--ease-out),
+    box-shadow var(--dur-slow) var(--ease-out), text-shadow var(--dur-slow) var(--ease-out), fill var(--dur-slow) var(--ease-out), stroke var(--dur-slow) var(--ease-out),
+    background var(--dur-slow) var(--ease-out), opacity var(--dur-slow) var(--ease-out) !important;
+}
+
+/* ---------- Vue <Transition> 命名过渡 ---------- */
+.fade-enter-active, .fade-leave-active { transition: opacity var(--dur-mid) var(--ease-out); }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.fade-slide-enter-active, .fade-slide-leave-active { transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-out); }
+.fade-slide-enter-from { opacity: 0; transform: translateY(8px); }
+.fade-slide-leave-to { opacity: 0; transform: translateY(-6px); }
+
+.tab-enter-active, .tab-leave-active { transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.tab-enter-from { opacity: 0; transform: translateX(10px); }
+.tab-leave-to { opacity: 0; transform: translateX(-10px); }
+
+.pop-enter-active { transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-spring); }
+.pop-leave-active { transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(.9); }
+
+.popover-enter-active, .popover-leave-active { transform-origin: top right; transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-out); }
+.popover-enter-from, .popover-leave-to { opacity: 0; transform: translateY(8px) scale(.97); }
+
+.carousel-enter-active, .carousel-leave-active { transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-out); }
+.carousel-enter-from { opacity: 0; transform: translateX(24px); }
+.carousel-leave-to { opacity: 0; transform: translateX(-24px); }
+.carousel-leave-active { position: absolute; inset: 0; }
+
+.tick-enter-active, .tick-leave-active { transition: opacity var(--dur-fast) var(--ease-out); }
+.tick-enter-from, .tick-leave-to { opacity: 0; }
+
+.medal-enter-active { transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-spring); }
+.medal-leave-active { transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.medal-enter-from, .medal-leave-to { opacity: 0; transform: translateY(-50%) scale(.6); }
+
+.lightbox-enter-active, .lightbox-leave-active { transition: opacity var(--dur-mid) var(--ease-out); }
+.lightbox-enter-active img, .lightbox-leave-active img { transition: transform var(--dur-mid) var(--ease-out), opacity var(--dur-mid) var(--ease-out); }
+.lightbox-enter-from, .lightbox-leave-to { opacity: 0; }
+.lightbox-enter-from img, .lightbox-leave-to img { transform: scale(.92); }
+
+.list-move, .list-enter-active, .list-leave-active { transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-out); }
+.list-enter-from { opacity: 0; transform: translateY(8px); }
+.list-leave-to { opacity: 0; transform: translateX(12px); }
+.list-leave-active { position: absolute; width: 100%; }
+
+/* ---------- 通用 keyframes ---------- */
+@keyframes spin { to { transform: rotate(1turn); } }
+@keyframes pulse-dot { 0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); } 50% { box-shadow: 0 0 0 6px transparent; } }
+@keyframes notice-pop { from { opacity: 0; transform: scale(.4); } 60% { transform: scale(1.2); } to { opacity: 1; transform: scale(1); } }
+@keyframes check-pop { 0% { transform: scale(1); } 50% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes clock-tick { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes metric-draw { from { stroke-dashoffset: var(--path-length, 1000); } to { stroke-dashoffset: 0; } }
+@keyframes gold-sweep { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes grid-scan { from { background-position: 0 0, 0 0, 0 -100vh; } to { background-position: 0 0, 0 0, 0 100vh; } }
+@keyframes scan-light { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dust { 0% { transform: translateY(0) translateX(0); opacity: 0; } 10% { opacity: .5; } 90% { opacity: .35; } 100% { transform: translateY(-40vh) translateX(6vw); opacity: 0; } }
+@keyframes ribbon-in { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ---------- 登录页序列 ---------- */
+@keyframes glitch-shift { 0%, 86%, 100% { transform: translate(0); } 88% { transform: translate(-1px, 1px); } 92% { transform: translate(1px, -1px); } 96% { transform: translate(-.5px, .5px); } }
+@keyframes glitch-1 { 0%, 100% { transform: translate(-2px, 0); clip-path: inset(0 0 55% 0); } 20% { transform: translate(-3px, 1px); clip-path: inset(10% 0 40% 0); } 40% { transform: translate(-1px, -1px); clip-path: inset(0 0 62% 0); } 60% { transform: translate(-2px, 2px); clip-path: inset(30% 0 20% 0); } 80% { transform: translate(-3px, -1px); clip-path: inset(0 0 55% 0); } }
+@keyframes glitch-2 { 0%, 100% { transform: translate(2px, 0); clip-path: inset(58% 0 0 0); } 20% { transform: translate(3px, -1px); clip-path: inset(40% 0 10% 0); } 40% { transform: translate(1px, 1px); clip-path: inset(66% 0 0 0); } 60% { transform: translate(2px, -2px); clip-path: inset(20% 0 35% 0); } 80% { transform: translate(3px, 1px); clip-path: inset(58% 0 0 0); } }
+@keyframes glitch-flicker { 0%, 100% { opacity: 1; } 91% { opacity: 1; } 92% { opacity: .55; } 93% { opacity: 1; } 96% { opacity: .8; } 97% { opacity: 1; } }
+@keyframes leave { to { transform: scale(1.15); opacity: 0; } }
+@keyframes greet { 0% { opacity: 0; transform: translateY(6px); } 25%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
+
+/* ---------- 三屏切换（View Transitions，二期已达标；本期只补入场质感） ---------- */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--dur-page); animation-timing-function: var(--ease-out); }
+@keyframes vt-glitch-out { 0% { opacity: 1; clip-path: inset(0); } 45% { transform: translateX(-12px); clip-path: polygon(0 0, 100% 0, 100% 18%, 0 30%, 0 45%, 100% 38%, 100% 62%, 0 72%, 0 100%, 100% 100%); } 100% { opacity: 0; transform: translateX(-28px); } }
+@keyframes vt-neon-in { from { opacity: 0; clip-path: inset(0 100% 0 0); filter: brightness(1.6); } to { opacity: 1; clip-path: inset(0); filter: none; } }
+@keyframes vt-past-out { from { opacity: 1; filter: sepia(0); } to { opacity: 0; filter: sepia(.85); } }
+@keyframes vt-past-in { from { opacity: 0; filter: sepia(.9) brightness(1.35); } to { opacity: 1; filter: sepia(0); } }
+@keyframes vt-fade-in { from { opacity: 0; } to { opacity: 1; } }
+html[data-transition="from-now-to-future"]::view-transition-old(root), html[data-transition="from-past-to-future"]::view-transition-old(root) { animation: vt-glitch-out var(--dur-page) var(--ease-out); }
+html[data-transition="from-now-to-future"]::view-transition-new(root), html[data-transition="from-past-to-future"]::view-transition-new(root) { animation: vt-neon-in var(--dur-page) var(--ease-out); }
+html[data-transition="from-now-to-past"]::view-transition-old(root), html[data-transition="from-future-to-past"]::view-transition-old(root) { animation: vt-past-out var(--dur-page) var(--ease-out); }
+html[data-transition="from-now-to-past"]::view-transition-new(root), html[data-transition="from-future-to-past"]::view-transition-new(root) { animation: vt-past-in var(--dur-page) var(--ease-out); }
+html[data-transition="from-future-to-now"]::view-transition-old(root) { animation: vt-glitch-out var(--dur-page) reverse var(--ease-out); }
+html[data-transition="from-future-to-now"]::view-transition-new(root) { animation: vt-neon-in var(--dur-page) reverse var(--ease-out); }
+html[data-transition="from-past-to-now"]::view-transition-old(root) { animation: vt-past-out var(--dur-page) reverse var(--ease-out); }
+html[data-transition="from-past-to-now"]::view-transition-new(root) { animation: vt-past-in var(--dur-page) reverse var(--ease-out); }
+html[data-transition="theme"]::view-transition-old(root), html[data-transition="theme"]::view-transition-new(root) { animation: vt-fade-in var(--dur-slow) var(--ease-out); }
+
+/* ---------- prefers-reduced-motion：本期全部动画瞬时完成 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-enter { opacity: 1; transform: none; }
+  .glitch-logo::before, .glitch-logo::after { animation: none !important; }
+}

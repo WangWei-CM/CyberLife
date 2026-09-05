@@ -1,0 +1,148 @@
+/* ============================================================
+   Cyberlife design tokens · 视觉规格书 §0
+   三套主题 × 亮暗；组件只允许引用这里的变量。
+   ============================================================ */
+:root {
+  --font-sans: "Inter", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", Georgia, serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "IBM Plex Mono", Consolas, monospace;
+
+  --radius-now: 4px;
+  --radius-past: 8px;
+  --radius-future: 0px;
+
+  --ease-standard: cubic-bezier(.25, 1, .5, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+
+  --dur-fast: .15s;
+  --dur-mid: .3s;
+  --dur-slow: .6s;
+  --dur-page: .8s;
+  --glitch-duration: 1.6s;
+  --glitch-intensity: .3;
+
+  --topbar-h: 56px;
+  --page-max: 1400px;
+  --page-pad: 32px;
+  --gap: 16px;
+  --stagger: 40ms;
+
+  color-scheme: dark;
+}
+
+/* ---------- 现在 now：蓝白 / 蓝黑 扁平 ---------- */
+.theme-now {
+  --radius: var(--radius-now);
+  --font-ui: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --accent-2: var(--accent);
+}
+.theme-now.light {
+  color-scheme: light;
+  --bg: #F5F8FF; --surface: #FFFFFF; --surface-2: #EDF2FC; --surface-3: #E2E9F7;
+  --text: #0B1B33; --text-dim: #5A6C85; --text-faint: #94A3B8;
+  --accent: #2F6BFF; --accent-hover: #1E55E0; --accent-soft: rgba(47, 107, 255, .10); --accent-glow: rgba(47, 107, 255, .35);
+  --border: #DCE4F2; --divider: #E6ECF7;
+  --shadow: 0 1px 3px rgba(11, 27, 51, .06), 0 4px 12px rgba(11, 27, 51, .05);
+  --shadow-lift: 0 6px 18px rgba(11, 27, 51, .10);
+  --glow: 0 0 0 1px var(--accent-soft), 0 0 18px var(--accent-soft);
+  --success: #16A34A; --danger: #DC2626; --warn: #D97706; --secret: #DC2626;
+  --scrim: rgba(11, 18, 32, .82);
+}
+.theme-now.dark {
+  color-scheme: dark;
+  --bg: #0B1220; --surface: #111B2E; --surface-2: #16233A; --surface-3: #1C2C47;
+  --text: #E8EEF9; --text-dim: #8FA3C0; --text-faint: #566985;
+  --accent: #4D8AFF; --accent-hover: #6B9CFF; --accent-soft: rgba(77, 138, 255, .16); --accent-glow: rgba(77, 138, 255, .4);
+  --border: #1F2E47; --divider: #1A2740;
+  --shadow: 0 2px 8px rgba(0, 0, 0, .35);
+  --shadow-lift: 0 10px 28px rgba(0, 0, 0, .45);
+  --glow: 0 0 0 1px var(--accent-soft), 0 0 18px var(--accent-soft);
+  --success: #34D399; --danger: #F87171; --warn: #FBBF24; --secret: #F87171;
+  --scrim: rgba(4, 8, 18, .86);
+}
+
+/* ---------- 过去 past：深金史诗调 ---------- */
+.theme-past {
+  --radius: var(--radius-past);
+  --font-ui: var(--font-sans);
+  --font-heading: var(--font-serif);
+  --accent-2: var(--copper);
+  color-scheme: dark;
+}
+.theme-past.light {
+  --bg: #221B12; --surface: #3A2F22; --surface-2: #2E251A; --surface-3: #46392A;
+  --text: #F2E5C9; --text-dim: #C4B8A8; --text-faint: #8A7B66;
+  --accent: #D4AF37; --accent-hover: #E6C65C; --accent-soft: rgba(212, 175, 55, .14); --accent-glow: rgba(212, 175, 55, .45);
+  --border: rgba(212, 175, 55, .25); --divider: rgba(212, 175, 55, .16);
+  --shadow: 0 2px 10px rgba(0, 0, 0, .4);
+  --shadow-lift: 0 12px 30px rgba(0, 0, 0, .5);
+  --gold: #D4AF37; --gold-hi: #FFE9A8; --copper: #B87333;
+  --glow: 0 0 0 1px rgba(212, 175, 55, .35), 0 0 18px rgba(212, 175, 55, .18);
+  --success: #C4A860; --danger: #B87333; --warn: #C4A860; --secret: #B87333;
+  --scrim: rgba(20, 14, 8, .9);
+}
+.theme-past.dark {
+  --bg: #1A1510; --surface: #2E251A; --surface-2: #3A2F22; --surface-3: #463A2B;
+  --text: #E8DCC3; --text-dim: #B3A48C; --text-faint: #7A6B56;
+  --accent: #C9A63E; --accent-hover: #DDBE5E; --accent-soft: rgba(201, 166, 62, .12); --accent-glow: rgba(201, 166, 62, .42);
+  --border: rgba(201, 166, 62, .20); --divider: rgba(201, 166, 62, .14);
+  --shadow: 0 2px 10px rgba(0, 0, 0, .5);
+  --shadow-lift: 0 12px 30px rgba(0, 0, 0, .6);
+  --gold: #C9A63E; --gold-hi: #F0DCA0; --copper: #A0653A;
+  --glow: 0 0 0 1px rgba(201, 166, 62, .3), 0 0 18px rgba(201, 166, 62, .16);
+  --success: #B89B52; --danger: #A0653A; --warn: #B89B52; --secret: #A0653A;
+  --scrim: rgba(14, 10, 6, .92);
+}
+
+/* ---------- 未来 future：赛博朋克 双色霓虹 ---------- */
+.theme-future {
+  --radius: var(--radius-future);
+  --font-ui: var(--font-mono);
+  --font-heading: var(--font-mono);
+  color-scheme: dark;
+}
+.theme-future.light {
+  --bg: #0A0A12; --surface: #12121C; --surface-2: #181826; --surface-3: #1F1F30;
+  --text: #E0E4F0; --text-dim: #6E7A96; --text-faint: #3E465E;
+  --accent: #00FFF5; --accent-2: #FF00FF; --accent-hover: #7AFFFA; --accent-soft: rgba(0, 255, 245, .10); --accent-glow: rgba(0, 255, 245, .45);
+  --accent-2-soft: rgba(255, 0, 255, .12);
+  --border: rgba(0, 255, 245, .22); --divider: rgba(0, 255, 245, .12);
+  --shadow: none;
+  --shadow-lift: 0 0 24px rgba(0, 255, 245, .12);
+  --glow: 0 0 12px rgba(0, 255, 245, .45), 0 0 32px rgba(0, 255, 245, .15);
+  --glow-2: 0 0 8px rgba(255, 0, 255, .4), 0 0 24px rgba(255, 0, 255, .12);
+  --glass: rgba(18, 18, 28, .65);
+  --success: #00FF41; --danger: #FF0055; --warn: #FFE600; --secret: #FF0055;
+  --scrim: rgba(6, 6, 14, .9);
+}
+.theme-future.dark {
+  --bg: #07070D; --surface: #0D0D16; --surface-2: #12121E; --surface-3: #181828;
+  --text: #C9D1E5; --text-dim: #5A6480; --text-faint: #323A52;
+  --accent: #00E5FF; --accent-2: #FF00E5; --accent-hover: #6DF0FF; --accent-soft: rgba(0, 229, 255, .10); --accent-glow: rgba(0, 229, 255, .4);
+  --accent-2-soft: rgba(255, 0, 229, .12);
+  --border: rgba(0, 229, 255, .18); --divider: rgba(0, 229, 255, .10);
+  --shadow: none;
+  --shadow-lift: 0 0 24px rgba(0, 229, 255, .1);
+  --glow: 0 0 10px rgba(0, 229, 255, .4), 0 0 28px rgba(0, 229, 255, .12);
+  --glow-2: 0 0 8px rgba(255, 0, 229, .4), 0 0 24px rgba(255, 0, 229, .12);
+  --glass: rgba(13, 13, 22, .68);
+  --success: #00FF41; --danger: #FF2A6D; --warn: #FFE600; --secret: #FF2A6D;
+  --scrim: rgba(4, 4, 10, .92);
+}
+
+/* ---------- 绝密模式：整屏转红（规格书 1.9） ---------- */
+.secret-mode {
+  --accent: var(--secret);
+  --accent-2: var(--secret);
+  --accent-hover: color-mix(in srgb, var(--secret) 80%, white);
+  --accent-soft: color-mix(in srgb, var(--secret) 14%, transparent);
+  --accent-glow: color-mix(in srgb, var(--secret) 45%, transparent);
+  --border: color-mix(in srgb, var(--secret) 35%, transparent);
+  --divider: color-mix(in srgb, var(--secret) 22%, transparent);
+  --glow: 0 0 0 1px color-mix(in srgb, var(--secret) 35%, transparent), 0 0 18px color-mix(in srgb, var(--secret) 22%, transparent);
+  --gold: var(--secret);
+  --gold-hi: color-mix(in srgb, var(--secret) 70%, white);
+}
