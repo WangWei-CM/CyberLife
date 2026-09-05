@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -63,6 +65,9 @@ func (s *Server) Router() *gin.Engine {
 	protected.GET("/notifications", s.listNotifications)
 	protected.POST("/notifications/:id/read", s.markNotificationRead)
 	protected.GET("/plans", s.listPlans)
+	protected.GET("/plans/:id/cover", s.downloadPlanImage("cover"))
+	protected.GET("/plans/:id/icon", s.downloadPlanImage("icon"))
+	protected.GET("/plans/:id/files/:fileID", s.downloadPlanFile)
 	protected.GET("/calendar", s.futureCalendar)
 	protected.POST("/comments", s.addVisibleComment)
 	protected.GET("/comments", s.listVisibleComments)
@@ -75,6 +80,10 @@ func (s *Server) Router() *gin.Engine {
 	writer.POST("/plans", s.createPlan)
 	writer.POST("/plans/:id/progress", s.setPlanProgress)
 	writer.PUT("/plans/:id", s.updatePlan)
+	writer.POST("/plans/:id/cover", s.uploadPlanImage("cover"))
+	writer.POST("/plans/:id/icon", s.uploadPlanImage("icon"))
+	writer.POST("/plans/:id/files", s.uploadPlanFile)
+	writer.DELETE("/plans/:id/files/:fileID", s.deletePlanFile)
 	writer.GET("/mood-tags", s.moodTags)
 	writer.POST("/mood-tags", s.addMoodTag)
 	writer.GET("/reader-keys", s.writerReaderKeys)
@@ -222,10 +231,15 @@ func (s *Server) revokeReaderKey(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+// planReadable applies the ACL to a plan. The end date is the anchor date: a plan that is still running
+// after a reader key was issued stays visible to that reader.
+func (s *Server) planReadable(ctx context.Context, a auth.Actor, plan future.Plan) (bool, error) {
+	return s.acl.CanRead(ctx, a, acl.Resource{LifeID: a.LifeID, Date: plan.EndDate, PresetID: plan.PresetID, Secret: plan.Secret})
+}
 func (s *Server) listPlans(c *gin.Context) {
 	a := c.MustGet("actor").(auth.Actor)
-	if a.Type != "writer" {
-		fail(c, 403, "forbidden", "阅读者规划读取将在规划 ACL 完成后开放")
+	if a.Type != "writer" && a.Type != "reader" {
+		fail(c, 403, "forbidden", "当前身份不能读取规划")
 		return
 	}
 	x, e := s.future.ListPlans(c.Request.Context(), a.LifeID)
@@ -233,7 +247,123 @@ func (s *Server) listPlans(c *gin.Context) {
 		internal(c, e)
 		return
 	}
-	c.JSON(200, gin.H{"items": x})
+	visible := []future.Plan{}
+	for _, plan := range x {
+		ok, e := s.planReadable(c.Request.Context(), a, plan)
+		if e != nil {
+			internal(c, e)
+			return
+		}
+		if ok {
+			visible = append(visible, plan)
+		}
+	}
+	c.JSON(200, gin.H{"items": visible})
+}
+func (s *Server) uploadPlanImage(kind string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, (5<<20)+1024)
+		file, header, e := c.Request.FormFile("file")
+		if e != nil {
+			fail(c, 400, "file_rejected", "请选择小于 5MB 的图片")
+			return
+		}
+		defer file.Close()
+		a := c.MustGet("actor").(auth.Actor)
+		x, e := s.future.SetImage(c.Request.Context(), a.LifeID, c.Param("id"), kind, header.Filename, header.Header.Get("Content-Type"), header.Size, file)
+		if e != nil {
+			fail(c, 400, "file_rejected", e.Error())
+			return
+		}
+		c.JSON(200, x)
+	}
+}
+func (s *Server) uploadPlanFile(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, (20<<20)+1024)
+	file, header, e := c.Request.FormFile("file")
+	if e != nil {
+		fail(c, 400, "file_rejected", "请选择小于 20MB 的文件")
+		return
+	}
+	defer file.Close()
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.future.AddFile(c.Request.Context(), a.LifeID, c.Param("id"), header.Filename, header.Header.Get("Content-Type"), header.Size, file)
+	if e != nil {
+		fail(c, 400, "file_rejected", e.Error())
+		return
+	}
+	c.JSON(201, x)
+}
+func (s *Server) deletePlanFile(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	if e := s.future.DeleteFile(c.Request.Context(), a.LifeID, c.Param("id"), c.Param("fileID")); e != nil {
+		fail(c, 404, "not_found", e.Error())
+		return
+	}
+	c.Status(204)
+}
+func (s *Server) downloadPlanImage(kind string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		a := c.MustGet("actor").(auth.Actor)
+		plan, path, contentType, e := s.future.ImageForRead(c.Request.Context(), a.LifeID, c.Param("id"), kind)
+		if e != nil {
+			fail(c, 404, "not_found", "图片不存在")
+			return
+		}
+		ok, e := s.planReadable(c.Request.Context(), a, plan)
+		if e != nil {
+			internal(c, e)
+			return
+		}
+		if !ok {
+			fail(c, 404, "not_found", "图片不存在")
+			return
+		}
+		file, e := os.Open(path)
+		if e != nil {
+			fail(c, 404, "not_found", "图片不存在")
+			return
+		}
+		defer file.Close()
+		stat, e := file.Stat()
+		if e != nil {
+			internal(c, e)
+			return
+		}
+		c.Header("Content-Type", contentType)
+		http.ServeContent(c.Writer, c.Request, filepath.Base(path), stat.ModTime(), file)
+	}
+}
+func (s *Server) downloadPlanFile(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	item, plan, path, e := s.future.FileForRead(c.Request.Context(), a.LifeID, c.Param("id"), c.Param("fileID"))
+	if e != nil {
+		fail(c, 404, "not_found", "文件不存在")
+		return
+	}
+	ok, e := s.planReadable(c.Request.Context(), a, plan)
+	if e != nil {
+		internal(c, e)
+		return
+	}
+	if !ok {
+		fail(c, 404, "not_found", "文件不存在")
+		return
+	}
+	file, e := os.Open(path)
+	if e != nil {
+		fail(c, 404, "not_found", "文件不存在")
+		return
+	}
+	defer file.Close()
+	stat, e := file.Stat()
+	if e != nil {
+		internal(c, e)
+		return
+	}
+	c.Header("Content-Type", item.MimeType)
+	c.Header("Content-Disposition", `attachment; filename="`+item.OriginalName+`"`)
+	http.ServeContent(c.Writer, c.Request, item.OriginalName, stat.ModTime(), file)
 }
 func (s *Server) createPlan(c *gin.Context) {
 	var r struct {
@@ -289,8 +419,8 @@ func (s *Server) setPlanProgress(c *gin.Context) {
 }
 func (s *Server) futureCalendar(c *gin.Context) {
 	a := c.MustGet("actor").(auth.Actor)
-	if a.Type != "writer" {
-		fail(c, 403, "forbidden", "阅读者日历读取将在规划 ACL 完成后开放")
+	if a.Type != "writer" && a.Type != "reader" {
+		fail(c, 403, "forbidden", "当前身份不能读取日历")
 		return
 	}
 	x, e := s.future.Calendar(c.Request.Context(), a.LifeID, c.Query("from"), c.Query("to"))
@@ -298,7 +428,18 @@ func (s *Server) futureCalendar(c *gin.Context) {
 		fail(c, 400, "validation_failed", e.Error())
 		return
 	}
-	c.JSON(200, gin.H{"items": x})
+	visible := []future.Task{}
+	for _, task := range x {
+		ok, e := s.acl.CanRead(c.Request.Context(), a, acl.Resource{LifeID: a.LifeID, Date: task.Date, PresetID: task.PresetID, Secret: task.Secret})
+		if e != nil {
+			internal(c, e)
+			return
+		}
+		if ok {
+			visible = append(visible, task)
+		}
+	}
+	c.JSON(200, gin.H{"items": visible})
 }
 func (s *Server) listNotifications(c *gin.Context) {
 	a := c.MustGet("actor").(auth.Actor)
@@ -306,6 +447,7 @@ func (s *Server) listNotifications(c *gin.Context) {
 		fail(c, 403, "forbidden", "管理员不使用人生通知中心")
 		return
 	}
+	s.sweepNotifications(c.Request.Context(), a)
 	x, e := s.notification.List(c.Request.Context(), a.LifeID, a.ID)
 	if e != nil {
 		internal(c, e)
@@ -438,12 +580,87 @@ func (s *Server) addVisibleComment(c *gin.Context) {
 		fail(c, 404, "not_found", "目标不存在或不可评论")
 		return
 	}
-	x, e := s.interaction.AddComment(c.Request.Context(), a.LifeID, a.ID, r.TargetType, r.TargetID, strings.TrimSpace(r.Content))
+	x, target, e := s.interaction.AddComment(c.Request.Context(), a.LifeID, a.ID, r.TargetType, r.TargetID, strings.TrimSpace(r.Content))
 	if e != nil {
 		fail(c, 400, "validation_failed", e.Error())
 		return
 	}
+	s.notifyComment(c.Request.Context(), a, target, x)
 	c.JSON(201, x)
+}
+// notifyComment tells the writer about a reader's comment; the message carries the day so the client
+// can open it on the past page.
+func (s *Server) notifyComment(ctx context.Context, a auth.Actor, target interaction.TargetAccess, comment interaction.Comment) {
+	if a.Type != "reader" {
+		return
+	}
+	writer, e := s.notification.WriterOf(ctx, a.LifeID)
+	if e != nil || writer == "" {
+		return
+	}
+	name := a.Nickname
+	if name == "" {
+		name = "阅读者"
+	}
+	kind := "日记"
+	if target.TargetType == "task" {
+		kind = "日程"
+	}
+	snippet := []rune(comment.Content)
+	if len(snippet) > 40 {
+		snippet = append(snippet[:40], '…')
+	}
+	_ = s.notification.Enqueue(ctx, a.LifeID, writer, "comment", target.TargetID, target.Date, fmt.Sprintf("%s 评论了 %s 的%s：%s", name, target.Date, kind, string(snippet)))
+}
+// sweepNotifications generates due reminders lazily on every inbox read: plans ending within three
+// days and reader keys expiring within seven days. EnsureOnce keeps them from duplicating.
+func (s *Server) sweepNotifications(ctx context.Context, a auth.Actor) {
+	zone := time.FixedZone("CST", 28800)
+	today, e := time.ParseInLocation("2006-01-02", acl.Today(), zone)
+	if e != nil {
+		return
+	}
+	if a.Type == "writer" {
+		if plans, e := s.future.ListPlans(ctx, a.LifeID); e == nil {
+			for _, plan := range plans {
+				end, e := time.ParseInLocation("2006-01-02", plan.EndDate, zone)
+				if e != nil || plan.Progress >= 100 {
+					continue
+				}
+				days := int(end.Sub(today).Hours() / 24)
+				if days < 0 || days > 3 {
+					continue
+				}
+				text := fmt.Sprintf("规划「%s」今天到期", plan.Name)
+				if days > 0 {
+					text = fmt.Sprintf("规划「%s」将在 %d 天后到期", plan.Name, days)
+				}
+				_ = s.notification.EnsureOnce(ctx, a.LifeID, a.ID, "plan_due", plan.ID, plan.EndDate, text)
+			}
+		}
+	}
+	keys, e := s.admin.ListReaderKeys(ctx, a.LifeID)
+	if e != nil {
+		return
+	}
+	for _, key := range keys {
+		if key.ExpiresAt == nil || key.RevokedAt != nil {
+			continue
+		}
+		if a.Type == "reader" && key.ID != a.ID {
+			continue
+		}
+		expiry, e := time.Parse(time.RFC3339Nano, *key.ExpiresAt)
+		if e != nil {
+			continue
+		}
+		days := int(expiry.Sub(time.Now()).Hours() / 24)
+		if days < 0 || days > 7 {
+			continue
+		}
+		date := expiry.In(zone).Format("2006-01-02")
+		_ = s.notification.EnsureOnce(ctx, a.LifeID, a.ID, "key_expired", key.ID, date, fmt.Sprintf("阅读密钥「%s」将于 %s 到期", key.Nickname, date))
+	}
 }
 func (s *Server) listVisibleComments(c *gin.Context) {
 	a := c.MustGet("actor").(auth.Actor)
@@ -514,7 +731,7 @@ func (s *Server) addComment(c *gin.Context) {
 		return
 	}
 	a := c.MustGet("actor").(auth.Actor)
-	x, e := s.interaction.AddComment(c.Request.Context(), a.LifeID, a.ID, r.TargetType, r.TargetID, strings.TrimSpace(r.Content))
+	x, _, e := s.interaction.AddComment(c.Request.Context(), a.LifeID, a.ID, r.TargetType, r.TargetID, strings.TrimSpace(r.Content))
 	if e != nil {
 		fail(c, 400, "validation_failed", e.Error())
 		return
