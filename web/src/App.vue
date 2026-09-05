@@ -33,6 +33,7 @@ function navigate(next: Screen) {
 }
 function setAppearance(next: 'dark' | 'light' | 'auto') { appearance.value = next }
 function setNavPosition(event: DragEvent) { const x=event.clientX/window.innerWidth; const y=event.clientY/window.innerHeight; navPosition.value=y<.2?'top':y>.8?'bottom':x<.5?'left':'right'; localStorage.setItem('cyberlife-nav-position',navPosition.value) }
+function setGlowPosition(event: PointerEvent) { const target = (event.target as HTMLElement).closest<HTMLElement>('.glow-spot'); if (!target) return; const bounds = target.getBoundingClientRect(); target.style.setProperty('--mx', `${event.clientX - bounds.left}px`); target.style.setProperty('--my', `${event.clientY - bounds.top}px`) }
 watch(appearance, value => localStorage.setItem('cyberlife-theme', value))
 watch(secretMode, value => localStorage.setItem('cyberlife-secret-mode',String(value)))
 onMounted(restoreSession)
@@ -42,23 +43,23 @@ onMounted(restoreSession)
   <div v-if="authState.loading" class="app-boot" aria-label="加载中"><i /></div>
   <AdminLoginView v-else-if="!authState.actor && isAdminPath" />
   <LoginView v-else-if="!authState.actor" />
-  <div v-else class="app-shell" :class="[screenTheme, resolvedAppearance, `nav-${navPosition}`, { 'secret-mode': secretMode }]" @dragover.prevent @drop="setNavPosition">
+  <div v-else class="app-shell" :class="[screenTheme, resolvedAppearance, `nav-${navPosition}`, { 'secret-mode': secretMode }]" @dragover.prevent @drop="setNavPosition" @pointermove="setGlowPosition">
     <header class="topbar" draggable="true">
-      <button class="topbar-arrow" aria-label="上一页" @click="navigate(screen === 'now' ? 'past' : 'now')">‹</button>
+      <button class="topbar-arrow glow-spot text-glow" aria-label="上一页" @click="navigate(screen === 'now' ? 'past' : 'now')">‹</button>
       <nav class="screen-nav" aria-label="页面导航">
-        <button :class="{ active: screen === 'past' }" @click="navigate('past')">过去</button>
-        <button :class="{ active: screen === 'now' }" @click="navigate('now')">现在</button>
-        <button :class="{ active: screen === 'future' }" @click="navigate('future')">未来</button>
+        <button class="glow-spot text-glow" :class="{ active: screen === 'past' }" @click="navigate('past')">过去</button>
+        <button class="glow-spot text-glow" :class="{ active: screen === 'now' }" @click="navigate('now')">现在</button>
+        <button class="glow-spot text-glow" :class="{ active: screen === 'future' }" @click="navigate('future')">未来</button>
       </nav>
-      <button class="topbar-arrow" aria-label="下一页" @click="navigate(screen === 'now' ? 'future' : 'now')">›</button>
+      <button class="topbar-arrow glow-spot text-glow" aria-label="下一页" @click="navigate(screen === 'now' ? 'future' : 'now')">›</button>
       <div class="topbar-tools">
         <MusicControl :page="screen === 'settings' ? 'now' : screen" />
-        <button class="icon-button" :aria-label="resolvedAppearance === 'dark' ? '切换亮色' : '切换暗色'" @click="setAppearance(resolvedAppearance === 'dark' ? 'light' : 'dark')">◐</button>
-        <button class="icon-button" aria-label="设置" @click="navigate('settings')">⚙</button>
+        <button class="icon-button glow-spot text-glow" :aria-label="resolvedAppearance === 'dark' ? '切换亮色' : '切换暗色'" @click="setAppearance(resolvedAppearance === 'dark' ? 'light' : 'dark')">◐</button>
+        <button class="icon-button glow-spot text-glow" aria-label="设置" @click="navigate('settings')">⚙</button>
         <NotificationCenter v-if="!isAdmin" />
-        <button v-if="authState.actor.type === 'writer'" class="secret-toggle" :class="{ active: secretMode }" @click="secretMode = !secretMode">⌁</button>
+        <button v-if="authState.actor.type === 'writer'" class="secret-toggle glow-spot text-glow" :class="{ active: secretMode }" @click="secretMode = !secretMode">⌁</button>
         <span class="actor-name">{{ authState.actor.type === 'admin' ? '管理员' : authState.actor.type === 'writer' ? '书写者' : '阅读者' }}</span>
-        <button class="text-button" @click="logout">登出</button>
+        <button class="text-button glow-spot text-glow" @click="logout">登出</button>
       </div>
     </header>
     <AdminView v-if="isAdmin" />
