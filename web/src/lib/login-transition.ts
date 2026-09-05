@@ -103,16 +103,28 @@ function createCloudTexture(quality: number) {
     const width = context.canvas.width
     const height = context.canvas.height
     context.clearRect(0, 0, width, height)
-    context.filter = `blur(${Math.max(5, quality / 150)}px)`
-    for (let index = 0; index < 90; index += 1) {
+    context.filter = `blur(${Math.max(4, quality / 210)}px)`
+    // Broad cloud banks keep their silhouette during the node close-up.
+    for (let index = 0; index < 72; index += 1) {
       const x = seeded(index + 310) * width
-      const y = seeded(index + 390) * height
-      const radiusX = width * (.008 + seeded(index + 470) * .04)
-      const radiusY = height * (.008 + seeded(index + 520) * .025)
-      const alpha = .14 + seeded(index + 610) * .3
-      context.fillStyle = `rgba(231, 244, 239, ${alpha})`
+      const y = height * (.16 + seeded(index + 390) * .68)
+      const radiusX = width * (.018 + seeded(index + 470) * .065)
+      const radiusY = height * (.014 + seeded(index + 520) * .045)
+      const alpha = .24 + seeded(index + 610) * .42
+      context.fillStyle = `rgba(236, 249, 244, ${alpha})`
       context.beginPath()
       context.ellipse(x, y, radiusX, radiusY, seeded(index + 690) * Math.PI, 0, TAU)
+      context.fill()
+    }
+    // Smaller wisps add parallax detail to the rotating outer shell.
+    for (let index = 0; index < 110; index += 1) {
+      const x = seeded(index + 730) * width
+      const y = seeded(index + 810) * height
+      const radiusX = width * (.006 + seeded(index + 870) * .026)
+      const radiusY = height * (.004 + seeded(index + 920) * .016)
+      context.fillStyle = `rgba(214, 242, 234, ${.12 + seeded(index + 980) * .28})`
+      context.beginPath()
+      context.ellipse(x, y, radiusX, radiusY, seeded(index + 1030) * Math.PI, 0, TAU)
       context.fill()
     }
     context.filter = 'none'
@@ -231,10 +243,17 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
 
   const clouds = new THREE.Mesh(
     new THREE.SphereGeometry(3.42, sphereSegments, sphereSegments),
-    new THREE.MeshPhongMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .54, depthWrite: false, color: 0xdaf3ec }),
+    new THREE.MeshPhongMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .78, depthWrite: false, color: 0xe9fff7, shininess: 18 }),
   )
   clouds.rotation.z = -.22
   earthGroup.add(clouds)
+
+  const cloudHighlight = new THREE.Mesh(
+    new THREE.SphereGeometry(3.49, sphereSegments, sphereSegments),
+    new THREE.MeshBasicMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .22, depthWrite: false, color: 0xb5fff0, blending: THREE.AdditiveBlending }),
+  )
+  cloudHighlight.rotation.z = -.22
+  earthGroup.add(cloudHighlight)
 
   const atmosphere = new THREE.Mesh(
     new THREE.SphereGeometry(3.54, sphereSegments, sphereSegments),
@@ -332,6 +351,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     stars.rotation.y = time * .000008
     earth.rotation.y = time * .000035
     clouds.rotation.y = time * .000052
+    cloudHighlight.rotation.y = -time * .000032
+    cloudHighlight.rotation.x = Math.sin(time * .00011) * .035
     orbitGroup.rotation.y = Math.sin(time * .00009) * .08
     orbitalLogo.position.y = .25 + Math.sin(time * .0007) * .08
     orbitalLogo.material.opacity = stage === 'authenticating' ? .38 : stage === 'orbital-login' ? .92 : Math.max(0, 1 - revealProgress * 1.8)
@@ -342,6 +363,9 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       node.scale.setScalar(.38 + revealProgress * .62)
       node.rotation.set(-.32 + revealProgress * .16, .65 + time * .00016, .12 + time * .00008)
       camera.position.z = 10 - revealProgress * 1.25
+      camera.lookAt(0, -.55 + revealProgress * .35, 0)
+      clouds.material.opacity = .78 + Math.sin(time * .0005) * .1
+      cloudHighlight.material.opacity = .22 + Math.sin(time * .0007 + 1) * .06
       if (elapsed >= NODE_REVEAL_MS) setStage('node-fall')
     } else if (stage === 'node-fall') {
       node.visible = true
