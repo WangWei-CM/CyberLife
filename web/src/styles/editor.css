@@ -1,0 +1,78 @@
+/* ============================================================
+   MD 编辑器（md-editor-v3）主题化 · 图片放大层 · 删除备份
+   ============================================================ */
+.diary-editor { position: relative; }
+.md-editor {
+  --md-color: var(--text) !important;
+  --md-hover-color: var(--accent) !important;
+  --md-bk-color: var(--surface) !important;
+  --md-bk-color-outstand: var(--surface-2) !important;
+  --md-bk-hover-color: var(--surface-2) !important;
+  --md-border-color: var(--divider) !important;
+  --md-border-hover-color: var(--accent) !important;
+  --md-border-active-color: var(--accent) !important;
+  --md-modal-mask: var(--scrim) !important;
+  --md-scrollbar-bg-color: transparent !important;
+  --md-scrollbar-thumb-color: var(--border) !important;
+  --md-scrollbar-thumb-hover-color: var(--accent) !important;
+  --md-scrollbar-thumb-active-color: var(--accent) !important;
+  border: 1px solid var(--divider) !important;
+  border-radius: var(--radius) !important;
+  font-family: var(--font-ui) !important;
+  min-height: 420px;
+  transition: border-color var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out);
+}
+.md-editor:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, transparent) !important; box-shadow: 0 0 0 2px var(--accent-soft); }
+.diary-editor.secret .md-editor { border-color: color-mix(in srgb, var(--secret) 45%, transparent) !important; }
+.md-editor-toolbar-wrapper { border-bottom: 1px solid var(--divider) !important; }
+.md-editor-toolbar-item { border-radius: var(--radius) !important; transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out) !important; }
+.md-editor-toolbar-item:hover { color: var(--accent) !important; background: var(--accent-soft) !important; filter: drop-shadow(0 0 6px var(--accent-glow)); }
+.md-editor-toolbar-item:active { transform: scale(.94); }
+.md-editor-toolbar-item svg { transition: filter var(--dur-fast); }
+.md-editor-divider { background: var(--divider) !important; }
+.md-editor-input-wrapper, .md-editor-preview-wrapper { background: var(--surface) !important; }
+.md-editor-preview-wrapper { border-left: 1px solid var(--divider) !important; }
+.md-editor-preview { font-size: 14px !important; line-height: 1.8 !important; color: var(--text) !important; }
+.md-editor-preview h1 { font-size: 24px !important; }
+.md-editor-preview h2 { font-size: 20px !important; }
+.md-editor-preview h3 { font-size: 16px !important; }
+.md-editor-preview h1, .md-editor-preview h2, .md-editor-preview h3 { font-weight: 700 !important; border: 0 !important; color: var(--text) !important; }
+.md-editor-preview blockquote { border-left: 2px solid var(--accent) !important; background: var(--surface-2) !important; color: var(--text-dim) !important; border-radius: 0 var(--radius) var(--radius) 0; }
+.md-editor-preview a { color: var(--accent) !important; }
+.md-editor-preview table { border-collapse: collapse; }
+.md-editor-preview th, .md-editor-preview td { border: 1px solid var(--divider) !important; padding: 6px 10px !important; }
+.md-editor-preview th { background: var(--surface-2) !important; }
+.md-editor-preview img { border-radius: var(--radius); cursor: zoom-in; transition: transform var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
+.md-editor-preview img:hover { transform: scale(1.01); box-shadow: var(--shadow-lift); }
+.md-editor-preview pre, .md-editor-preview code { font-family: var(--font-mono) !important; }
+.md-editor-footer { border-top: 1px solid var(--divider) !important; color: var(--text-faint) !important; font-family: var(--font-mono); font-size: 11px; }
+.md-editor-modal { border: 0 !important; box-shadow: var(--shadow-lift) !important; border-radius: var(--radius) !important; }
+.md-editor-dropdown { border: 0 !important; box-shadow: var(--shadow-lift) !important; }
+.theme-past .md-editor-preview { font-family: var(--font-serif) !important; color: var(--text) !important; }
+.theme-future .md-editor { border-radius: 0 !important; }
+.theme-future .md-editor-preview { font-family: var(--font-mono) !important; }
+.theme-future .md-editor:focus-within { box-shadow: var(--glow); }
+.theme-past .md-editor:focus-within { box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 40%, transparent), 0 0 18px rgba(212, 175, 55, .16); }
+
+/* 删除备份入口与面板 */
+.vault-icon { position: relative; display: inline-grid; place-items: center; }
+.vault-icon i { position: absolute; top: -1px; right: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); animation: notice-pop var(--dur-mid) var(--ease-spring); }
+.vault { top: 44px; right: auto; left: 12px; width: min(420px, calc(100% - 24px)); max-height: 380px; overflow: auto; z-index: 70; }
+.vault-list { display: grid; }
+.vault-list li { display: grid; gap: 6px; padding: 10px 0; box-shadow: inset 0 -1px 0 var(--divider); }
+.vault-list li:last-child { box-shadow: none; }
+.vault-list small { color: var(--text-faint); font-size: 11px; }
+.vault-list p { white-space: pre-wrap; color: var(--text-dim); font-size: 13px; max-height: 96px; overflow: hidden; mask-image: linear-gradient(#000 70%, transparent); }
+.vault-actions { display: flex; gap: 4px; }
+
+/* 自研图片放大层：三屏各一套遮罩色 */
+.lightbox { position: fixed; inset: 0; z-index: 1000; display: grid; background: var(--scrim, rgba(0, 0, 0, .88)); color: var(--text, #fff); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.lightbox.theme-past { background: radial-gradient(ellipse at center, rgba(40, 28, 14, .78), rgba(12, 8, 4, .96)); }
+.lightbox.theme-future { background: var(--scrim); box-shadow: inset 0 0 0 1px var(--border), inset 0 0 60px var(--accent-soft); }
+.lightbox-stage { display: grid; place-items: center; overflow: hidden; cursor: grab; touch-action: none; }
+.lightbox-stage.dragging { cursor: grabbing; }
+.lightbox-stage img { max-width: 92vw; max-height: 88vh; user-select: none; will-change: transform; transition: transform var(--dur-fast) var(--ease-out); box-shadow: var(--shadow-lift); }
+.lightbox-stage.dragging img { transition: none; }
+.theme-future.lightbox img { box-shadow: var(--glow); }
+.lightbox-close { position: absolute; top: 16px; right: 16px; width: 44px; height: 44px; color: var(--text, #fff); background: color-mix(in srgb, var(--surface, #111) 60%, transparent); }
+.lightbox-zoom { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--text-dim, #aaa); pointer-events: none; }

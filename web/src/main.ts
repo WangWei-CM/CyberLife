@@ -8,5 +8,6 @@ import './styles/glow.css'
 import './styles/shell.css'
 import './styles/components.css'
 import './styles/login.css'
+import './styles/editor.css'
 
 createApp(App).directive('glow', vGlow).directive('stagger', vStagger).mount('#app')
