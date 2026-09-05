@@ -68,9 +68,9 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (timer) clearTimeout
     <p v-if="error" class="error">{{ error }}</p>
     <section class="now-layout" :style="{ '--left-width': `${leftWidth}%` }">
       <div class="now-left">
-        <section class="now-clock"><strong>{{ dateLabel }}</strong><span>{{ lunar }}</span><time>{{ timeLabel.slice(0, 5) }}<small>{{ timeLabel.slice(5) }}</small></time></section>
+        <section class="now-clock"><strong>{{ dateLabel }}</strong><span>{{ lunar }}</span><time><span>{{ timeLabel.slice(0, 5) }}</span><small :key="timeLabel.slice(5)" class="clock-seconds">{{ timeLabel.slice(5) }}</small></time></section>
         <section v-if="currentPlan" class="plan-carousel" @mouseenter="pauseCarousel(true)" @mouseleave="pauseCarousel(false)" @focusin="pauseCarousel(true)" @focusout="pauseCarousel(false)">
-          <button class="plan-banner" @click="emit('navigate-future')"><b>{{ currentPlan.name }}</b><span class="banner-bar"><i :style="{ width: `${currentPlan.timeProgress}%` }" /></span><span class="banner-bar plan"><i :style="{ width: `${currentPlan.progress}%` }" /></span></button>
+          <Transition name="carousel" mode="out-in"><button :key="currentPlan.id" class="plan-banner" @click="emit('navigate-future')"><b>{{ currentPlan.name }}</b><span class="banner-bar"><i :style="{ width: `${currentPlan.timeProgress}%` }" /></span><span class="banner-bar plan"><i :style="{ width: `${currentPlan.progress}%` }" /></span></button></Transition>
           <div v-if="activePlans.length > 1" class="carousel-dots" aria-label="进行中规划">
             <button v-for="(_, index) in activePlans" :key="index" :class="{ active: index === activePlan }" :aria-label="`第 ${index + 1} 项规划`" @click="choosePlan(index)" />
           </div>
