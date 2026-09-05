@@ -28,7 +28,7 @@ async function submit() {
     phase.value = 'leaving'
     await wait(DUR.slow - 100)
     // 3. 问候语：淡入 → 停留 → 淡出
-    greeting.value = `${greetingForHour()}，${result.actor.type === 'writer' ? '书写者' : '阅读者'}`
+    greeting.value = `${greetingForHour()}，${result.actor.nickname || (result.actor.type === 'writer' ? '书写者' : '阅读者')}`
     phase.value = 'greeting'
     await nextTick()
     requestAnimationFrame(() => { greetingVisible.value = true })

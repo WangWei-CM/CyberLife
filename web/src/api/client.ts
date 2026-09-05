@@ -1,5 +1,5 @@
 export type ActorType = 'admin' | 'writer' | 'reader'
-export type Actor = { sessionId: string; type: ActorType; id: string; lifeId: string }
+export type Actor = { sessionId: string; type: ActorType; id: string; lifeId: string; nickname: string; lifeCreatedAt: string }
 export type Notice = { id: string; type: string; refID?: string; text: string; createdAt: string; read: boolean }
 type ApiError = { error: { code: string; message: string } }
 
@@ -8,7 +8,7 @@ export function normalizeActor(raw: unknown): Actor {
   const value = (raw ?? {}) as Record<string, unknown>
   const pick = (...keys: string[]) => { for (const key of keys) { const item = value[key]; if (typeof item === 'string') return item } return '' }
   const type = pick('type', 'Type') as ActorType
-  return { sessionId: pick('session_id', 'sessionId', 'SessionID'), type, id: pick('id', 'ID'), lifeId: pick('life_id', 'lifeId', 'LifeID') }
+  return { sessionId: pick('session_id', 'sessionId', 'SessionID'), type, id: pick('id', 'ID'), lifeId: pick('life_id', 'lifeId', 'LifeID'), nickname: pick('nickname', 'Nickname'), lifeCreatedAt: pick('life_created_at', 'lifeCreatedAt', 'LifeCreatedAt') }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -47,6 +47,7 @@ export const api = {
   history: (from: string, to: string) => request<HistoryRange>(`/api/v1/history?from=${encode(from)}&to=${encode(to)}`),
   plans: () => request<{ items: Plan[] }>('/api/v1/plans'),
   createPlan: (payload: Pick<Plan, 'name' | 'startDate' | 'endDate' | 'intro'>) => request<Plan>('/api/v1/now/plans', { method: 'POST', body: JSON.stringify({ name: payload.name, start_date: payload.startDate, end_date: payload.endDate, intro: payload.intro }) }),
+  updatePlan: (id: string, payload: Pick<Plan, 'name' | 'startDate' | 'endDate' | 'intro'>) => request<Plan>(`/api/v1/now/plans/${encode(id)}`, { method: 'PUT', body: JSON.stringify({ name: payload.name, start_date: payload.startDate, end_date: payload.endDate, intro: payload.intro }) }),
   setPlanProgress: (id: string, date: string, percent: number) => request<Plan>(`/api/v1/now/plans/${encode(id)}/progress`, { method: 'POST', body: JSON.stringify({ date, percent }) }),
   calendar: (from: string, to: string) => request<{ items: FutureTask[] }>(`/api/v1/calendar?from=${encode(from)}&to=${encode(to)}`),
   notifications: () => request<{ items: Notice[] }>('/api/v1/notifications'),
@@ -62,10 +63,12 @@ export const api = {
   deleteMusicPlaylist: (page: PlaylistPage) => request<void>(`/api/v1/now/music/playlists/${page}`, { method: 'DELETE' }),
   uploadMusicTrack: (page: PlaylistPage, file: File) => upload<MusicTrack>(`/api/v1/now/music/playlists/${page}/tracks`, file),
   deleteMusicTrack: (id: string) => request<void>(`/api/v1/now/music/tracks/${encode(id)}`, { method: 'DELETE' }),
-  saveDraft: (content: string) => request<Draft>('/api/v1/now/diary/draft', { method: 'PUT', body: JSON.stringify({ content }) }),
-  saveDiary: (content: string) => request<Diary>('/api/v1/now/diary', { method: 'PUT', body: JSON.stringify({ content }) }),
-  addTask: (title: string, description: string, priority: string) => request<Task>('/api/v1/now/tasks', { method: 'POST', body: JSON.stringify({ title, description, priority }) }),
-  setTaskDone: (id: string, done: boolean) => request<Task>(`/api/v1/now/tasks/${encode(id)}/done`, { method: 'POST', body: JSON.stringify({ done }) }),
+  saveDraft: (content: string, secret = false) => request<Draft>('/api/v1/now/diary/draft', { method: 'PUT', body: JSON.stringify({ content, secret }) }),
+  saveDiary: (content: string, secret = false) => request<Diary>('/api/v1/now/diary', { method: 'PUT', body: JSON.stringify({ content, secret }) }),
+  /** date 为空则记到今天；否则记到指定日期（YYYY-MM-DD）。 */
+  addTask: (title: string, description: string, priority: string, date = '') => request<Task>('/api/v1/now/tasks', { method: 'POST', body: JSON.stringify({ title, description, priority, date }) }),
+  /** 任务按月分库，传 date 以便服务端定位到对应月份。 */
+  setTaskDone: (id: string, done: boolean, date = '') => request<Task>(`/api/v1/now/tasks/${encode(id)}/done`, { method: 'POST', body: JSON.stringify({ done, date }) }),
   readerKeysForWriter: () => request<{ items: ReaderKey[] }>('/api/v1/now/reader-keys'),
   presets: () => request<{ items: Preset[] }>('/api/v1/now/presets'),
   replacePresetRules: (id: string, rules: PresetRule[]) => request<void>(`/api/v1/now/presets/${encode(id)}/rules`, { method: 'PUT', body: JSON.stringify({ rules }) }),
@@ -95,9 +98,9 @@ export type Preset = { id: string; name: string; rules: PresetRule[] }
 export type Comment = { id: string; targetType: string; targetId: string; authorKeyId: string; content: string; createdAt: string }
 export type Milestone = { id: string; targetType: string; targetId: string; description: string; detail: string; presetId: string; secret: boolean }
 export type Task = { id: string; taskDate: string; title: string; description: string; priority: 'low' | 'normal' | 'high'; done: boolean; presetId?: string; secret?: boolean; commentable?: boolean }
-export type NowData = { diary: Diary; moods: MoodRecord[]; bodies: BodyRecord[]; tasks: Task[] }
+export type NowData = { diary: Diary; secretDiary?: Diary; moods: MoodRecord[]; bodies: BodyRecord[]; tasks: Task[] }
 export type Plan = { id: string; name: string; startDate: string; endDate: string; intro: string; progress: number; timeProgress: number }
 export type FutureTask = { id: string; date: string; title: string; priority: string; done: boolean }
-export type HistoryDay = { date: string; diary: Diary; tasks: Task[]; moodCount: number; bodyCount: number; milestoneCount: number }
+export type HistoryDay = { date: string; diary: Diary; secretDiary?: Diary | null; tasks: Task[]; moodCount: number; bodyCount: number; milestoneCount: number }
 export type TrendPoint = { date: string; mood: number | null; body: number | null }
 export type HistoryRange = { from: string; to: string; days: HistoryDay[]; points: TrendPoint[] }

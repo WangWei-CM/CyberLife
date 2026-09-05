@@ -18,7 +18,7 @@ const emit = defineEmits<{ (event: 'navigate-future'): void }>()
 
 type CardKey = 'body' | 'mood' | 'diary'
 const DEFAULT_ORDER: CardKey[] = ['body', 'mood', 'diary']
-const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, moods: [], bodies: [], tasks: [] })
+const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, secretDiary: { id: '', entryDate: '', content: '', secret: true, commentable: false }, moods: [], bodies: [], tasks: [] })
 const trend = ref<TrendPoint[]>([])
 const tags = ref<MoodTag[]>([])
 const plans = ref<Plan[]>([])
@@ -63,7 +63,12 @@ const calendarOptions = computed(() => ({
   height: 'auto', fixedWeekCount: false, dayMaxEventRows: 3, events: events.value,
   viewDidMount: (info: { view: { type: string } }) => { calendarView.value = info.view.type as 'dayGridMonth' | 'dayGridDay' },
 }))
-const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today}`)
+const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today}${props.secret ? ':secret' : ''}`)
+/** 绝密模式下编辑当天的绝密层日记，公开层不受影响。 */
+const activeDiary = computed(() => props.secret ? data.value.secretDiary! : data.value.diary)
+function normalize(payload: NowData): NowData {
+  return { ...payload, secretDiary: payload.secretDiary ?? { id: '', entryDate: today, content: '', secret: true, commentable: false } }
+}
 
 function readOrder(): CardKey[] {
   try { const stored = JSON.parse(localStorage.getItem('now-card-order') || '[]') as CardKey[]; const valid = stored.filter(key => DEFAULT_ORDER.includes(key)); return valid.length === DEFAULT_ORDER.length ? valid : DEFAULT_ORDER } catch { return DEFAULT_ORDER }
@@ -87,14 +92,14 @@ function onCardDragEnd() { dragCard.value = null; localStorage.setItem('now-card
 async function load() {
   try {
     const [todayData, tagData, planData, history] = await Promise.all([api.today(), api.moodTags(), api.plans(), api.history(addDaysISO(today, -6), today)])
-    data.value = todayData
+    data.value = normalize(todayData)
     tags.value = tagData.items
     plans.value = planData.items
     trend.value = history.points
     if (todayData.bodies.length) bodyScore.value = todayData.bodies[todayData.bodies.length - 1].score
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' }
 }
-async function refreshToday() { try { data.value = await api.today() } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' } }
+async function refreshToday() { try { data.value = normalize(await api.today()) } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' } }
 async function recordMood() {
   if (!selectedTags.value.length) return
   try { await api.addMood(selectedTags.value, moodNote.value.trim(), props.secret); selectedTags.value = []; moodNote.value = ''; await refreshToday() } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
@@ -104,7 +109,7 @@ async function recordBody() {
     await api.addBody(bodyScore.value, bodyNote.value.trim(), props.secret)
     bodyNote.value = ''
     const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today, -6), today)])
-    data.value = todayData
+    data.value = normalize(todayData)
     trend.value = history.points
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
 }
@@ -115,7 +120,7 @@ async function addTag() {
 async function toggleTask(task: Task) {
   const next = !task.done
   task.done = next
-  try { await api.setTaskDone(task.id, next) } catch (cause) { task.done = !next; error.value = cause instanceof Error ? cause.message : '更新失败' }
+  try { await api.setTaskDone(task.id, next, task.taskDate) } catch (cause) { task.done = !next; error.value = cause instanceof Error ? cause.message : '更新失败' }
 }
 async function addTask() {
   const title = newTask.value.trim()
@@ -125,9 +130,17 @@ async function addTask() {
 function toggleTag(id: string) { selectedTags.value = selectedTags.value.includes(id) ? selectedTags.value.filter(item => item !== id) : [...selectedTags.value, id] }
 function scheduleSave() {
   if (saveTimer) clearTimeout(saveTimer)
+  const layerSecret = props.secret
   saveTimer = window.setTimeout(async () => {
+    const content = (layerSecret ? data.value.secretDiary : data.value.diary)?.content ?? ''
     saving.value = true
-    try { await api.saveDraft(data.value.diary.content); await api.saveDiary(data.value.diary.content); savedAt.value = timeLabel(beijingNow()) } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { saving.value = false }
+    try {
+      await api.saveDraft(content, layerSecret)
+      const saved = await api.saveDiary(content, layerSecret)
+      if (layerSecret && data.value.secretDiary) data.value.secretDiary.id = saved.id
+      else data.value.diary.id = saved.id
+      savedAt.value = timeLabel(beijingNow())
+    } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { saving.value = false }
   }, 700)
 }
 function startResize(event: PointerEvent) {
@@ -207,7 +220,7 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
             <h2><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('diary', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>日记</span><span v-if="secret" class="secret-badge">绝密模式</span></h2>
             <Transition name="fade" mode="out-in"><small :key="savedAt + String(saving)" class="faint mono">{{ saving ? '' : savedAt ? `已保存 ${savedAt}` : '' }}</small></Transition>
           </header>
-          <DiaryEditor v-model="data.diary.content" :theme="theme" :vault-key="vaultKey" :secret="secret" placeholder="今天……" @change="scheduleSave" />
+          <DiaryEditor :key="secret ? 'secret' : 'public'" :model-value="activeDiary.content" :editor-id="secret ? 'diary-editor-secret' : 'diary-editor'" :theme="theme" :vault-key="vaultKey" :secret="secret" :placeholder="secret ? '只有你自己能看到的内心 OS……' : '今天……'" @update:model-value="activeDiary.content = $event" @change="scheduleSave" />
         </article>
       </div>
 

@@ -7,9 +7,10 @@ import MetricLine, { type MetricPoint } from '../components/MetricLine.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { api, type Comment, type HistoryDay, type Milestone, type TrendPoint } from '../api/client'
-import { isWriter } from '../stores/auth'
+import { isWriter, lifeStartISO } from '../stores/auth'
 import { addDaysISO, dayIndex, diffDays, fullDateLabel, monthDayLabel, relativeDayLabel, timeLabel, todayISO, weekdayLabel, parseISO } from '../lib/dates'
 
+const props = withDefaults(defineProps<{ secret?: boolean }>(), { secret: false })
 const today = todayISO()
 const selected = ref(today)
 const dock = ref<'left' | 'right'>(localStorage.getItem('past-axis-dock') === 'right' ? 'right' : 'left')
@@ -26,6 +27,12 @@ const comment = ref('')
 const theme = computed(() => 'dark' as const)
 
 const selectedDay = computed(() => days.value.get(selected.value))
+/** 绝密模式下书写者看到的是当天的绝密层日记；其余情况看公开层。 */
+const shownDiary = computed(() => {
+  const day = selectedDay.value
+  if (!day) return undefined
+  return props.secret && day.secretDiary?.id ? day.secretDiary : day.diary
+})
 const milestoneDates = computed(() => [...days.value.values()].filter(day => day.milestoneCount > 0).map(day => day.date))
 const visibleDates = computed(() => { const list: string[] = []; for (let date = visible.value.from; date <= visible.value.to; date = addDaysISO(date, 1)) list.push(date); return list })
 const moodPoints = computed<MetricPoint[]>(() => visibleDates.value.map(date => ({ x: dayIndex(date), y: points.value.get(date)?.mood ?? null, label: monthDayLabel(date) })))
@@ -85,7 +92,7 @@ watch(selected, () => { ensure(selected.value, selected.value) })
     <div class="past-dust" aria-hidden="true"><i v-for="n in 7" :key="n" /></div>
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
     <section class="past-layout" :class="`dock-${dock}`">
-      <LifeAxis v-model:selected="selected" :today="today" :milestones="milestoneDates" :mirror="dock === 'right'" @range="onRange" @toggle-dock="toggleDock" />
+      <LifeAxis v-model:selected="selected" :life-start="lifeStartISO || undefined" :today="today" :milestones="milestoneDates" :mirror="dock === 'right'" @range="onRange" @toggle-dock="toggleDock" />
       <section v-stagger class="past-content" :class="{ loading: loading > 0 }">
         <header class="past-head">
           <div class="chapter" :data-year="chapterYear"><span class="chapter-year">{{ chapterYear }}</span><h1 class="chapter-title">{{ selectedLabel.replace(/^\d+年/, '') }}<small>{{ selectedWeekday }} · {{ relativeDayLabel(selected) }}</small></h1></div>
@@ -103,10 +110,10 @@ watch(selected, () => { ensure(selected.value, selected.value) })
                   <span class="milestone-badge"><AppIcon name="medal" :size="14" />里程碑</span>
                   <h2 v-for="item in diaryMilestones" :key="item.id" class="monument-title">{{ item.description }}<small v-if="item.detail">{{ item.detail }}</small></h2>
                 </section>
-                <header class="card-head"><h2>日记</h2><small v-if="selectedDay?.diary.secret" class="secret-badge">绝密</small></header>
-                <MdPreview v-if="selectedDay?.diary.id" :editor-id="`past-${selected}`" :model-value="selectedDay.diary.content" :theme="theme" language="zh-CN" preview-theme="default" :no-img-zoom-in="true" />
+                <header class="card-head"><h2>日记</h2><small v-if="shownDiary?.secret" class="secret-badge">绝密层</small><small v-else-if="props.secret && selectedDay?.diary.id" class="faint">这一天没有绝密层，显示公开层</small></header>
+                <MdPreview v-if="shownDiary?.id" :editor-id="`past-${selected}-${shownDiary.secret ? 's' : 'p'}`" :model-value="shownDiary.content" :theme="theme" language="zh-CN" preview-theme="default" :no-img-zoom-in="true" />
                 <EmptyState v-else icon="book" text="这一天没有可查看的日记" />
-                <section v-if="selectedDay?.diary.id && (comments.length || selectedDay.diary.commentable)" class="past-comments">
+                <section v-if="selectedDay?.diary.id && !shownDiary?.secret && (comments.length || selectedDay.diary.commentable)" class="past-comments">
                   <h3 class="card-title">评论<small v-if="comments.length">{{ comments.length }}</small></h3>
                   <TransitionGroup name="list" tag="ul" class="comment-list">
                     <li v-for="item in comments" :key="item.id"><p>{{ item.content }}</p><small class="mono faint">{{ timeLabel(item.createdAt) }}</small></li>

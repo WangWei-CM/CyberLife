@@ -20,6 +20,7 @@ const selectedDate = ref(today)
 const editMode = ref(false)
 const progress = ref(0)
 const progressDate = ref(today)
+const edit = ref({ name: '', startDate: today, endDate: today, intro: '' })
 const creating = ref(false)
 const form = ref({ name: '', startDate: today, endDate: addDaysISO(today, 30), intro: '' })
 const newTask = ref('')
@@ -68,27 +69,36 @@ async function ensureTasks(from: string, to: string) {
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' }
 }
 function onRange(from: string, to: string) { ensureTasks(from, to) }
-function choose(plan: Plan) { selectedPlanId.value = plan.id; progress.value = plan.progress; progressDate.value = today; editMode.value = false }
+function choose(plan: Plan) { selectedPlanId.value = plan.id; progress.value = plan.progress; progressDate.value = today; editMode.value = false; edit.value = { name: plan.name, startDate: plan.startDate, endDate: plan.endDate, intro: plan.intro } }
 function choosePlanById(id: string) { const plan = plans.value.find(item => item.id === id); if (plan) choose(plan) }
 async function createPlan() {
   if (!form.value.name.trim() || busy.value) return
   busy.value = true
   try { const plan = await api.createPlan({ name: form.value.name.trim(), startDate: form.value.startDate, endDate: form.value.endDate, intro: form.value.intro }); form.value = { name: '', startDate: today, endDate: addDaysISO(today, 30), intro: '' }; creating.value = false; await loadPlans(); choose(plan) } catch (cause) { error.value = cause instanceof Error ? cause.message : '创建失败' } finally { busy.value = false }
 }
-async function saveProgress() {
-  if (!selectedPlan.value || busy.value) return
+/** 编辑模式：保存名称/起止/简介，以及（若有变化）当次标记的完成百分比。 */
+async function savePlan() {
+  const plan = selectedPlan.value
+  if (!plan || busy.value || !edit.value.name.trim()) return
   busy.value = true
-  try { await api.setPlanProgress(selectedPlan.value.id, progressDate.value, progress.value); await loadPlans(); editMode.value = false } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { busy.value = false }
+  try {
+    await api.updatePlan(plan.id, { name: edit.value.name.trim(), startDate: edit.value.startDate, endDate: edit.value.endDate, intro: edit.value.intro })
+    if (progress.value !== plan.progress) await api.setPlanProgress(plan.id, progressDate.value, progress.value)
+    await loadPlans()
+    const refreshed = plans.value.find(item => item.id === plan.id)
+    if (refreshed) edit.value = { name: refreshed.name, startDate: refreshed.startDate, endDate: refreshed.endDate, intro: refreshed.intro }
+    editMode.value = false
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { busy.value = false }
 }
 async function addTask() {
   const title = newTask.value.trim()
-  if (!title || selectedDate.value !== today) return
-  try { const task = await api.addTask(title, '', 'normal'); newTask.value = ''; tasks.value = new Map(tasks.value).set(task.id, { id: task.id, date: task.taskDate, title: task.title, priority: task.priority, done: task.done }) } catch (cause) { error.value = cause instanceof Error ? cause.message : '添加失败' }
+  if (!title) return
+  try { const task = await api.addTask(title, '', 'normal', selectedDate.value); newTask.value = ''; tasks.value = new Map(tasks.value).set(task.id, { id: task.id, date: task.taskDate, title: task.title, priority: task.priority, done: task.done }) } catch (cause) { error.value = cause instanceof Error ? cause.message : '添加失败' }
 }
 async function toggleTask(task: FutureTask) {
   const next = !task.done
   tasks.value = new Map(tasks.value).set(task.id, { ...task, done: next })
-  try { await api.setTaskDone(task.id, next) } catch (cause) { tasks.value = new Map(tasks.value).set(task.id, { ...task, done: !next }); error.value = cause instanceof Error ? cause.message : '更新失败' }
+  try { await api.setTaskDone(task.id, next, task.date) } catch (cause) { tasks.value = new Map(tasks.value).set(task.id, { ...task, done: !next }); error.value = cause instanceof Error ? cause.message : '更新失败' }
 }
 function startResize(kind: 'col' | 'row', event: PointerEvent) {
   dragging.value = kind
@@ -157,16 +167,19 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
                 <div class="dual-row"><span class="cyber-heading">时间进度</span><ProgressBar :value="selectedPlan.timeProgress" :height="6" /><b class="mono">{{ Math.round(timeDisplay) }}%</b></div>
                 <div class="dual-row"><span class="cyber-heading magenta">计划进度</span><ProgressBar :value="selectedPlan.progress" tone="accent-2" :height="6" /><b class="mono">{{ Math.round(planDisplay) }}%</b></div>
               </div>
-              <Transition name="fade-slide">
-                <form v-if="editMode" class="progress-form" @submit.prevent="saveProgress">
+              <Transition name="fade-slide" mode="out-in">
+                <form v-if="editMode" class="progress-form" @submit.prevent="savePlan">
+                  <input v-model="edit.name" placeholder="规划名称" maxlength="60" required aria-label="规划名称" />
+                  <div class="form-row"><input v-model="edit.startDate" type="date" required aria-label="开始日期" /><input v-model="edit.endDate" type="date" required aria-label="截止日期" /></div>
+                  <textarea v-model="edit.intro" rows="6" placeholder="简介（支持 Markdown）" aria-label="简介" />
                   <label class="field"><span>标记完成百分比 <b class="mono">{{ progress }}%</b></span><input v-model.number="progress" type="range" min="0" max="100" :style="{ '--range-fill': `${progress}%` }" /></label>
-                  <div class="form-row"><input v-model="progressDate" type="date" :max="today" aria-label="标记日期" /><button class="primary" type="submit" :disabled="busy">保存进度</button></div>
+                  <div class="form-row"><input v-model="progressDate" type="date" :max="today" aria-label="标记日期" /><button class="primary" type="submit" :disabled="busy || !edit.name.trim()">保存</button></div>
                 </form>
+                <section v-else class="detail-intro">
+                  <MdPreview v-if="selectedPlan.intro" :editor-id="`plan-${selectedPlan.id}`" :model-value="selectedPlan.intro" theme="dark" language="zh-CN" :no-img-zoom-in="true" />
+                  <EmptyState v-else icon="book" text="这项规划还没有简介" compact />
+                </section>
               </Transition>
-              <section class="detail-intro">
-                <MdPreview v-if="selectedPlan.intro" :editor-id="`plan-${selectedPlan.id}`" :model-value="selectedPlan.intro" theme="dark" language="zh-CN" :no-img-zoom-in="true" />
-                <EmptyState v-else icon="book" text="这项规划还没有简介" compact />
-              </section>
             </div>
             <EmptyState v-else icon="target" text="从左侧选择一项规划" />
           </Transition>
@@ -180,11 +193,11 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
             <header class="cyber-head"><span class="cyber-heading"><AppIcon name="calendar" :size="14" />{{ selectedDate }}</span><small class="faint">{{ relativeDayLabel(selectedDate) }}</small><small v-if="dayTasks.length" class="faint mono">{{ dayTasks.filter(task => task.done).length }} / {{ dayTasks.length }}</small></header>
             <div class="day-columns">
               <div class="day-col">
-                <form v-if="selectedDate === today" class="task-add" @submit.prevent="addTask"><input v-model="newTask" placeholder="为今天添加待办，回车保存" maxlength="120" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
+                <form class="task-add" @submit.prevent="addTask"><input v-model="newTask" :placeholder="selectedDate === today ? '为今天添加待办，回车保存' : `为 ${monthDayLabel(selectedDate)} 添加待办，回车保存`" maxlength="120" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
                 <ul v-if="dayTasks.length" class="day-tasks">
                   <li v-for="task in dayTasks" :key="task.id" :class="{ done: task.done }"><label class="task-row"><input type="checkbox" :checked="task.done" @change="toggleTask(task)" /><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><i v-if="task.priority === 'high'" class="task-priority high" title="高优先级" /></label></li>
                 </ul>
-                <EmptyState v-else icon="check" :text="selectedDate === today ? '今天还没有待办' : '这一天没有待办'" compact />
+                <EmptyState v-else icon="check" :text="selectedDate === today ? '今天还没有待办' : '这一天还没有待办'" compact />
               </div>
               <div class="day-col day-plans">
                 <span class="cyber-heading">当天进行中的规划</span>

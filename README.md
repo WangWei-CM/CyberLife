@@ -58,7 +58,7 @@ pnpm dev
 
 将 `product/` 整个文件夹复制到另一台 Windows 电脑，双击 `启动 Cyberlife.cmd`。脚本会启动内置 Go 服务、托管已构建的 Web UI，并打开 `http://127.0.0.1:8080/`。首次启动提示管理员密码；数据保存在 `product/runtime-data/`。双击 `停止 Cyberlife.cmd` 可停止服务。
 
-> 注意：`product/bin/cyberlife.exe` 与 `product/web/` 需要在服务端与前端重新构建后更新。当前源码已修复密钥登录在单连接 SQLite 池下的死锁以及历史接口对 NULL 权限预设的扫描错误，旧构建的产物仍带有这两个问题。
+> 注意：`product/bin/cyberlife.exe` 与 `product/web/` 需要在服务端与前端重新构建后更新。当前源码已修复密钥登录在单连接 SQLite 池下的死锁、历史接口对 NULL 权限预设的扫描错误，并新增昵称/注册日、任意日期待办、规划编辑、日记绝密层与跨月规划列表；这些服务端改动尚未在本机编译，旧构建的产物不包含它们。
 
 ## 首批 API
 
@@ -76,10 +76,11 @@ pnpm dev
 | POST | `/api/v1/now/moods` | 按服务端标签值记录心情 |
 | POST | `/api/v1/now/body` | 记录身体评分 |
 | PUT | `/api/v1/now/diary/draft` | 保存独立日记草稿 |
-| PUT | `/api/v1/now/diary` | 保存当日日记 |
+| PUT | `/api/v1/now/diary` | 保存当日日记（`secret` 选择公开层 / 绝密层） |
 | POST | `/api/v1/now/diary/attachments` | 上传当日日记附件 |
-| POST | `/api/v1/now/tasks` | 创建当天任务 |
-| POST | `/api/v1/now/tasks/:id/done` | 更新任务完成状态 |
+| POST | `/api/v1/now/tasks` | 创建任务（可带 `date`，默认今天） |
+| POST | `/api/v1/now/tasks/:id/done` | 更新任务完成状态（带 `date` 定位月库） |
+| PUT | `/api/v1/now/plans/:id` | 编辑规划名称、起止日期与简介 |
 | GET | `/api/v1/history` | 过去页按日期范围读取（≤ 366 天/次） |
 | GET | `/api/v1/plans` · `/api/v1/calendar` | 规划列表 · 待办日历 |
 

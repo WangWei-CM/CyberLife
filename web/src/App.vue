@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { authState, isAdmin, isWriter, logout, restoreSession, roleLabel } from './stores/auth'
+import { authState, displayName, isAdmin, isWriter, logout, restoreSession } from './stores/auth'
 import { DUR, reducedMotion, transitionTheme } from './lib/motion'
 import { isDaytime } from './lib/dates'
 import AppIcon from './components/AppIcon.vue'
@@ -136,13 +136,13 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
         <button v-if="isWriter" v-glow class="icon-button secret-toggle" :class="{ active: secretMode }" :aria-label="secretMode ? '退出绝密模式' : '进入绝密模式'" :title="secretMode ? '绝密模式已开启' : '绝密模式'" @click="toggleSecret">
           <span class="icon-morph"><AppIcon name="lock" :class="{ on: secretMode }" /><AppIcon name="unlock" :class="{ on: !secretMode }" /></span>
         </button>
-        <span class="actor-name">{{ roleLabel }}</span>
+        <span class="actor-name">{{ displayName }}</span>
         <button v-glow class="text-button" aria-label="登出" @click="logout"><AppIcon name="logout" :size="16" /><span>登出</span></button>
       </div>
     </header>
     <div class="screen">
       <AdminView v-if="isAdmin" />
-      <PastView v-else-if="screen === 'past'" />
+      <PastView v-else-if="screen === 'past'" :secret="secretActive" />
       <FutureView v-else-if="screen === 'future'" />
       <SettingsView v-else-if="screen === 'settings'" :appearance="appearance" :nav-position="navPosition" @update:appearance="setAppearance" @update:nav-position="navPosition = $event" @logout="logout" />
       <NowView v-else-if="isWriter" :secret="secretActive" @navigate-future="navigate('future')" />
