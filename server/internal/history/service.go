@@ -2,8 +2,8 @@ package history
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 
 	"cyberlife/server/internal/acl"
@@ -42,6 +42,18 @@ type Range struct {
 	Points []Point `json:"points"`
 }
 
+type accumulator struct {
+	moodSum   float64
+	moodCount int
+	bodySum   float64
+	bodyCount int
+}
+
+// decision answers "can this actor read a resource on this date" with memoisation per request.
+type decision func(date, preset string, secret bool) (bool, error)
+
+// Range reads a date span by opening each month database once and querying whole date ranges,
+// instead of opening a database per day. A year on the timeline is therefore twelve database opens.
 func (s *Service) Range(ctx context.Context, actor auth.Actor, from, to time.Time) (Range, error) {
 	if from.After(to) {
 		return Range{}, fmt.Errorf("起始日期不能晚于结束日期")
@@ -57,241 +69,249 @@ func (s *Service) Range(ctx context.Context, actor auth.Actor, from, to time.Tim
 		return Range{}, fmt.Errorf("单次查询最多 366 天")
 	}
 	out := Range{From: from.Format("2006-01-02"), To: to.Format("2006-01-02"), Days: []Day{}, Points: []Point{}}
+
+	decisions := map[string]bool{}
+	canRead := func(date, preset string, secret bool) (bool, error) {
+		key := date + "|" + preset + "|" + strconv.FormatBool(secret)
+		if value, ok := decisions[key]; ok {
+			return value, nil
+		}
+		value, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: date, PresetID: preset, Secret: secret})
+		if err != nil {
+			return false, err
+		}
+		decisions[key] = value
+		return value, nil
+	}
+
+	days := map[string]*Day{}
+	sums := map[string]*accumulator{}
+	order := []string{}
 	for date := from; !date.After(to); date = date.AddDate(0, 0, 1) {
-		day, e := s.day(ctx, actor, date)
-		if e != nil {
+		key := date.Format("2006-01-02")
+		days[key] = &Day{Date: key, Tasks: []nowservice.Task{}}
+		sums[key] = &accumulator{}
+		order = append(order, key)
+	}
+	for month := time.Date(from.Year(), from.Month(), 1, 0, 0, 0, 0, location); !month.After(to); month = month.AddDate(0, 1, 0) {
+		low := from
+		if month.After(low) {
+			low = month
+		}
+		high := month.AddDate(0, 1, -1)
+		if high.After(to) {
+			high = to
+		}
+		if e := s.collectMonth(ctx, actor.LifeID, storage.MonthKey(month), low.Format("2006-01-02"), high.Format("2006-01-02"), days, sums, canRead); e != nil {
 			return out, e
 		}
-		out.Days = append(out.Days, day)
-		out.Points = append(out.Points, Point{Date: day.Date})
 	}
-	for i := range out.Days {
-		point := &out.Points[i]
-		day := out.Days[i]
-		if day.MoodCount > 0 {
-			value := s.averageMood(ctx, actor, from.AddDate(0, 0, i))
-			point.Mood = value
+	for _, key := range order {
+		out.Days = append(out.Days, *days[key])
+		point := Point{Date: key}
+		if sum := sums[key]; sum.moodCount > 0 {
+			value := sum.moodSum / float64(sum.moodCount)
+			point.Mood = &value
 		}
-		if day.BodyCount > 0 {
-			value := s.averageBody(ctx, actor, from.AddDate(0, 0, i))
-			point.Body = value
+		if sum := sums[key]; sum.bodyCount > 0 {
+			value := sum.bodySum / float64(sum.bodyCount)
+			point.Body = &value
 		}
+		out.Points = append(out.Points, point)
 	}
 	return out, nil
 }
-func (s *Service) day(ctx context.Context, actor auth.Actor, date time.Time) (Day, error) {
-	db, e := s.db(ctx, actor.LifeID, date)
+
+// collectMonth fills days/sums for the [low, high] slice of one month database.
+func (s *Service) collectMonth(ctx context.Context, life, monthKey, low, high string, days map[string]*Day, sums map[string]*accumulator, canRead decision) error {
+	db, e := s.store.OpenLifeMonth(ctx, life, monthKey)
 	if e != nil {
-		return Day{}, e
+		return e
 	}
 	defer db.Close()
-	value := Day{Date: date.Format("2006-01-02"), Tasks: []nowservice.Task{}}
-	var diary nowservice.Diary
-	var secret, commentable int
-	e = db.QueryRowContext(ctx, "SELECT id,entry_date,content_md,COALESCE(visibility_preset_id,''),secret,COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? AND secret=0 LIMIT 1", value.Date).Scan(&diary.ID, &diary.EntryDate, &diary.Content, &diary.PresetID, &secret, &commentable)
-	if e == nil {
-		diary.Secret = secret == 1
-		diary.Commentable = commentable == 1
-		ok, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: value.Date, PresetID: diary.PresetID, Secret: diary.Secret})
-		if err != nil {
-			return value, err
-		}
-		if ok {
-			value.Diary = diary
-		}
-	}
-	// The secret layer is a separate entry on the same day; CanRead only passes it for the writer.
-	var secretDiary nowservice.Diary
-	var secretCommentable int
-	if scanErr := db.QueryRowContext(ctx, "SELECT id,entry_date,content_md,COALESCE(visibility_preset_id,''),COALESCE(commentable,0) FROM diary_entries WHERE entry_date=? AND secret=1 LIMIT 1", value.Date).Scan(&secretDiary.ID, &secretDiary.EntryDate, &secretDiary.Content, &secretDiary.PresetID, &secretCommentable); scanErr == nil {
-		secretDiary.Secret = true
-		secretDiary.Commentable = secretCommentable == 1
-		ok, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: value.Date, PresetID: secretDiary.PresetID, Secret: true})
-		if err != nil {
-			return value, err
-		}
-		if ok {
-			layer := secretDiary
-			value.SecretDiary = &layer
-		}
-	}
-	rows, e := db.QueryContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE task_date=? ORDER BY done,created_at", value.Date)
+
+	// Diaries: both layers; the secret layer only survives the ACL check for the writer.
+	rows, e := db.QueryContext(ctx, "SELECT id,entry_date,content_md,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM diary_entries WHERE entry_date BETWEEN ? AND ? ORDER BY entry_date", low, high)
 	if e != nil {
-		return value, e
+		return e
 	}
+	diaries := []nowservice.Diary{}
 	for rows.Next() {
-		var task nowservice.Task
-		var doneInt, secretInt, commentableInt int
-		if e = rows.Scan(&task.ID, &task.TaskDate, &task.Title, &task.Description, &task.Priority, &doneInt, &task.PresetID, &secretInt, &commentableInt); e != nil {
+		var d nowservice.Diary
+		var secret, commentable int
+		if e = rows.Scan(&d.ID, &d.EntryDate, &d.Content, &d.PresetID, &secret, &commentable); e != nil {
 			rows.Close()
-			return value, e
+			return e
 		}
-		task.Done = doneInt == 1
-		task.Secret = secretInt == 1
-		task.Commentable = commentableInt == 1
-		ok, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: value.Date, PresetID: task.PresetID, Secret: task.Secret})
-		if err != nil {
-			rows.Close()
-			return value, err
-		}
-		if ok {
-			value.Tasks = append(value.Tasks, task)
-		}
+		d.Secret = secret == 1
+		d.Commentable = commentable == 1
+		diaries = append(diaries, d)
 	}
 	rows.Close()
-	value.MoodCount, e = s.visibleMoodCount(ctx, db, actor, value.Date)
-	if e != nil {
-		return value, e
-	}
-	value.BodyCount, e = s.visibleBodyCount(ctx, db, actor, value.Date)
-	if e != nil {
-		return value, e
-	}
-	value.MilestoneCount, e = s.visibleMilestoneCount(ctx, db, actor, value.Date)
-	return value, e
-}
-func (s *Service) visibleMoodCount(ctx context.Context, db *sql.DB, actor auth.Actor, date string) (int, error) {
-	rows, e := db.QueryContext(ctx, "SELECT COALESCE(secret,0) FROM mood_records WHERE recorded_date=?", date)
-	if e != nil {
-		return 0, e
-	}
-	defer rows.Close()
-	count := 0
-	for rows.Next() {
-		var secret int
-		if e = rows.Scan(&secret); e != nil {
-			return 0, e
+	for _, d := range diaries {
+		day := days[d.EntryDate]
+		if day == nil {
+			continue
 		}
-		ok, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: date, Secret: secret == 1})
+		ok, err := canRead(d.EntryDate, d.PresetID, d.Secret)
 		if err != nil {
-			return 0, err
-		}
-		if ok {
-			count++
-		}
-	}
-	return count, rows.Err()
-}
-func (s *Service) visibleBodyCount(ctx context.Context, db *sql.DB, actor auth.Actor, date string) (int, error) {
-	rows, e := db.QueryContext(ctx, "SELECT COALESCE(secret,0) FROM body_records WHERE recorded_date=?", date)
-	if e != nil {
-		return 0, e
-	}
-	defer rows.Close()
-	count := 0
-	for rows.Next() {
-		var secret int
-		if e = rows.Scan(&secret); e != nil {
-			return 0, e
-		}
-		ok, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: date, Secret: secret == 1})
-		if err != nil {
-			return 0, err
-		}
-		if ok {
-			count++
-		}
-	}
-	return count, rows.Err()
-}
-func (s *Service) visibleMilestoneCount(ctx context.Context, db *sql.DB, actor auth.Actor, date string) (int, error) {
-	// visibility_preset_id is NULL when no preset is chosen; scan it through COALESCE like every other query does.
-	rows, e := db.QueryContext(ctx, "SELECT COALESCE(m.visibility_preset_id,''),COALESCE(m.secret,0),COALESCE(d.visibility_preset_id,''),COALESCE(d.secret,0) FROM milestones m JOIN diary_entries d ON m.target_type='diary' AND m.target_id=d.id WHERE d.entry_date=?", date)
-	if e != nil {
-		return 0, e
-	}
-	defer rows.Close()
-	count := 0
-	for rows.Next() {
-		var preset, milestonePreset string
-		var secret, targetSecret int
-		if e = rows.Scan(&milestonePreset, &secret, &preset, &targetSecret); e != nil {
-			return 0, e
-		}
-		ok, err := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: date, PresetID: preset, Secret: targetSecret == 1})
-		if err != nil {
-			return 0, err
+			return err
 		}
 		if !ok {
 			continue
 		}
-		ok, err = s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: date, PresetID: milestonePreset, Secret: secret == 1})
+		if d.Secret {
+			layer := d
+			day.SecretDiary = &layer
+		} else {
+			day.Diary = d
+		}
+	}
+
+	// Tasks.
+	rows, e = db.QueryContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE task_date BETWEEN ? AND ? ORDER BY task_date,done,created_at", low, high)
+	if e != nil {
+		return e
+	}
+	tasks := []nowservice.Task{}
+	for rows.Next() {
+		var t nowservice.Task
+		var done, secret, commentable int
+		if e = rows.Scan(&t.ID, &t.TaskDate, &t.Title, &t.Description, &t.Priority, &done, &t.PresetID, &secret, &commentable); e != nil {
+			rows.Close()
+			return e
+		}
+		t.Done = done == 1
+		t.Secret = secret == 1
+		t.Commentable = commentable == 1
+		tasks = append(tasks, t)
+	}
+	rows.Close()
+	for _, t := range tasks {
+		day := days[t.TaskDate]
+		if day == nil {
+			continue
+		}
+		ok, err := canRead(t.TaskDate, t.PresetID, t.Secret)
 		if err != nil {
-			return 0, err
+			return err
 		}
 		if ok {
-			count++
+			day.Tasks = append(day.Tasks, t)
 		}
 	}
-	return count, rows.Err()
-}
-func (s *Service) averageMood(ctx context.Context, actor auth.Actor, date time.Time) *float64 {
-	db, e := s.db(ctx, actor.LifeID, date)
-	if e != nil {
-		return nil
+
+	// Mood and body samples: averages per day of the records the actor may read.
+	type sample struct {
+		date   string
+		value  float64
+		secret bool
 	}
-	defer db.Close()
-	rows, e := db.QueryContext(ctx, "SELECT value,COALESCE(secret,0) FROM mood_records WHERE recorded_date=?", date.Format("2006-01-02"))
-	if e != nil {
-		return nil
+	readSamples := func(query string) ([]sample, error) {
+		rows, e := db.QueryContext(ctx, query, low, high)
+		if e != nil {
+			return nil, e
+		}
+		defer rows.Close()
+		samples := []sample{}
+		for rows.Next() {
+			var x sample
+			var secret int
+			if e = rows.Scan(&x.date, &x.value, &secret); e != nil {
+				return nil, e
+			}
+			x.secret = secret == 1
+			samples = append(samples, x)
+		}
+		return samples, rows.Err()
 	}
-	defer rows.Close()
-	sum := 0.0
-	count := 0
-	for rows.Next() {
-		var value float64
-		var secret int
-		if rows.Scan(&value, &secret) != nil {
+	moods, e := readSamples("SELECT recorded_date,value,COALESCE(secret,0) FROM mood_records WHERE recorded_date BETWEEN ? AND ?")
+	if e != nil {
+		return e
+	}
+	for _, m := range moods {
+		day, sum := days[m.date], sums[m.date]
+		if day == nil || sum == nil {
 			continue
 		}
-		ok, _ := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: date.Format("2006-01-02"), Secret: secret == 1})
+		ok, err := canRead(m.date, "", m.secret)
+		if err != nil {
+			return err
+		}
 		if ok {
-			sum += value
-			count++
+			sum.moodSum += m.value
+			sum.moodCount++
+			day.MoodCount++
 		}
 	}
-	if count == 0 {
-		return nil
-	}
-	value := sum / float64(count)
-	return &value
-}
-func (s *Service) averageBody(ctx context.Context, actor auth.Actor, date time.Time) *float64 {
-	db, e := s.db(ctx, actor.LifeID, date)
+	bodies, e := readSamples("SELECT recorded_date,CAST(score AS REAL),COALESCE(secret,0) FROM body_records WHERE recorded_date BETWEEN ? AND ?")
 	if e != nil {
-		return nil
+		return e
 	}
-	defer db.Close()
-	rows, e := db.QueryContext(ctx, "SELECT score,COALESCE(secret,0) FROM body_records WHERE recorded_date=?", date.Format("2006-01-02"))
-	if e != nil {
-		return nil
-	}
-	defer rows.Close()
-	sum := 0.0
-	count := 0
-	for rows.Next() {
-		var score float64
-		var secret int
-		if rows.Scan(&score, &secret) != nil {
+	for _, b := range bodies {
+		day, sum := days[b.date], sums[b.date]
+		if day == nil || sum == nil {
 			continue
 		}
-		ok, _ := s.acl.CanRead(ctx, actor, acl.Resource{LifeID: actor.LifeID, Date: date.Format("2006-01-02"), Secret: secret == 1})
+		ok, err := canRead(b.date, "", b.secret)
+		if err != nil {
+			return err
+		}
 		if ok {
-			sum += score
-			count++
+			sum.bodySum += b.value
+			sum.bodyCount++
+			day.BodyCount++
 		}
 	}
-	if count == 0 {
-		return nil
+
+	// Milestones on diaries: both the diary and the milestone must be readable.
+	rows, e = db.QueryContext(ctx, "SELECT d.entry_date,COALESCE(m.visibility_preset_id,''),COALESCE(m.secret,0),COALESCE(d.visibility_preset_id,''),COALESCE(d.secret,0) FROM milestones m JOIN diary_entries d ON m.target_type='diary' AND m.target_id=d.id WHERE d.entry_date BETWEEN ? AND ?", low, high)
+	if e != nil {
+		return e
 	}
-	value := sum / float64(count)
-	return &value
+	type medal struct {
+		date, preset, targetPreset string
+		secret, targetSecret       bool
+	}
+	medals := []medal{}
+	for rows.Next() {
+		var x medal
+		var secret, targetSecret int
+		if e = rows.Scan(&x.date, &x.preset, &secret, &x.targetPreset, &targetSecret); e != nil {
+			rows.Close()
+			return e
+		}
+		x.secret = secret == 1
+		x.targetSecret = targetSecret == 1
+		medals = append(medals, x)
+	}
+	rows.Close()
+	for _, m := range medals {
+		day := days[m.date]
+		if day == nil {
+			continue
+		}
+		ok, err := canRead(m.date, m.targetPreset, m.targetSecret)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		ok, err = canRead(m.date, m.preset, m.secret)
+		if err != nil {
+			return err
+		}
+		if ok {
+			day.MilestoneCount++
+		}
+	}
+	return nil
 }
-func (s *Service) db(ctx context.Context, life string, date time.Time) (*sql.DB, error) {
-	if e := s.store.EnsureLifeMonth(ctx, life, date); e != nil {
-		return nil, e
-	}
-	return sql.Open("sqlite", "file:"+s.store.LifeDBPath(life, date.In(shanghai()).Format("2006-01"))+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+
+func dayStart(value time.Time, location *time.Location) time.Time {
+	local := value.In(location)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location)
 }
 func shanghai() *time.Location {
 	location, e := time.LoadLocation("Asia/Shanghai")
@@ -299,8 +319,4 @@ func shanghai() *time.Location {
 		return time.FixedZone("CST", 28800)
 	}
 	return location
-}
-func dayStart(value time.Time, location *time.Location) time.Time {
-	v := value.In(location)
-	return time.Date(v.Year(), v.Month(), v.Day(), 0, 0, 0, 0, location)
 }

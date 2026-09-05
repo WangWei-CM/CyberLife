@@ -82,12 +82,69 @@ func (s *Service) db(ctx context.Context, life string, t time.Time) (*sql.DB, er
 	return sql.Open("sqlite", "file:"+s.store.LifeDBPath(life, t.In(time.FixedZone("CST", 28800)).Format("2006-01"))+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 }
 func date(t time.Time) string { return t.In(time.FixedZone("CST", 28800)).Format("2006-01-02") }
+type tagRow struct {
+	id, name, emoji, createdAt string
+	value, sortOrder           int
+}
+
+// ensureTags copies the mood tag set forward into a month database that has none yet. Tags live in
+// month databases, so without this every new month would start with an empty tag grid.
+func (s *Service) ensureTags(ctx context.Context, life string, db *sql.DB) error {
+	var count int
+	if e := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM mood_tags").Scan(&count); e != nil || count > 0 {
+		return e
+	}
+	months, e := s.store.LifeMonths(ctx, life)
+	if e != nil {
+		return e
+	}
+	current := storage.MonthKey(time.Now())
+	for _, month := range months {
+		if month == current {
+			continue
+		}
+		source, e := s.store.OpenLifeMonth(ctx, life, month)
+		if e != nil {
+			return e
+		}
+		rows, e := source.QueryContext(ctx, "SELECT id,name,emoji,value,sort_order,created_at FROM mood_tags ORDER BY sort_order,id")
+		if e != nil {
+			source.Close()
+			return e
+		}
+		copied := []tagRow{}
+		for rows.Next() {
+			var r tagRow
+			if e = rows.Scan(&r.id, &r.name, &r.emoji, &r.value, &r.sortOrder, &r.createdAt); e != nil {
+				rows.Close()
+				source.Close()
+				return e
+			}
+			copied = append(copied, r)
+		}
+		rows.Close()
+		source.Close()
+		if len(copied) == 0 {
+			continue
+		}
+		for _, r := range copied {
+			if _, e = db.ExecContext(ctx, "INSERT OR IGNORE INTO mood_tags(id,name,emoji,value,sort_order,created_at) VALUES(?,?,?,?,?,?)", r.id, r.name, r.emoji, r.value, r.sortOrder, r.createdAt); e != nil {
+				return e
+			}
+		}
+		return nil
+	}
+	return nil
+}
 func (s *Service) Tags(ctx context.Context, life string) ([]MoodTag, error) {
 	db, e := s.db(ctx, life, time.Now())
 	if e != nil {
 		return nil, e
 	}
 	defer db.Close()
+	if e = s.ensureTags(ctx, life, db); e != nil {
+		return nil, e
+	}
 	r, e := db.QueryContext(ctx, "SELECT id,name,emoji,value,sort_order FROM mood_tags ORDER BY sort_order,id")
 	if e != nil {
 		return nil, e
@@ -130,6 +187,9 @@ func (s *Service) AddMood(ctx context.Context, life, note string, tagIDs []strin
 		return MoodRecord{}, e
 	}
 	defer db.Close()
+	if e = s.ensureTags(ctx, life, db); e != nil {
+		return MoodRecord{}, e
+	}
 	tags := make([]MoodTag, 0, len(tagIDs))
 	sum := 0
 	for _, id := range tagIDs {
@@ -201,40 +261,54 @@ func (s *Service) SaveAttachment(ctx context.Context, life, name, mime string, s
 	}
 	return x, e
 }
+// AttachmentForRead walks the month databases (newest first) because attachments are stored in the
+// month they were uploaded; the file lives in that month's upload directory.
 func (s *Service) AttachmentForRead(ctx context.Context, life, id string) (Attachment, string, string, error) {
-	now := time.Now().UTC()
-	db, e := s.db(ctx, life, now)
+	months, e := s.store.LifeMonths(ctx, life)
 	if e != nil {
 		return Attachment{}, "", "", e
 	}
-	defer db.Close()
-	var entryDate, stored string
-	var secret int
-	x := Attachment{ID: id}
-	e = db.QueryRowContext(ctx, "SELECT entry_date,original_name,stored_name,mime_type,byte_size,COALESCE(visibility_preset_id,''),COALESCE(secret,0) FROM content_attachments WHERE id=?", id).Scan(&entryDate, &x.OriginalName, &stored, &x.MimeType, &x.ByteSize, &x.PresetID, &secret)
-	if e != nil {
-		return x, "", "", fmt.Errorf("附件不存在")
+	for _, month := range months {
+		db, e := s.store.OpenLifeMonth(ctx, life, month)
+		if e != nil {
+			return Attachment{}, "", "", e
+		}
+		var entryDate, stored string
+		var secret int
+		x := Attachment{ID: id}
+		e = db.QueryRowContext(ctx, "SELECT entry_date,original_name,stored_name,mime_type,byte_size,COALESCE(visibility_preset_id,''),COALESCE(secret,0) FROM content_attachments WHERE id=?", id).Scan(&entryDate, &x.OriginalName, &stored, &x.MimeType, &x.ByteSize, &x.PresetID, &secret)
+		db.Close()
+		if e == sql.ErrNoRows {
+			continue
+		}
+		if e != nil {
+			return x, "", "", e
+		}
+		x.Secret = secret == 1
+		return x, entryDate, filepath.Join(s.store.UploadDir(life, month), stored), nil
 	}
-	x.Secret = secret == 1
-	return x, entryDate, s.store.UploadDir(life, now.In(time.FixedZone("CST", 28800)).Format("2006-01")) + string(os.PathSeparator) + stored, nil
+	return Attachment{}, "", "", fmt.Errorf("附件不存在")
 }
 func (s *Service) SetAttachmentAccess(ctx context.Context, life, id, presetID string, secret bool) (Attachment, error) {
-	now := time.Now().UTC()
-	db, e := s.db(ctx, life, now)
+	months, e := s.store.LifeMonths(ctx, life)
 	if e != nil {
 		return Attachment{}, e
 	}
-	defer db.Close()
-	r, e := db.ExecContext(ctx, "UPDATE content_attachments SET visibility_preset_id=?,secret=? WHERE id=?", nullString(presetID), secret, id)
-	if e != nil {
-		return Attachment{}, e
+	for _, month := range months {
+		db, e := s.store.OpenLifeMonth(ctx, life, month)
+		if e != nil {
+			return Attachment{}, e
+		}
+		r, e := db.ExecContext(ctx, "UPDATE content_attachments SET visibility_preset_id=?,secret=? WHERE id=?", nullString(presetID), secret, id)
+		db.Close()
+		if e != nil {
+			return Attachment{}, e
+		}
+		if n, _ := r.RowsAffected(); n == 1 {
+			return Attachment{ID: id, PresetID: presetID, Secret: secret}, nil
+		}
 	}
-	n, _ := r.RowsAffected()
-	if n != 1 {
-		return Attachment{}, fmt.Errorf("附件不存在")
-	}
-	x := Attachment{ID: id, PresetID: presetID, Secret: secret}
-	return x, nil
+	return Attachment{}, fmt.Errorf("附件不存在")
 }
 // SaveDraft stores today's draft. The secret layer keeps its own draft row; diary_drafts is keyed by
 // entry_date alone, so the secret draft is stored under "<date>#secret".
@@ -311,29 +385,28 @@ func (s *Service) SetDiaryAccess(ctx context.Context, life, presetID string, sec
 	d, _, _, _, e := s.Today(ctx, life)
 	return d, e
 }
+// SetTaskAccess walks the month databases because the task may belong to an earlier month.
 func (s *Service) SetTaskAccess(ctx context.Context, life, id, presetID string, secret, commentable bool) (Task, error) {
-	now := time.Now().UTC()
-	db, e := s.db(ctx, life, now)
+	months, e := s.store.LifeMonths(ctx, life)
 	if e != nil {
 		return Task{}, e
 	}
-	defer db.Close()
-	r, e := db.ExecContext(ctx, "UPDATE tasks SET visibility_preset_id=?,secret=?,commentable=?,updated_at=? WHERE id=? AND life_id=?", nullString(presetID), secret, commentable, now.Format(time.RFC3339Nano), id, life)
-	if e != nil {
-		return Task{}, e
-	}
-	n, _ := r.RowsAffected()
-	if n != 1 {
-		return Task{}, fmt.Errorf("任务不存在")
-	}
-	_, _, _, tasks, e := s.Today(ctx, life)
-	if e != nil {
-		return Task{}, e
-	}
-	for _, x := range tasks {
-		if x.ID == id {
-			return x, nil
+	for _, month := range months {
+		db, e := s.store.OpenLifeMonth(ctx, life, month)
+		if e != nil {
+			return Task{}, e
 		}
+		r, e := db.ExecContext(ctx, "UPDATE tasks SET visibility_preset_id=?,secret=?,commentable=?,updated_at=? WHERE id=? AND life_id=?", nullString(presetID), secret, commentable, time.Now().UTC().Format(time.RFC3339Nano), id, life)
+		if e != nil {
+			db.Close()
+			return Task{}, e
+		}
+		if n, _ := r.RowsAffected(); n == 1 {
+			x, e := readTask(ctx, db, id)
+			db.Close()
+			return x, e
+		}
+		db.Close()
 	}
 	return Task{}, fmt.Errorf("任务不存在")
 }

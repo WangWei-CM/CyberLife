@@ -5,23 +5,49 @@ import (
 	"cyberlife/server/internal/storage"
 	"database/sql"
 	"fmt"
-	"github.com/google/uuid"
+	"io"
+	"mime"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
+)
+
+const (
+	maxImageSize int64 = 5 << 20
+	maxFileSize  int64 = 20 << 20
 )
 
 type Service struct{ store *storage.Store }
 
 func New(store *storage.Store) *Service { return &Service{store} }
 
+type PlanFile struct {
+	ID           string `json:"id"`
+	PlanID       string `json:"planId"`
+	OriginalName string `json:"originalName"`
+	MimeType     string `json:"mimeType"`
+	ByteSize     int64  `json:"byteSize"`
+	URL          string `json:"url"`
+}
 type Plan struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	StartDate    string  `json:"startDate"`
-	EndDate      string  `json:"endDate"`
-	Intro        string  `json:"intro"`
-	Progress     float64 `json:"progress"`
-	TimeProgress float64 `json:"timeProgress"`
+	ID           string     `json:"id"`
+	Name         string     `json:"name"`
+	StartDate    string     `json:"startDate"`
+	EndDate      string     `json:"endDate"`
+	Intro        string     `json:"intro"`
+	Progress     float64    `json:"progress"`
+	TimeProgress float64    `json:"timeProgress"`
+	Secret       bool       `json:"secret"`
+	PresetID     string     `json:"presetId"`
+	CoverURL     string     `json:"coverUrl"`
+	IconURL      string     `json:"iconUrl"`
+	Files        []PlanFile `json:"files"`
+	coverPath    string
+	iconPath     string
 }
 type Task struct {
 	ID       string `json:"id"`
@@ -29,71 +55,68 @@ type Task struct {
 	Title    string `json:"title"`
 	Priority string `json:"priority"`
 	Done     bool   `json:"done"`
-}
-
-func (s *Service) db(ctx context.Context, life string, t time.Time) (*sql.DB, error) {
-	if e := s.store.EnsureLifeMonth(ctx, life, t); e != nil {
-		return nil, e
-	}
-	return sql.Open("sqlite", "file:"+s.store.LifeDBPath(life, t.In(location()).Format("2006-01"))+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
-}
-// months lists the month databases registered for a life (newest first), always including the
-// current month so a fresh life works before any month database exists.
-func (s *Service) months(ctx context.Context, life string) ([]string, error) {
-	rows, e := s.store.Global().QueryContext(ctx, "SELECT month_key FROM life_months WHERE life_id=? ORDER BY month_key DESC", life)
-	if e != nil {
-		return nil, e
-	}
-	out := []string{}
-	for rows.Next() {
-		var key string
-		if e = rows.Scan(&key); e != nil {
-			rows.Close()
-			return nil, e
-		}
-		out = append(out, key)
-	}
-	rows.Close()
-	current := time.Now().In(location()).Format("2006-01")
-	for _, key := range out {
-		if key == current {
-			return out, nil
-		}
-	}
-	return append([]string{current}, out...), nil
-}
-
-func (s *Service) monthDB(ctx context.Context, life, month string) (*sql.DB, error) {
-	t, e := time.ParseInLocation("2006-01", month, location())
-	if e != nil {
-		return nil, fmt.Errorf("月份无效")
-	}
-	return s.db(ctx, life, t)
+	PresetID string `json:"presetId"`
+	Secret   bool   `json:"secret"`
 }
 
 type planScanner interface{ Scan(dest ...any) error }
 
+const planColumns = "id,name,start_date,end_date,intro_md,COALESCE(secret,0),COALESCE(visibility_preset_id,''),COALESCE(cover_path,''),COALESCE(icon_path,'')"
+
 func scanPlan(row planScanner) (Plan, error) {
 	var x Plan
-	e := row.Scan(&x.ID, &x.Name, &x.StartDate, &x.EndDate, &x.Intro)
-	return x, e
+	var secret int
+	e := row.Scan(&x.ID, &x.Name, &x.StartDate, &x.EndDate, &x.Intro, &secret, &x.PresetID, &x.coverPath, &x.iconPath)
+	if e != nil {
+		return Plan{}, e
+	}
+	x.Secret = secret == 1
+	if x.coverPath != "" {
+		x.CoverURL = "/api/v1/plans/" + x.ID + "/cover"
+	}
+	if x.iconPath != "" {
+		x.IconURL = "/api/v1/plans/" + x.ID + "/icon"
+	}
+	x.Files = []PlanFile{}
+	return x, nil
+}
+
+// hydrate fills progress, time progress and the file list from the plan's own month database.
+func (s *Service) hydrate(ctx context.Context, db *sql.DB, x *Plan) error {
+	x.Progress = s.progress(ctx, db, x.ID)
+	x.TimeProgress = timeProgress(x.StartDate, x.EndDate)
+	rows, e := db.QueryContext(ctx, "SELECT id,original_name,mime_type,byte_size FROM plan_files WHERE plan_id=? ORDER BY created_at", x.ID)
+	if e != nil {
+		return e
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var f PlanFile
+		if e = rows.Scan(&f.ID, &f.OriginalName, &f.MimeType, &f.ByteSize); e != nil {
+			return e
+		}
+		f.PlanID = x.ID
+		f.URL = "/api/v1/plans/" + x.ID + "/files/" + f.ID
+		x.Files = append(x.Files, f)
+	}
+	return rows.Err()
 }
 
 // ListPlans unions the plans of every month database. Plans are written to the month database that is
 // current at creation time, so listing only the present month would hide them after a month rolls over.
 func (s *Service) ListPlans(ctx context.Context, life string) ([]Plan, error) {
-	months, e := s.months(ctx, life)
+	months, e := s.store.LifeMonths(ctx, life)
 	if e != nil {
 		return nil, e
 	}
 	seen := map[string]bool{}
 	out := []Plan{}
 	for _, month := range months {
-		db, e := s.monthDB(ctx, life, month)
+		db, e := s.store.OpenLifeMonth(ctx, life, month)
 		if e != nil {
 			return nil, e
 		}
-		rows, e := db.QueryContext(ctx, "SELECT id,name,start_date,end_date,intro_md FROM plans")
+		rows, e := db.QueryContext(ctx, "SELECT "+planColumns+" FROM plans")
 		if e != nil {
 			db.Close()
 			return nil, e
@@ -114,8 +137,10 @@ func (s *Service) ListPlans(ctx context.Context, life string) ([]Plan, error) {
 		}
 		rows.Close()
 		for i := range batch {
-			batch[i].Progress = s.progress(ctx, db, batch[i].ID)
-			batch[i].TimeProgress = timeProgress(batch[i].StartDate, batch[i].EndDate)
+			if e := s.hydrate(ctx, db, &batch[i]); e != nil {
+				db.Close()
+				return nil, e
+			}
 		}
 		db.Close()
 		out = append(out, batch...)
@@ -126,19 +151,24 @@ func (s *Service) ListPlans(ctx context.Context, life string) ([]Plan, error) {
 
 // findPlan locates the month database holding the plan; the caller closes the returned handle.
 func (s *Service) findPlan(ctx context.Context, life, id string) (*sql.DB, Plan, error) {
-	months, e := s.months(ctx, life)
+	if id == "" {
+		return nil, Plan{}, fmt.Errorf("规划不存在")
+	}
+	months, e := s.store.LifeMonths(ctx, life)
 	if e != nil {
 		return nil, Plan{}, e
 	}
 	for _, month := range months {
-		db, e := s.monthDB(ctx, life, month)
+		db, e := s.store.OpenLifeMonth(ctx, life, month)
 		if e != nil {
 			return nil, Plan{}, e
 		}
-		x, e := scanPlan(db.QueryRowContext(ctx, "SELECT id,name,start_date,end_date,intro_md FROM plans WHERE id=?", id))
+		x, e := scanPlan(db.QueryRowContext(ctx, "SELECT "+planColumns+" FROM plans WHERE id=?", id))
 		if e == nil {
-			x.Progress = s.progress(ctx, db, x.ID)
-			x.TimeProgress = timeProgress(x.StartDate, x.EndDate)
+			if e := s.hydrate(ctx, db, &x); e != nil {
+				db.Close()
+				return nil, Plan{}, e
+			}
 			return db, x, nil
 		}
 		db.Close()
@@ -169,14 +199,15 @@ func (s *Service) CreatePlan(ctx context.Context, life, name, start, end, intro 
 	if e := validatePlan(name, start, end); e != nil {
 		return Plan{}, e
 	}
-	db, e := s.db(ctx, life, time.Now())
+	db, e := s.store.OpenLifeMonth(ctx, life, storage.MonthKey(time.Now()))
 	if e != nil {
 		return Plan{}, e
 	}
 	defer db.Close()
-	x := Plan{ID: uuid.NewString(), Name: name, StartDate: start, EndDate: end, Intro: intro}
+	x := Plan{ID: uuid.NewString(), Name: name, StartDate: start, EndDate: end, Intro: intro, Files: []PlanFile{}}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	_, e = db.ExecContext(ctx, "INSERT INTO plans(id,life_id,name,start_date,end_date,intro_md,secret,commentable,created_at,updated_at) VALUES(?,?,?,?,?,?,0,0,?,?)", x.ID, life, x.Name, x.StartDate, x.EndDate, x.Intro, now, now)
+	x.TimeProgress = timeProgress(start, end)
 	return x, e
 }
 
@@ -218,12 +249,179 @@ func (s *Service) SetProgress(ctx context.Context, life, id, date string, percen
 	x.Progress = s.progress(ctx, db, id)
 	return x, nil
 }
+
+// SetImage stores the cover or icon image of a plan and replaces the previous one.
+func (s *Service) SetImage(ctx context.Context, life, id, kind, name, declaredType string, size int64, source io.Reader) (Plan, error) {
+	if kind != "cover" && kind != "icon" {
+		return Plan{}, fmt.Errorf("图片类型无效")
+	}
+	if size < 1 || size > maxImageSize {
+		return Plan{}, fmt.Errorf("图片大小必须在 1B 至 5MB 之间")
+	}
+	if !strings.HasPrefix(declaredType, "image/") {
+		return Plan{}, fmt.Errorf("仅支持图片文件")
+	}
+	db, x, e := s.findPlan(ctx, life, id)
+	if e != nil {
+		return Plan{}, e
+	}
+	defer db.Close()
+	stored, e := s.storeFile(life, x.ID+"-"+kind+"-"+uuid.NewString()+extensionFor(name, declaredType), size, source, maxImageSize)
+	if e != nil {
+		return Plan{}, e
+	}
+	column, previous := "cover_path", x.coverPath
+	if kind == "icon" {
+		column, previous = "icon_path", x.iconPath
+	}
+	if _, e = db.ExecContext(ctx, "UPDATE plans SET "+column+"=?,updated_at=? WHERE id=?", stored, time.Now().UTC().Format(time.RFC3339Nano), id); e != nil {
+		_ = os.Remove(filepath.Join(s.store.PlanUploadDir(life), stored))
+		return Plan{}, e
+	}
+	if previous != "" {
+		_ = os.Remove(filepath.Join(s.store.PlanUploadDir(life), previous))
+	}
+	if kind == "icon" {
+		x.iconPath = stored
+		x.IconURL = "/api/v1/plans/" + x.ID + "/icon"
+	} else {
+		x.coverPath = stored
+		x.CoverURL = "/api/v1/plans/" + x.ID + "/cover"
+	}
+	return x, nil
+}
+
+// ImageForRead returns the plan (for the access check), the file path and the content type.
+func (s *Service) ImageForRead(ctx context.Context, life, id, kind string) (Plan, string, string, error) {
+	db, x, e := s.findPlan(ctx, life, id)
+	if e != nil {
+		return Plan{}, "", "", e
+	}
+	db.Close()
+	stored := x.coverPath
+	if kind == "icon" {
+		stored = x.iconPath
+	}
+	if stored == "" {
+		return x, "", "", fmt.Errorf("图片不存在")
+	}
+	contentType := mime.TypeByExtension(filepath.Ext(stored))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	return x, filepath.Join(s.store.PlanUploadDir(life), stored), contentType, nil
+}
+
+// AddFile attaches a document to a plan (same 20MB limit as diary attachments).
+func (s *Service) AddFile(ctx context.Context, life, id, name, declaredType string, size int64, source io.Reader) (PlanFile, error) {
+	if size < 1 || size > maxFileSize {
+		return PlanFile{}, fmt.Errorf("文件大小必须在 1B 至 20MB 之间")
+	}
+	if name == "" || strings.ContainsAny(name, "\\/\x00") {
+		return PlanFile{}, fmt.Errorf("文件名无效")
+	}
+	db, x, e := s.findPlan(ctx, life, id)
+	if e != nil {
+		return PlanFile{}, e
+	}
+	defer db.Close()
+	f := PlanFile{ID: uuid.NewString(), PlanID: x.ID, OriginalName: name, MimeType: declaredType, ByteSize: size}
+	if f.MimeType == "" {
+		f.MimeType = "application/octet-stream"
+	}
+	stored, e := s.storeFile(life, f.ID+extensionFor(name, declaredType), size, source, maxFileSize)
+	if e != nil {
+		return PlanFile{}, e
+	}
+	if _, e = db.ExecContext(ctx, "INSERT INTO plan_files(id,plan_id,original_name,stored_name,mime_type,byte_size,created_at) VALUES(?,?,?,?,?,?,?)", f.ID, x.ID, f.OriginalName, stored, f.MimeType, f.ByteSize, time.Now().UTC().Format(time.RFC3339Nano)); e != nil {
+		_ = os.Remove(filepath.Join(s.store.PlanUploadDir(life), stored))
+		return PlanFile{}, e
+	}
+	f.URL = "/api/v1/plans/" + x.ID + "/files/" + f.ID
+	return f, nil
+}
+
+func (s *Service) DeleteFile(ctx context.Context, life, planID, fileID string) error {
+	db, _, e := s.findPlan(ctx, life, planID)
+	if e != nil {
+		return e
+	}
+	defer db.Close()
+	var stored string
+	if e = db.QueryRowContext(ctx, "SELECT stored_name FROM plan_files WHERE id=? AND plan_id=?", fileID, planID).Scan(&stored); e != nil {
+		return fmt.Errorf("文件不存在")
+	}
+	if _, e = db.ExecContext(ctx, "DELETE FROM plan_files WHERE id=?", fileID); e != nil {
+		return e
+	}
+	if e = os.Remove(filepath.Join(s.store.PlanUploadDir(life), stored)); e != nil && !os.IsNotExist(e) {
+		return e
+	}
+	return nil
+}
+
+// FileForRead returns the file record, its plan (for the access check) and the path on disk.
+func (s *Service) FileForRead(ctx context.Context, life, planID, fileID string) (PlanFile, Plan, string, error) {
+	db, x, e := s.findPlan(ctx, life, planID)
+	if e != nil {
+		return PlanFile{}, Plan{}, "", e
+	}
+	defer db.Close()
+	var f PlanFile
+	var stored string
+	if e = db.QueryRowContext(ctx, "SELECT id,original_name,stored_name,mime_type,byte_size FROM plan_files WHERE id=? AND plan_id=?", fileID, planID).Scan(&f.ID, &f.OriginalName, &stored, &f.MimeType, &f.ByteSize); e != nil {
+		return PlanFile{}, x, "", fmt.Errorf("文件不存在")
+	}
+	f.PlanID = x.ID
+	f.URL = "/api/v1/plans/" + x.ID + "/files/" + f.ID
+	return f, x, filepath.Join(s.store.PlanUploadDir(life), stored), nil
+}
+
+// storeFile writes an upload atomically into the plan upload directory and returns the stored name.
+func (s *Service) storeFile(life, storedName string, size int64, source io.Reader, limit int64) (string, error) {
+	if storedName == "" || strings.ContainsAny(storedName, "\\/\x00") {
+		return "", fmt.Errorf("文件名无效")
+	}
+	dir := s.store.PlanUploadDir(life)
+	if e := os.MkdirAll(dir, 0o750); e != nil {
+		return "", e
+	}
+	temp := filepath.Join(dir, storedName+".part")
+	target := filepath.Join(dir, storedName)
+	out, e := os.OpenFile(temp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if e != nil {
+		return "", e
+	}
+	written, copyErr := io.Copy(out, io.LimitReader(source, limit+1))
+	closeErr := out.Close()
+	if copyErr != nil || closeErr != nil || written != size {
+		_ = os.Remove(temp)
+		return "", fmt.Errorf("保存文件失败")
+	}
+	if e = os.Rename(temp, target); e != nil {
+		return "", e
+	}
+	return storedName, nil
+}
+
+func extensionFor(name, declaredType string) string {
+	if ext := strings.ToLower(filepath.Ext(name)); ext != "" && len(ext) <= 8 {
+		return ext
+	}
+	if exts, _ := mime.ExtensionsByType(declaredType); len(exts) > 0 {
+		return exts[0]
+	}
+	return ""
+}
+
+// Calendar returns the tasks in [from, to] by opening each month database once. Callers apply the
+// ACL to the returned preset/secret fields.
 func (s *Service) Calendar(ctx context.Context, life, from, to string) ([]Task, error) {
-	start, e := time.Parse("2006-01-02", from)
+	start, e := time.ParseInLocation("2006-01-02", from, location())
 	if e != nil {
 		return nil, fmt.Errorf("起始日期无效")
 	}
-	end, e := time.Parse("2006-01-02", to)
+	end, e := time.ParseInLocation("2006-01-02", to, location())
 	if e != nil || end.Before(start) {
 		return nil, fmt.Errorf("截止日期无效")
 	}
@@ -231,30 +429,42 @@ func (s *Service) Calendar(ctx context.Context, life, from, to string) ([]Task, 
 		return nil, fmt.Errorf("单次日历范围最多 366 天")
 	}
 	out := []Task{}
-	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
-		db, e := s.db(ctx, life, date)
+	for month := time.Date(start.Year(), start.Month(), 1, 0, 0, 0, 0, location()); !month.After(end); month = month.AddDate(0, 1, 0) {
+		low := start
+		if month.After(low) {
+			low = month
+		}
+		high := month.AddDate(0, 1, -1)
+		if high.After(end) {
+			high = end
+		}
+		db, e := s.store.OpenLifeMonth(ctx, life, storage.MonthKey(month))
 		if e != nil {
 			return nil, e
 		}
-		rows, e := db.QueryContext(ctx, "SELECT id,task_date,title,priority,done FROM tasks WHERE task_date=? ORDER BY created_at", date.Format("2006-01-02"))
-		if e == nil {
-			for rows.Next() {
-				var x Task
-				var done int
-				if e = rows.Scan(&x.ID, &x.Date, &x.Title, &x.Priority, &done); e != nil {
-					rows.Close()
-					db.Close()
-					return nil, e
-				}
-				x.Done = done == 1
-				out = append(out, x)
-			}
-			rows.Close()
+		rows, e := db.QueryContext(ctx, "SELECT id,task_date,title,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0) FROM tasks WHERE task_date BETWEEN ? AND ? ORDER BY task_date,created_at", low.Format("2006-01-02"), high.Format("2006-01-02"))
+		if e != nil {
+			db.Close()
+			return nil, e
 		}
+		for rows.Next() {
+			var x Task
+			var done, secret int
+			if e = rows.Scan(&x.ID, &x.Date, &x.Title, &x.Priority, &done, &x.PresetID, &secret); e != nil {
+				rows.Close()
+				db.Close()
+				return nil, e
+			}
+			x.Done = done == 1
+			x.Secret = secret == 1
+			out = append(out, x)
+		}
+		rows.Close()
 		db.Close()
 	}
 	return out, nil
 }
+
 func (s *Service) progress(ctx context.Context, db *sql.DB, id string) float64 {
 	var v sql.NullFloat64
 	_ = db.QueryRowContext(ctx, "SELECT percent FROM plan_progress WHERE plan_id=? ORDER BY date DESC LIMIT 1", id).Scan(&v)

@@ -148,6 +148,7 @@ CREATE INDEX IF NOT EXISTS idx_attachments_date ON content_attachments(entry_dat
 CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, target_type TEXT NOT NULL CHECK(target_type IN ('diary','task')), target_id TEXT NOT NULL, parent_id TEXT, author_key_id TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL, deleted_at TEXT);
 CREATE INDEX IF NOT EXISTS idx_comments_target ON comments(target_type, target_id, created_at);
 CREATE TABLE IF NOT EXISTS milestones (id TEXT PRIMARY KEY, target_type TEXT NOT NULL CHECK(target_type IN ('diary','task')), target_id TEXT NOT NULL UNIQUE, description TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '', visibility_preset_id TEXT, secret INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS plan_files (id TEXT PRIMARY KEY, plan_id TEXT NOT NULL REFERENCES plans(id), original_name TEXT NOT NULL, stored_name TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL, byte_size INTEGER NOT NULL, visibility_preset_id TEXT, secret INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
 `); err != nil {
 		return fmt.Errorf("migrate life month database: %w", err)
 	}
@@ -156,6 +157,7 @@ CREATE TABLE IF NOT EXISTS milestones (id TEXT PRIMARY KEY, target_type TEXT NOT
 		{"tasks", "visibility_preset_id", "TEXT"}, {"tasks", "commentable", "INTEGER NOT NULL DEFAULT 0"}, {"tasks", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"mood_records", "secret", "INTEGER NOT NULL DEFAULT 0"}, {"body_records", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"content_attachments", "visibility_preset_id", "TEXT"}, {"content_attachments", "secret", "INTEGER NOT NULL DEFAULT 0"},
+		{"inbox_messages", "ref_date", "TEXT"}, {"plans", "cover_path", "TEXT"}, {"plans", "icon_path", "TEXT"},
 	} {
 		if err := ensureColumn(ctx, db, change.table, change.column, change.definition); err != nil {
 			return err
@@ -201,6 +203,62 @@ func (s *Store) UploadDir(lifeID, monthKey string) string {
 
 func (s *Store) MusicUploadDir(lifeID string) string {
 	return filepath.Join(s.dataDir, "uploads", lifeID, "music")
+}
+
+func (s *Store) PlanUploadDir(lifeID string) string {
+	return filepath.Join(s.dataDir, "uploads", lifeID, "plans")
+}
+
+// MonthKey formats an instant as a month database key in Beijing time.
+func MonthKey(date time.Time) string { return date.In(shanghai()).Format("2006-01") }
+
+// MonthStart parses a month key into the first instant of that month in Beijing time.
+func MonthStart(monthKey string) (time.Time, error) {
+	start, err := time.ParseInLocation("2006-01", monthKey, shanghai())
+	if err != nil {
+		return time.Time{}, fmt.Errorf("invalid month key %q", monthKey)
+	}
+	return start, nil
+}
+
+// LifeMonths lists the month databases registered for a life, newest first. The current month is
+// always included so a life without data still resolves to a database. Content is written to the
+// month database of its date, so anything that looks up an item by id must walk these months.
+func (s *Store) LifeMonths(ctx context.Context, lifeID string) ([]string, error) {
+	rows, err := s.global.QueryContext(ctx, "SELECT month_key FROM life_months WHERE life_id=? ORDER BY month_key DESC", lifeID)
+	if err != nil {
+		return nil, err
+	}
+	months := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		months = append(months, key)
+	}
+	rows.Close()
+	current := MonthKey(time.Now())
+	for _, key := range months {
+		if key == current {
+			return months, nil
+		}
+	}
+	return append([]string{current}, months...), nil
+}
+
+// OpenLifeMonth opens the month database for a key, creating and migrating it if necessary.
+// The caller closes the returned handle.
+func (s *Store) OpenLifeMonth(ctx context.Context, lifeID, monthKey string) (*sql.DB, error) {
+	start, err := MonthStart(monthKey)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.EnsureLifeMonth(ctx, lifeID, start); err != nil {
+		return nil, err
+	}
+	return sql.Open("sqlite", "file:"+filepath.ToSlash(s.LifeDBPath(lifeID, monthKey))+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 }
 
 func shanghai() *time.Location {

@@ -31,65 +31,83 @@ type Milestone struct {
 	Secret      bool   `json:"secret"`
 }
 type TargetAccess struct {
+	TargetType  string
+	TargetID    string
 	Date        string
 	PresetID    string
 	Secret      bool
 	Commentable bool
 }
 
-func (s *Service) db(ctx context.Context, life string) (*sql.DB, error) {
-	now := time.Now()
-	if e := s.store.EnsureLifeMonth(ctx, life, now); e != nil {
-		return nil, e
+// findTarget locates the month database holding the diary or task. Comments and milestones are stored
+// next to their target, so a comment on last month's diary lands in last month's database and is found
+// again when that day is opened on the past page. The caller closes the returned handle.
+func (s *Service) findTarget(ctx context.Context, life, targetType, targetID string) (*sql.DB, TargetAccess, error) {
+	if targetType != "diary" && targetType != "task" {
+		return nil, TargetAccess{}, fmt.Errorf("目标类型无效")
 	}
-	return sql.Open("sqlite", "file:"+s.store.LifeDBPath(life, now.In(time.FixedZone("CST", 28800)).Format("2006-01"))+"?_pragma=foreign_keys(1)")
+	if targetID == "" {
+		return nil, TargetAccess{}, fmt.Errorf("目标不存在")
+	}
+	months, e := s.store.LifeMonths(ctx, life)
+	if e != nil {
+		return nil, TargetAccess{}, e
+	}
+	for _, month := range months {
+		db, e := s.store.OpenLifeMonth(ctx, life, month)
+		if e != nil {
+			return nil, TargetAccess{}, e
+		}
+		x := TargetAccess{TargetType: targetType, TargetID: targetID}
+		var secret, commentable int
+		if targetType == "diary" {
+			e = db.QueryRowContext(ctx, "SELECT entry_date,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM diary_entries WHERE id=? AND life_id=?", targetID, life).Scan(&x.Date, &x.PresetID, &secret, &commentable)
+		} else {
+			e = db.QueryRowContext(ctx, "SELECT task_date,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE id=? AND life_id=?", targetID, life).Scan(&x.Date, &x.PresetID, &secret, &commentable)
+		}
+		if e == nil {
+			x.Secret = secret == 1
+			x.Commentable = commentable == 1
+			return db, x, nil
+		}
+		db.Close()
+		if e != sql.ErrNoRows {
+			return nil, TargetAccess{}, e
+		}
+	}
+	return nil, TargetAccess{}, fmt.Errorf("目标不存在")
 }
+
 func (s *Service) TargetAccess(ctx context.Context, life, targetType, targetID string) (TargetAccess, error) {
-	db, e := s.db(ctx, life)
+	db, x, e := s.findTarget(ctx, life, targetType, targetID)
 	if e != nil {
 		return TargetAccess{}, e
 	}
-	defer db.Close()
-	var x TargetAccess
-	var secret, commentable int
-	if targetType == "diary" {
-		e = db.QueryRowContext(ctx, "SELECT entry_date,COALESCE(visibility_preset_id,''),secret,COALESCE(commentable,0) FROM diary_entries WHERE id=? AND life_id=?", targetID, life).Scan(&x.Date, &x.PresetID, &secret, &commentable)
-	} else if targetType == "task" {
-		e = db.QueryRowContext(ctx, "SELECT task_date,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE id=? AND life_id=?", targetID, life).Scan(&x.Date, &x.PresetID, &secret, &commentable)
-	} else {
-		return x, fmt.Errorf("目标类型无效")
-	}
-	if e != nil {
-		return x, fmt.Errorf("目标不存在")
-	}
-	x.Secret = secret == 1
-	x.Commentable = commentable == 1
+	db.Close()
 	return x, nil
 }
-func (s *Service) AddComment(ctx context.Context, life, actorID, targetType, targetID, content string) (Comment, error) {
-	if (targetType != "diary" && targetType != "task") || targetID == "" || content == "" {
-		return Comment{}, fmt.Errorf("评论参数无效")
+
+// AddComment stores the comment in the target's month database and returns the target so callers can
+// notify the writer with the target date.
+func (s *Service) AddComment(ctx context.Context, life, actorID, targetType, targetID, content string) (Comment, TargetAccess, error) {
+	if content == "" {
+		return Comment{}, TargetAccess{}, fmt.Errorf("评论内容不能为空")
 	}
-	db, e := s.db(ctx, life)
+	db, target, e := s.findTarget(ctx, life, targetType, targetID)
 	if e != nil {
-		return Comment{}, e
+		return Comment{}, TargetAccess{}, e
 	}
 	defer db.Close()
-	var commentable int
-	if targetType == "diary" {
-		e = db.QueryRowContext(ctx, "SELECT COALESCE(commentable,0) FROM diary_entries WHERE id=? AND life_id=?", targetID, life).Scan(&commentable)
-	} else {
-		e = db.QueryRowContext(ctx, "SELECT COALESCE(commentable,0) FROM tasks WHERE id=? AND life_id=?", targetID, life).Scan(&commentable)
-	}
-	if e != nil || commentable != 1 {
-		return Comment{}, fmt.Errorf("目标不存在或未开启评论")
+	if !target.Commentable {
+		return Comment{}, target, fmt.Errorf("目标不存在或未开启评论")
 	}
 	x := Comment{ID: uuid.NewString(), TargetType: targetType, TargetID: targetID, AuthorKeyID: actorID, Content: content, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
 	_, e = db.ExecContext(ctx, "INSERT INTO comments(id,target_type,target_id,author_key_id,content,created_at) VALUES(?,?,?,?,?,?)", x.ID, x.TargetType, x.TargetID, x.AuthorKeyID, x.Content, x.CreatedAt)
-	return x, e
+	return x, target, e
 }
+
 func (s *Service) ListComments(ctx context.Context, life, targetType, targetID string) ([]Comment, error) {
-	db, e := s.db(ctx, life)
+	db, _, e := s.findTarget(ctx, life, targetType, targetID)
 	if e != nil {
 		return nil, e
 	}
@@ -109,13 +127,14 @@ func (s *Service) ListComments(ctx context.Context, life, targetType, targetID s
 	}
 	return out, rows.Err()
 }
+
 func (s *Service) ListMilestones(ctx context.Context, life, targetType, targetID string) ([]Milestone, error) {
-	db, e := s.db(ctx, life)
+	db, _, e := s.findTarget(ctx, life, targetType, targetID)
 	if e != nil {
 		return nil, e
 	}
 	defer db.Close()
-	rows, e := db.QueryContext(ctx, "SELECT id,target_type,target_id,description,detail,COALESCE(visibility_preset_id,''),secret FROM milestones WHERE target_type=? AND target_id=? ORDER BY created_at", targetType, targetID)
+	rows, e := db.QueryContext(ctx, "SELECT id,target_type,target_id,description,detail,COALESCE(visibility_preset_id,''),COALESCE(secret,0) FROM milestones WHERE target_type=? AND target_id=? ORDER BY created_at", targetType, targetID)
 	if e != nil {
 		return nil, e
 	}
@@ -132,17 +151,25 @@ func (s *Service) ListMilestones(ctx context.Context, life, targetType, targetID
 	}
 	return out, rows.Err()
 }
+
 func (s *Service) AddMilestone(ctx context.Context, life, targetType, targetID, description, detail, presetID string, secret bool) (Milestone, error) {
-	if (targetType != "diary" && targetType != "task") || targetID == "" || description == "" {
+	if description == "" {
 		return Milestone{}, fmt.Errorf("里程碑参数无效")
 	}
-	db, e := s.db(ctx, life)
+	db, _, e := s.findTarget(ctx, life, targetType, targetID)
 	if e != nil {
 		return Milestone{}, e
 	}
 	defer db.Close()
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	x := Milestone{ID: uuid.NewString(), TargetType: targetType, TargetID: targetID, Description: description, Detail: detail, PresetID: presetID, Secret: secret}
-	_, e = db.ExecContext(ctx, "INSERT INTO milestones(id,target_type,target_id,description,detail,visibility_preset_id,secret,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)", x.ID, x.TargetType, x.TargetID, x.Description, x.Detail, x.PresetID, x.Secret, now, now)
+	_, e = db.ExecContext(ctx, "INSERT INTO milestones(id,target_type,target_id,description,detail,visibility_preset_id,secret,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)", x.ID, x.TargetType, x.TargetID, x.Description, x.Detail, nullString(presetID), x.Secret, now, now)
 	return x, e
+}
+
+func nullString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }
