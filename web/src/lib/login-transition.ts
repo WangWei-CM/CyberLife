@@ -201,6 +201,30 @@ function createOrbit(radius: number, color: number, opacity: number) {
   )
 }
 
+function createChamferedPlate(width: number, chamfer: number, depth: number, material: THREE.Material) {
+  const half = width / 2
+  const shape = new THREE.Shape()
+  shape.moveTo(-half + chamfer, -half)
+  shape.lineTo(half - chamfer, -half)
+  shape.lineTo(half, -half + chamfer)
+  shape.lineTo(half, half - chamfer)
+  shape.lineTo(half - chamfer, half)
+  shape.lineTo(-half + chamfer, half)
+  shape.lineTo(-half, half - chamfer)
+  shape.lineTo(-half, -half + chamfer)
+  shape.closePath()
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSegments: 2, bevelSize: .055, bevelThickness: .055 })
+  geometry.center()
+  return new THREE.Mesh(geometry, material)
+}
+
+function createChipLine(points: Array<[number, number]>, z: number, material: THREE.Material) {
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(points.map(([x, y]) => new THREE.Vector3(x, y, z))),
+    material,
+  )
+}
+
 function disposeObject(root: THREE.Object3D) {
   root.traverse(object => {
     const mesh = object as THREE.Mesh
@@ -215,7 +239,7 @@ function disposeObject(root: THREE.Object3D) {
   })
 }
 
-/** Original CyberLife WebGL scene. No third-party site assets are embedded. */
+/** CyberLife WebGL scene with original geometry and an attributed public-domain Earth texture. */
 export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneOptions = {}) {
   let renderer: THREE.WebGLRenderer
   try {
@@ -287,6 +311,18 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   )
   earth.rotation.z = -.22
   earthGroup.add(earth)
+  new THREE.TextureLoader().load('/textures/earth-day-blue-marble.jpg', texture => {
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.wrapS = THREE.RepeatWrapping
+    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+    const material = earth.material as THREE.MeshStandardMaterial
+    material.map?.dispose()
+    material.bumpMap?.dispose()
+    material.map = texture
+    material.bumpMap = texture
+    material.bumpScale = .075
+    material.needsUpdate = true
+  })
 
   const clouds = new THREE.Mesh(
     new THREE.SphereGeometry(earthRadius * 1.018, sphereSegments, sphereSegments),
@@ -362,22 +398,46 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
 
   const node = new THREE.Group()
   node.visible = false
-  const nodeCore = new THREE.Mesh(
-    new THREE.BoxGeometry(2.25, 2.25, .55, 6, 6, 2),
-    new THREE.MeshPhysicalMaterial({ color: 0x87999a, metalness: .94, roughness: .24, clearcoat: .7, clearcoatRoughness: .18 }),
-  )
-  const nodeInset = new THREE.Mesh(
-    new THREE.BoxGeometry(1.78, 1.78, .08),
-    new THREE.MeshPhysicalMaterial({ color: 0x142328, metalness: .82, roughness: .34, clearcoat: .45 }),
-  )
-  nodeInset.position.z = .32
-  const nodeMark = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.36, 1.36),
-    new THREE.MeshBasicMaterial({ map: logoTexture, transparent: true, opacity: .9, depthWrite: false }),
-  )
-  nodeMark.position.z = .38
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(nodeCore.geometry), new THREE.LineBasicMaterial({ color: 0xc9e9e3, transparent: true, opacity: .74 }))
-  node.add(nodeCore, nodeInset, nodeMark, edge)
+  const whiteMetal = new THREE.MeshPhysicalMaterial({ color: 0xf0f1ed, metalness: .82, roughness: .2, clearcoat: .85, clearcoatRoughness: .12 })
+  const darkMetal = new THREE.MeshPhysicalMaterial({ color: 0x050607, metalness: .75, roughness: .3, clearcoat: .5 })
+  const matteWhite = new THREE.MeshStandardMaterial({ color: 0xd8dad7, metalness: .36, roughness: .48 })
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x080a0b, transparent: true, opacity: .92 })
+
+  const nodeCore = createChamferedPlate(2.5, .25, .44, whiteMetal)
+  const rearPlate = createChamferedPlate(2.72, .3, .16, matteWhite)
+  rearPlate.position.z = -.29
+  const nodeInset = createChamferedPlate(2.08, .22, .09, darkMetal)
+  nodeInset.position.z = .3
+  const facePlate = createChamferedPlate(1.72, .18, .035, matteWhite)
+  facePlate.position.z = .38
+  const outerEdge = new THREE.LineSegments(new THREE.EdgesGeometry(nodeCore.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .82 }))
+  const innerEdge = new THREE.LineSegments(new THREE.EdgesGeometry(nodeInset.geometry), new THREE.LineBasicMaterial({ color: 0x070809, transparent: true, opacity: .95 }))
+  innerEdge.position.copy(nodeInset.position)
+
+  const circuitLines = new THREE.Group()
+  const routes: Array<Array<[number, number]>> = [
+    [[-.66, .6], [-.18, .6], [.02, .32], [.62, .32]],
+    [[-.7, .25], [-.36, .25], [-.02, -.06], [.7, -.06]],
+    [[-.7, -.18], [-.24, -.18], [.08, -.5], [.64, -.5]],
+    [[-.48, .7], [-.48, .38], [-.12, .02], [-.12, -.7]],
+    [[.38, .68], [.38, .38], [.02, .02], [.02, -.68]],
+    [[.68, .5], [.5, .5], [.22, .2], [.22, -.65]],
+  ]
+  for (const route of routes) circuitLines.add(createChipLine(route, .407, lineMaterial))
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(.17, .17, .045, 32), darkMetal)
+  hub.rotation.x = Math.PI / 2
+  hub.position.set(0, 0, .43)
+
+  const fastenerGeometry = new THREE.CylinderGeometry(.075, .075, .055, 20)
+  const fasteners = [[-.98, -.98], [.98, -.98], [-.98, .98], [.98, .98]]
+    .map(([x, y]) => {
+      const fastener = new THREE.Mesh(fastenerGeometry, darkMetal)
+      fastener.rotation.x = Math.PI / 2
+      fastener.position.set(x, y, .31)
+      return fastener
+    })
+
+  node.add(rearPlate, nodeCore, nodeInset, facePlate, outerEdge, innerEdge, circuitLines, hub, ...fasteners)
   scene.add(node)
 
   let width = 1
