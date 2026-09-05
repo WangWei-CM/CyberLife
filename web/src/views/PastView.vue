@@ -1,93 +1,132 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import MetricLine from '../components/MetricLine.vue'
-import { api, type HistoryDay, type HistoryRange } from '../api/client'
+import { computed, ref, watch } from 'vue'
+import { MdPreview } from 'md-editor-v3'
+import 'md-editor-v3/lib/preview.css'
+import LifeAxis from '../components/LifeAxis.vue'
+import MetricLine, { type MetricPoint } from '../components/MetricLine.vue'
+import EmptyState from '../components/EmptyState.vue'
+import AppIcon from '../components/AppIcon.vue'
+import { api, type Comment, type HistoryDay, type Milestone, type TrendPoint } from '../api/client'
+import { isWriter } from '../stores/auth'
+import { addDaysISO, dayIndex, diffDays, fullDateLabel, monthDayLabel, relativeDayLabel, timeLabel, todayISO, weekdayLabel, parseISO } from '../lib/dates'
 
-type Scale = 'day' | 'month' | 'year'
-type Tick = { key: string; date: string; label: string; milestone: boolean; today: boolean }
-const today = new Date()
-const iso = (value: Date) => value.toISOString().slice(0, 10)
-const add = (value: Date, days: number) => { const result = new Date(value); result.setDate(result.getDate() + days); return result }
-const monthStart = (value: Date) => new Date(value.getFullYear(), value.getMonth(), 1)
-const yearStart = (value: Date) => new Date(value.getFullYear(), 0, 1)
-const targetDays = ref(14)
-const displayDays = ref(14)
-const anchor = ref(today)
-const range = ref<HistoryRange>({ from: iso(add(today, -13)), to: iso(today), days: [], points: [] })
-const selected = ref(iso(today))
+const today = todayISO()
+const selected = ref(today)
+const visible = ref<{ from: string; to: string }>({ from: addDaysISO(today, -13), to: today })
+const days = ref(new Map<string, HistoryDay>())
+const points = ref(new Map<string, TrendPoint>())
+const fetched = ref(new Set<string>())
+const loading = ref(0)
 const error = ref('')
-const axisHeight = 600
-let frame = 0
-let loadTimer: number | undefined
-let dragStart: { y: number; date: Date } | null = null
+const milestones = ref<Milestone[]>([])
+const comments = ref<Comment[]>([])
+const comment = ref('')
+const theme = computed(() => 'dark' as const)
 
-const pxPerDay = computed(() => axisHeight / displayDays.value)
-const scale = computed<Scale>(() => pxPerDay.value >= 6 ? 'day' : pxPerDay.value >= 1 ? 'month' : 'year')
-const selectedDay = computed<HistoryDay | undefined>(() => range.value.days.find(day => day.date === selected.value))
-const mood = computed(() => range.value.points.map(point => point.mood ?? 0))
-const body = computed(() => range.value.points.map(point => point.body ?? 0))
-const ticks = computed<Tick[]>(() => {
-  const milestoneDates = new Set(range.value.days.filter(day => day.milestoneCount > 0).map(day => day.date))
-  const start = new Date(`${range.value.from}T00:00:00`)
-  const end = new Date(`${range.value.to}T00:00:00`)
-  const result: Tick[] = []
-  if (scale.value === 'day') {
-    const labelEvery = Math.max(1, Math.round(18 / pxPerDay.value))
-    let index = 0
-    for (let value = start; value <= end; value = add(value, 1), index++) {
-      const date = iso(value)
-      const crossMonth = value.getDate() === 1 || date === range.value.from
-      const label = crossMonth ? `${value.getMonth() + 1}月${value.getDate()}日` : index % labelEvery === 0 ? `${value.getDate()}日` : ''
-      result.push({ key: date, date, label, milestone: milestoneDates.has(date), today: date === iso(today) })
-    }
-  } else if (scale.value === 'month') {
-    for (let value = monthStart(start); value <= end; value = new Date(value.getFullYear(), value.getMonth() + 1, 1)) {
-      const date = iso(value)
-      result.push({ key: date, date, label: `${value.getMonth() + 1}月`, milestone: [...milestoneDates].some(item => item.startsWith(date.slice(0, 7))), today: iso(today).startsWith(date.slice(0, 7)) })
-    }
-  } else {
-    for (let value = yearStart(start); value <= end; value = new Date(value.getFullYear() + 1, 0, 1)) {
-      const date = iso(value)
-      result.push({ key: date, date, label: `${value.getFullYear()}年`, milestone: [...milestoneDates].some(item => item.startsWith(String(value.getFullYear()))), today: today.getFullYear() === value.getFullYear() })
-    }
+const selectedDay = computed(() => days.value.get(selected.value))
+const milestoneDates = computed(() => [...days.value.values()].filter(day => day.milestoneCount > 0).map(day => day.date))
+const visibleDates = computed(() => { const list: string[] = []; for (let date = visible.value.from; date <= visible.value.to; date = addDaysISO(date, 1)) list.push(date); return list })
+const moodPoints = computed<MetricPoint[]>(() => visibleDates.value.map(date => ({ x: dayIndex(date), y: points.value.get(date)?.mood ?? null, label: monthDayLabel(date) })))
+const bodyPoints = computed<MetricPoint[]>(() => visibleDates.value.map(date => ({ x: dayIndex(date), y: points.value.get(date)?.body ?? null, label: monthDayLabel(date) })))
+const selectedLabel = computed(() => fullDateLabel(selected.value))
+const selectedWeekday = computed(() => weekdayLabel(parseISO(selected.value)))
+const chapterYear = computed(() => selected.value.slice(0, 4))
+const diaryMilestones = computed(() => milestones.value.filter(item => item.targetType === 'diary'))
+
+/** 按需拉取可见范围内尚未缓存的日期，单次请求 ≤ 366 天。 */
+async function ensure(from: string, to: string) {
+  const missing: string[] = []
+  for (let date = from; date <= to; date = addDaysISO(date, 1)) if (!fetched.value.has(date)) missing.push(date)
+  if (!missing.length) return
+  const spans: { from: string; to: string }[] = []
+  for (const date of missing) {
+    const last = spans[spans.length - 1]
+    if (last && diffDays(last.to, date) === 1 && diffDays(last.from, date) < 365) last.to = date
+    else spans.push({ from: date, to: date })
   }
-  return result
-})
-async function load() {
-  const end = anchor.value > today ? today : anchor.value
-  const start = add(end, -Math.ceil(displayDays.value) + 1)
+  loading.value++
   try {
-    range.value = await api.history(iso(start), iso(end))
-    if (selected.value < range.value.from || selected.value > range.value.to) selected.value = range.value.to
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' }
+    await Promise.all(spans.map(async span => {
+      const range = await api.history(span.from, span.to)
+      const nextDays = new Map(days.value)
+      const nextPoints = new Map(points.value)
+      const nextFetched = new Set(fetched.value)
+      for (const day of range.days) { nextDays.set(day.date, day); nextFetched.add(day.date) }
+      for (const point of range.points) nextPoints.set(point.date, point)
+      days.value = nextDays; points.value = nextPoints; fetched.value = nextFetched
+    }))
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' } finally { loading.value-- }
 }
-function scheduleLoad() { if (loadTimer) clearTimeout(loadTimer); loadTimer = window.setTimeout(load, 90) }
-function animateScale() {
-  const distance = targetDays.value - displayDays.value
-  if (Math.abs(distance) > .01) { displayDays.value += distance * .12; scheduleLoad(); frame = requestAnimationFrame(animateScale) }
-  else { displayDays.value = targetDays.value; scheduleLoad(); frame = 0 }
+function onRange(from: string, to: string) { visible.value = { from, to }; ensure(from, to) }
+async function loadDetails(day: HistoryDay | undefined) {
+  milestones.value = []
+  comments.value = []
+  if (!day?.diary.id) return
+  try {
+    const [milestoneResult, commentResult] = await Promise.all([api.milestones('diary', day.diary.id), api.comments('diary', day.diary.id)])
+    milestones.value = milestoneResult.items
+    comments.value = commentResult.items
+  } catch { /* 无权限或无数据时保持空 */ }
 }
-function wheel(event: WheelEvent) { event.preventDefault(); targetDays.value = Math.max(3, Math.min(36500, targetDays.value * Math.pow(1.05, Math.sign(event.deltaY)))); if (!frame) frame = requestAnimationFrame(animateScale) }
-function down(event: PointerEvent) { dragStart = { y: event.clientY, date: new Date(anchor.value) }; (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId) }
-function move(event: PointerEvent) { if (!dragStart) return; anchor.value = add(dragStart.date, Math.round((dragStart.y - event.clientY) * Math.max(1, displayDays.value / axisHeight))); if (anchor.value > today) anchor.value = today; scheduleLoad() }
-function up() { dragStart = null }
-function selectTick(tick: Tick) { const date = new Date(`${tick.date}T00:00:00`); if (scale.value === 'month') date.setDate(Math.min(new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate(), today.getDate())); if (scale.value === 'year') date.setMonth(today.getMonth(), today.getDate()); selected.value = iso(date > today ? today : date) }
-onMounted(load)
-onBeforeUnmount(() => { if (frame) cancelAnimationFrame(frame); if (loadTimer) clearTimeout(loadTimer) })
+async function submitComment() {
+  const day = selectedDay.value
+  const text = comment.value.trim()
+  if (!day?.diary.id || !text) return
+  try { await api.addComment('diary', day.diary.id, text); comment.value = ''; comments.value = (await api.comments('diary', day.diary.id)).items } catch (cause) { error.value = cause instanceof Error ? cause.message : '评论失败' }
+}
+watch(selectedDay, loadDetails, { immediate: true })
+watch(selected, () => { ensure(selected.value, selected.value) })
 </script>
 
 <template>
   <main class="page past-page">
-    <p v-if="error" class="error">{{ error }}</p>
+    <div class="past-dust" aria-hidden="true"><i v-for="n in 7" :key="n" /></div>
+    <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
     <section class="past-layout">
-      <aside class="life-axis" :class="`axis-${scale}`" :style="{ '--axis-row-height': `${Math.max(18, pxPerDay)}px` }" @wheel="wheel" @pointerdown="down" @pointermove="move" @pointerup="up">
-        <button v-for="tick in ticks" :key="tick.key" :class="{ selected: selected.startsWith(tick.date.slice(0, scale === 'day' ? 10 : scale === 'month' ? 7 : 4)), today: tick.today }" @click="selectTick(tick)">
-          <span v-if="tick.milestone" class="medal" aria-label="里程碑">✦</span><time :class="{ 'axis-label-hidden': !tick.label }">{{ tick.label || '·' }}</time><i v-if="tick.today" aria-label="今天" />
-        </button>
-      </aside>
-      <section class="past-content">
-        <div class="past-trends"><article class="past-card"><h2>心情</h2><MetricLine :values="mood" /></article><article class="past-card"><h2>身体</h2><MetricLine :values="body" /></article></div>
-        <div v-if="selectedDay" class="past-day"><article class="past-card diary-render"><header><h2>{{ selectedDay.date }}</h2><span v-if="selectedDay.milestoneCount" class="medal">✦</span></header><div v-if="selectedDay.diary.id" class="markdown-view">{{ selectedDay.diary.content }}</div><div v-else class="empty">这一天没有可查看的日记</div></article><article class="past-card"><h2>日程</h2><ul class="past-tasks"><li v-for="task in selectedDay.tasks" :key="task.id" :class="{ done: task.done }"><span>{{ task.title }}</span><small>{{ task.description }}</small></li><li v-if="!selectedDay.tasks.length" class="empty">这一天没有可查看的日程</li></ul></article></div>
+      <LifeAxis v-model:selected="selected" :today="today" :milestones="milestoneDates" @range="onRange" />
+      <section v-stagger class="past-content" :class="{ loading: loading > 0 }">
+        <header class="past-head">
+          <div class="chapter" :data-year="chapterYear"><span class="chapter-year">{{ chapterYear }}</span><h1 class="chapter-title">{{ selectedLabel.replace(/^\d+年/, '') }}<small>{{ selectedWeekday }} · {{ relativeDayLabel(selected) }}</small></h1></div>
+          <span class="past-range mono">{{ monthDayLabel(visible.from) }} — {{ monthDayLabel(visible.to) }}</span>
+        </header>
+        <div class="past-trends">
+          <article class="card past-card"><h2 class="card-title">心情</h2><MetricLine :points="moodPoints" :min="0" :max="100" :height="140" empty="这段时间没有心情记录" /></article>
+          <article class="card past-card"><h2 class="card-title">身体</h2><MetricLine :points="bodyPoints" :min="0" :max="100" :height="140" empty="这段时间没有身体记录" /></article>
+        </div>
+        <div class="past-day">
+          <article class="card past-card diary-render">
+            <Transition name="fade-slide" mode="out-in">
+              <div :key="selected" class="past-diary">
+                <section v-if="diaryMilestones.length" class="monument">
+                  <span class="milestone-badge"><AppIcon name="medal" :size="14" />里程碑</span>
+                  <h2 v-for="item in diaryMilestones" :key="item.id" class="monument-title">{{ item.description }}<small v-if="item.detail">{{ item.detail }}</small></h2>
+                </section>
+                <header class="card-head"><h2>日记</h2><small v-if="selectedDay?.diary.secret" class="secret-badge">绝密</small></header>
+                <MdPreview v-if="selectedDay?.diary.id" :editor-id="`past-${selected}`" :model-value="selectedDay.diary.content" :theme="theme" language="zh-CN" preview-theme="default" :no-img-zoom-in="true" />
+                <EmptyState v-else icon="book" text="这一天没有可查看的日记" />
+                <section v-if="selectedDay?.diary.id && (comments.length || selectedDay.diary.commentable)" class="past-comments">
+                  <h3 class="card-title">评论<small v-if="comments.length">{{ comments.length }}</small></h3>
+                  <TransitionGroup name="list" tag="ul" class="comment-list">
+                    <li v-for="item in comments" :key="item.id"><p>{{ item.content }}</p><small class="mono faint">{{ timeLabel(item.createdAt) }}</small></li>
+                  </TransitionGroup>
+                  <form v-if="selectedDay.diary.commentable || isWriter" class="comment-form" @submit.prevent="submitComment"><input v-model="comment" placeholder="写下评论" maxlength="500" /><button class="icon-button" type="submit" aria-label="发送" :disabled="!comment.trim()"><AppIcon name="send" :size="16" /></button></form>
+                </section>
+              </div>
+            </Transition>
+          </article>
+          <article class="card past-card">
+            <header class="card-head"><h2>日程</h2><small v-if="selectedDay?.tasks.length" class="faint">{{ selectedDay.tasks.filter(task => task.done).length }} / {{ selectedDay.tasks.length }} 完成</small></header>
+            <Transition name="fade-slide" mode="out-in">
+              <ul v-if="selectedDay?.tasks.length" :key="selected" class="past-tasks">
+                <li v-for="task in selectedDay.tasks" :key="task.id" :class="{ done: task.done }">
+                  <i class="task-state"><AppIcon v-if="task.done" name="check" :size="12" :stroke-width="2.5" /></i>
+                  <div><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><small v-if="task.description" class="faint">{{ task.description }}</small></div>
+                </li>
+              </ul>
+              <EmptyState v-else :key="`empty-${selected}`" icon="calendar" text="这一天没有可查看的日程" />
+            </Transition>
+          </article>
+        </div>
       </section>
     </section>
   </main>
