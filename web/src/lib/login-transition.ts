@@ -53,48 +53,90 @@ function canvasTexture(width: number, height: number, draw: (context: CanvasRend
   return texture
 }
 
+function terrainNoise(x: number, y: number) {
+  const lattice = (ix: number, iy: number) => {
+    const value = Math.sin(ix * 127.1 + iy * 311.7 + 19.19) * 43758.5453
+    return value - Math.floor(value)
+  }
+  const smooth = (value: number) => value * value * (3 - 2 * value)
+  const sample = (scale: number) => {
+    const px = x * scale
+    const py = y * scale
+    const x0 = Math.floor(px)
+    const y0 = Math.floor(py)
+    const fx = smooth(px - x0)
+    const fy = smooth(py - y0)
+    const a = lattice(x0, y0)
+    const b = lattice(x0 + 1, y0)
+    const c = lattice(x0, y0 + 1)
+    const d = lattice(x0 + 1, y0 + 1)
+    return (a + (b - a) * fx) * (1 - fy) + (c + (d - c) * fx) * fy
+  }
+  return sample(2.3) * .5 + sample(5.7) * .3 + sample(13.4) * .14 + sample(31.8) * .06
+}
+
 function createEarthTexture(quality: number) {
   return canvasTexture(quality, quality / 2, context => {
     const width = context.canvas.width
     const height = context.canvas.height
-    const ocean = context.createLinearGradient(0, 0, 0, height)
-    ocean.addColorStop(0, '#183d4d')
-    ocean.addColorStop(.52, '#0b2939')
-    ocean.addColorStop(1, '#061a29')
-    context.fillStyle = ocean
-    context.fillRect(0, 0, width, height)
-
-    for (let index = 0; index < 54; index += 1) {
-      const x = seeded(index + 10) * width
-      const y = seeded(index + 90) * height
-      const radiusX = width * (.018 + seeded(index + 130) * .055)
-      const radiusY = height * (.025 + seeded(index + 170) * .095)
-      context.save()
-      context.translate(x, y)
-      context.rotate(seeded(index + 210) * Math.PI)
-      context.fillStyle = index % 3 === 0 ? 'rgba(87, 128, 111, .82)' : 'rgba(57, 105, 96, .9)'
-      context.beginPath()
-      for (let point = 0; point < 12; point += 1) {
-        const angle = point / 12 * TAU
-        const radius = .68 + seeded(index * 30 + point) * .42
-        const px = Math.cos(angle) * radiusX * radius
-        const py = Math.sin(angle) * radiusY * radius
-        if (point === 0) context.moveTo(px, py)
-        else context.lineTo(px, py)
+    const image = context.createImageData(width, height)
+    const pixels = image.data
+    for (let y = 0; y < height; y += 1) {
+      const latitude = y / (height - 1)
+      const polar = Math.abs(latitude * 2 - 1)
+      for (let x = 0; x < width; x += 1) {
+        const longitude = x / width
+        const warpedX = longitude * 2.2 + Math.sin(latitude * 17) * .045
+        const warpedY = latitude * 1.65 + Math.sin(longitude * 13) * .035
+        const terrain = terrainNoise(warpedX, warpedY)
+        const coast = terrain + Math.sin(longitude * 31 + latitude * 9) * .035
+        const land = clamp((coast - .535) * 8.5)
+        const elevation = clamp((coast - .575) * 3.7)
+        const ice = clamp((polar - .72) * 5.4)
+        const shade = .72 + terrain * .25
+        const index = (y * width + x) * 4
+        const oceanR = 5 + shade * 12
+        const oceanG = 24 + shade * 34
+        const oceanB = 39 + shade * 48
+        const landR = 31 + elevation * 48 + terrain * 18
+        const landG = 72 + elevation * 58 + terrain * 28
+        const landB = 61 + elevation * 32 + terrain * 22
+        pixels[index] = Math.round(oceanR * (1 - land) + landR * land + ice * 178)
+        pixels[index + 1] = Math.round(oceanG * (1 - land) + landG * land + ice * 170)
+        pixels[index + 2] = Math.round(oceanB * (1 - land) + landB * land + ice * 160)
+        pixels[index + 3] = 255
       }
-      context.closePath()
-      context.fill()
-      context.restore()
     }
+    context.putImageData(image, 0, 0)
 
     context.globalCompositeOperation = 'screen'
-    const polar = context.createLinearGradient(0, 0, 0, height)
-    polar.addColorStop(0, 'rgba(210, 233, 225, .42)')
-    polar.addColorStop(.12, 'rgba(210, 233, 225, 0)')
-    polar.addColorStop(.88, 'rgba(210, 233, 225, 0)')
-    polar.addColorStop(1, 'rgba(210, 233, 225, .34)')
-    context.fillStyle = polar
+    const polarLight = context.createLinearGradient(0, 0, 0, height)
+    polarLight.addColorStop(0, 'rgba(228, 249, 243, .32)')
+    polarLight.addColorStop(.1, 'rgba(228, 249, 243, 0)')
+    polarLight.addColorStop(.9, 'rgba(228, 249, 243, 0)')
+    polarLight.addColorStop(1, 'rgba(228, 249, 243, .28)')
+    context.fillStyle = polarLight
     context.fillRect(0, 0, width, height)
+  })
+}
+
+function createEarthBumpTexture(quality: number) {
+  return canvasTexture(quality, quality / 2, context => {
+    const width = context.canvas.width
+    const height = context.canvas.height
+    const image = context.createImageData(width, height)
+    const pixels = image.data
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const value = Math.round(38 + terrainNoise(x / width * 2.2, y / height * 1.65) * 145)
+        const index = (y * width + x) * 4
+        pixels[index] = value
+        pixels[index + 1] = value
+        pixels[index + 2] = value
+        pixels[index + 3] = 255
+      }
+    }
+    context.putImageData(image, 0, 0)
   })
 }
 
@@ -225,48 +267,81 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .035 : .045, vertexColors: true, transparent: true, opacity: .82, sizeAttenuation: true }))
   scene.add(stars)
 
+  const textureQuality = mobile ? 768 : 1536
+  const earthTexture = createEarthTexture(textureQuality)
+  const earthBumpTexture = createEarthBumpTexture(mobile ? 384 : 768)
+  const cloudTexture = createCloudTexture(textureQuality)
+  const sphereSegments = mobile ? 48 : 72
+
+  // The opening shot uses a deliberately oversized Earth: only its right and
+  // lower arc enters frame, leaving negative space for the orbital subject.
+  const earthRadius = mobile ? 6.25 : 7.1
   const earthGroup = new THREE.Group()
-  earthGroup.position.set(mobile ? 2.2 : 3.35, mobile ? -3.2 : -2.35, -1.8)
+  earthGroup.position.set(mobile ? 4.75 : 7.05, mobile ? -4.8 : -5.25, -2.35)
   earthGroup.rotation.z = -.16
   scene.add(earthGroup)
 
-  const textureQuality = mobile ? 768 : 1536
-  const earthTexture = createEarthTexture(textureQuality)
-  const cloudTexture = createCloudTexture(textureQuality)
-  const sphereSegments = mobile ? 48 : 72
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(3.35, sphereSegments, sphereSegments),
-    new THREE.MeshStandardMaterial({ map: earthTexture, roughness: .82, metalness: .04, color: 0x83b4b1 }),
+    new THREE.SphereGeometry(earthRadius, sphereSegments, sphereSegments),
+    new THREE.MeshStandardMaterial({ map: earthTexture, bumpMap: earthBumpTexture, bumpScale: .12, roughness: .82, metalness: .04, color: 0x83b4b1, transparent: true }),
   )
   earth.rotation.z = -.22
   earthGroup.add(earth)
 
   const clouds = new THREE.Mesh(
-    new THREE.SphereGeometry(3.42, sphereSegments, sphereSegments),
-    new THREE.MeshPhongMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .78, depthWrite: false, color: 0xe9fff7, shininess: 18 }),
+    new THREE.SphereGeometry(earthRadius * 1.018, sphereSegments, sphereSegments),
+    new THREE.MeshPhongMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .82, depthWrite: false, color: 0xe9fff7, shininess: 18 }),
   )
   clouds.rotation.z = -.22
+  clouds.visible = false
   earthGroup.add(clouds)
 
   const cloudHighlight = new THREE.Mesh(
-    new THREE.SphereGeometry(3.49, sphereSegments, sphereSegments),
-    new THREE.MeshBasicMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .22, depthWrite: false, color: 0xb5fff0, blending: THREE.AdditiveBlending }),
+    new THREE.SphereGeometry(earthRadius * 1.034, sphereSegments, sphereSegments),
+    new THREE.MeshBasicMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .25, depthWrite: false, color: 0xb5fff0, blending: THREE.AdditiveBlending }),
   )
   cloudHighlight.rotation.z = -.22
+  cloudHighlight.visible = false
   earthGroup.add(cloudHighlight)
 
+  const atmosphereMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    side: THREE.BackSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uOpacity: { value: .48 } },
+    vertexShader: `varying vec3 vNormal; void main(){ vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform float uOpacity; varying vec3 vNormal; void main(){ float rim = pow(0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.2); gl_FragColor = vec4(0.23, 0.86, 0.82, rim * uOpacity); }`,
+  })
   const atmosphere = new THREE.Mesh(
-    new THREE.SphereGeometry(3.54, sphereSegments, sphereSegments),
-    new THREE.ShaderMaterial({
-      transparent: true,
-      side: THREE.BackSide,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      vertexShader: `varying vec3 vNormal; void main(){ vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `varying vec3 vNormal; void main(){ float rim = pow(0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.2); gl_FragColor = vec4(0.23, 0.86, 0.82, rim * 0.48); }`,
-    }),
+    new THREE.SphereGeometry(earthRadius * 1.05, sphereSegments, sphereSegments),
+    atmosphereMaterial,
   )
   earthGroup.add(atmosphere)
+
+  // Clouds continue as a separate atmospheric layer after the Earth leaves
+  // frame, so the close-up resolves into a soft cloud field rather than black.
+  const cloudField = new THREE.Group()
+  cloudField.position.set(0, .15, -1.35)
+  cloudField.visible = false
+  const cloudFieldMaterials: THREE.MeshBasicMaterial[] = []
+  for (let index = 0; index < (mobile ? 3 : 4); index += 1) {
+    const material = new THREE.MeshBasicMaterial({
+      map: cloudTexture,
+      alphaMap: cloudTexture,
+      transparent: true,
+      depthWrite: false,
+      opacity: .18 + index * .035,
+      color: index % 2 ? 0xcbe9e5 : 0xeaf8f2,
+      blending: THREE.AdditiveBlending,
+    })
+    const layer = new THREE.Mesh(new THREE.PlaneGeometry(22 + index * 5, 10 + index * 2.5), material)
+    layer.position.set((index - 1.5) * 2.6, (index % 2 ? -.55 : .45) + index * .08, -index * .32)
+    layer.rotation.z = (index - 1.5) * .045
+    cloudField.add(layer)
+    cloudFieldMaterials.push(material)
+  }
+  scene.add(cloudField)
 
   const orbitGroup = new THREE.Group()
   orbitGroup.position.copy(earthGroup.position)
@@ -350,15 +425,31 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
 
     stars.rotation.y = time * .000008
     earth.rotation.y = time * .000035
+    clouds.visible = stage !== 'orbital-login' && stage !== 'authenticating'
+    cloudHighlight.visible = clouds.visible
     clouds.rotation.y = time * .000052
     cloudHighlight.rotation.y = -time * .000032
     cloudHighlight.rotation.x = Math.sin(time * .00011) * .035
+    cloudField.rotation.z = Math.sin(time * .00008) * .025
+    cloudField.position.x = Math.sin(time * .00012) * .42
+    cloudField.position.y = .15 + Math.cos(time * .00017) * .14
+    cloudFieldMaterials.forEach((material, index) => {
+      material.opacity = (.16 + index * .035) + Math.sin(time * (.00034 + index * .00004) + index) * .025
+    })
     orbitGroup.rotation.y = Math.sin(time * .00009) * .08
     orbitalLogo.position.y = .25 + Math.sin(time * .0007) * .08
     orbitalLogo.material.opacity = stage === 'authenticating' ? .38 : stage === 'orbital-login' ? .92 : Math.max(0, 1 - revealProgress * 1.8)
 
     if (stage === 'node-reveal') {
       node.visible = true
+      cloudField.visible = true
+      earthGroup.visible = revealProgress < .48
+      const earthFade = 1 - clamp((revealProgress - .04) / .44)
+      ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
+      ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
+      ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
+      atmosphereMaterial.uniforms.uOpacity.value = .48 * earthFade
+      cloudFieldMaterials.forEach((material, index) => { material.opacity = (.16 + index * .035) * clamp((revealProgress - .18) / .3) })
       node.position.set(0, .2 + (1 - revealProgress) * .8, .3)
       node.scale.setScalar(.38 + revealProgress * .62)
       node.rotation.set(-.32 + revealProgress * .16, .65 + time * .00016, .12 + time * .00008)
@@ -369,6 +460,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       if (elapsed >= NODE_REVEAL_MS) setStage('node-fall')
     } else if (stage === 'node-fall') {
       node.visible = true
+      cloudField.visible = true
+      earthGroup.visible = false
       node.position.set(0, .2 - fallProgress * 7.4, .3 + fallProgress * 7.25)
       node.scale.setScalar(1 + fallProgress * 1.85)
       node.rotation.x = -.16 + fallProgress * .78
@@ -379,10 +472,18 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       if (elapsed >= NODE_FALL_MS) setStage('page-enter')
     } else if (stage === 'page-enter') {
       node.visible = true
+      cloudField.visible = true
+      earthGroup.visible = false
       renderer.toneMappingExposure = 1.05 + pageProgress * 2.2
       canvas.style.opacity = String(1 - pageProgress * .96)
     } else if (stage === 'orbital-login' || stage === 'authenticating') {
       node.visible = false
+      earthGroup.visible = true
+      ;(earth.material as THREE.MeshStandardMaterial).opacity = 1
+      ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82
+      ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
+      atmosphereMaterial.uniforms.uOpacity.value = .48
+      cloudField.visible = false
       camera.position.z += (10 - camera.position.z) * .06
       renderer.toneMappingExposure = 1.05
       canvas.style.opacity = '1'
