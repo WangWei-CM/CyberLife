@@ -179,7 +179,8 @@ func (s *Service) visibleBodyCount(ctx context.Context, db *sql.DB, actor auth.A
 	return count, rows.Err()
 }
 func (s *Service) visibleMilestoneCount(ctx context.Context, db *sql.DB, actor auth.Actor, date string) (int, error) {
-	rows, e := db.QueryContext(ctx, "SELECT m.visibility_preset_id,m.secret,d.visibility_preset_id,d.secret FROM milestones m JOIN diary_entries d ON m.target_type='diary' AND m.target_id=d.id WHERE d.entry_date=?", date)
+	// visibility_preset_id is NULL when no preset is chosen; scan it through COALESCE like every other query does.
+	rows, e := db.QueryContext(ctx, "SELECT COALESCE(m.visibility_preset_id,''),COALESCE(m.secret,0),COALESCE(d.visibility_preset_id,''),COALESCE(d.secret,0) FROM milestones m JOIN diary_entries d ON m.target_type='diary' AND m.target_id=d.id WHERE d.entry_date=?", date)
 	if e != nil {
 		return 0, e
 	}

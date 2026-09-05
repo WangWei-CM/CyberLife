@@ -60,53 +60,78 @@ func (s *Service) KeyLogin(ctx context.Context, key, userAgent string) (string, 
 	if key == "" {
 		return "", Actor{}, invalidCredentials(nil)
 	}
+	// The pool is limited to a single connection (storage.Open sets MaxOpenConns(1)), so every
+	// candidate row must be read and the cursor closed before any nested query or insert runs.
+	// Keeping the cursor open while calling createSession deadlocked the login until the client
+	// gave up, which made every writer/reader key login fail.
+	type writerCandidate struct {
+		id, hash string
+		version  int
+	}
 	rows, err := s.db.QueryContext(ctx, `SELECT id, master_key_hash, key_version FROM writers WHERE revoked_at IS NULL`)
 	if err != nil {
 		return "", Actor{}, err
 	}
-	defer rows.Close()
+	var writers []writerCandidate
 	for rows.Next() {
-		var id, hash string
-		var version int
-		if err := rows.Scan(&id, &hash, &version); err != nil {
+		var candidate writerCandidate
+		if err := rows.Scan(&candidate.id, &candidate.hash, &candidate.version); err != nil {
+			rows.Close()
 			return "", Actor{}, err
 		}
-		if verifySecret(hash, key) {
-			var lifeID string
-			if err := s.db.QueryRowContext(ctx, "SELECT id FROM lives WHERE owner_id=?", id).Scan(&lifeID); err != nil {
-				return "", Actor{}, err
-			}
-			return s.createSession(ctx, Actor{Type: "writer", ID: id, LifeID: lifeID}, version, userAgent)
-		}
+		writers = append(writers, candidate)
 	}
 	if err := rows.Err(); err != nil {
+		rows.Close()
 		return "", Actor{}, err
 	}
+	rows.Close()
+	for _, candidate := range writers {
+		if verifySecret(candidate.hash, key) {
+			var lifeID string
+			if err := s.db.QueryRowContext(ctx, "SELECT id FROM lives WHERE owner_id=?", candidate.id).Scan(&lifeID); err != nil {
+				return "", Actor{}, err
+			}
+			return s.createSession(ctx, Actor{Type: "writer", ID: candidate.id, LifeID: lifeID}, candidate.version, userAgent)
+		}
+	}
 
+	type readerCandidate struct {
+		id, lifeID, hash string
+		version          int
+		expiresAt        sql.NullString
+	}
 	rows, err = s.db.QueryContext(ctx, `SELECT id, life_id, key_hash, key_version, expires_at FROM reader_keys WHERE revoked_at IS NULL`)
 	if err != nil {
 		return "", Actor{}, err
 	}
-	defer rows.Close()
-	now := time.Now().UTC()
+	var readers []readerCandidate
 	for rows.Next() {
-		var id, lifeID, hash string
-		var version int
-		var expiresAt sql.NullString
-		if err := rows.Scan(&id, &lifeID, &hash, &version, &expiresAt); err != nil {
+		var candidate readerCandidate
+		if err := rows.Scan(&candidate.id, &candidate.lifeID, &candidate.hash, &candidate.version, &candidate.expiresAt); err != nil {
+			rows.Close()
 			return "", Actor{}, err
 		}
-		if expiresAt.Valid {
-			expiry, parseErr := time.Parse(time.RFC3339Nano, expiresAt.String)
+		readers = append(readers, candidate)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return "", Actor{}, err
+	}
+	rows.Close()
+	now := time.Now().UTC()
+	for _, candidate := range readers {
+		if candidate.expiresAt.Valid {
+			expiry, parseErr := time.Parse(time.RFC3339Nano, candidate.expiresAt.String)
 			if parseErr != nil || !now.Before(expiry) {
 				continue
 			}
 		}
-		if verifySecret(hash, key) {
-			return s.createSession(ctx, Actor{Type: "reader", ID: id, LifeID: lifeID}, version, userAgent)
+		if verifySecret(candidate.hash, key) {
+			return s.createSession(ctx, Actor{Type: "reader", ID: candidate.id, LifeID: candidate.lifeID}, candidate.version, userAgent)
 		}
 	}
-	return "", Actor{}, invalidCredentials(rows.Err())
+	return "", Actor{}, invalidCredentials(nil)
 }
 
 func (s *Service) Authenticate(ctx context.Context, token string) (Actor, error) {
