@@ -32,7 +32,9 @@
 .notice-list li.unread .notice-item { border-left-color: var(--accent); }
 .notice-list li.unread .notice-type { color: var(--accent); }
 .notice-list li + li .notice-item { box-shadow: inset 0 1px 0 var(--divider); }
-.notice-type { font-size: 11px; letter-spacing: .08em; color: var(--text-faint); transition: color var(--dur-mid); }
+.notice-type { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; letter-spacing: .08em; color: var(--text-faint); transition: color var(--dur-mid); }
+.notice-jump { display: inline-grid; place-items: center; opacity: .6; transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast); }
+.notice-item:hover .notice-jump { transform: translateX(2px); opacity: 1; }
 .notice-item p { color: var(--text); line-height: 1.5; }
 .notice-item small { color: var(--text-faint); font-family: var(--font-mono); font-size: 11px; }
 

@@ -8,6 +8,7 @@ import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { api, type Comment, type HistoryDay, type Milestone, type TrendPoint } from '../api/client'
 import { isWriter, lifeStartISO } from '../stores/auth'
+import { ui } from '../stores/ui'
 import { addDaysISO, dayIndex, diffDays, fullDateLabel, monthDayLabel, relativeDayLabel, timeLabel, todayISO, weekdayLabel, parseISO } from '../lib/dates'
 
 const props = withDefaults(defineProps<{ secret?: boolean }>(), { secret: false })
@@ -85,6 +86,8 @@ async function submitComment() {
 }
 watch(selectedDay, loadDetails, { immediate: true })
 watch(selected, () => { ensure(selected.value, selected.value) })
+// 通知中心跳转过来时直接定位到那一天（不早于今天）。
+watch(() => ui.pendingPastDate, value => { if (value) { selected.value = value > today ? today : value; ui.pendingPastDate = '' } }, { immediate: true })
 </script>
 
 <template>

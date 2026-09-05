@@ -42,3 +42,6 @@ product/runtime-data/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Frontend e2e screenshots
+web/e2e/shots/

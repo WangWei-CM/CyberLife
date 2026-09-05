@@ -62,6 +62,22 @@
 .future-detail { overflow: auto; }
 .detail-body { display: grid; gap: 18px; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.detail-title-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.plan-cover { height: 160px; margin: -16px -18px 0; background: var(--surface-2) center / cover no-repeat; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); box-shadow: inset 0 -60px 60px -30px var(--surface); animation: scan-light var(--dur-slow) var(--ease-out) both; }
+.plan-icon { width: 44px; height: 44px; object-fit: cover; flex: 0 0 auto; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); box-shadow: 0 0 12px var(--accent-soft); }
+.plan-icon.small { width: 20px; height: 20px; }
+.plan-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.asset-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.upload-trigger { position: relative; overflow: hidden; cursor: pointer; }
+.upload-trigger input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-trigger.busy { opacity: .5; pointer-events: none; }
+.plan-files { display: grid; gap: 8px; }
+.file-list { display: grid; position: relative; }
+.file-list li { display: flex; align-items: center; gap: 8px; box-shadow: inset 0 -1px 0 var(--divider); }
+.file-list li:last-child { box-shadow: none; }
+.file-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 8px 4px; color: var(--text); transition: color var(--dur-fast) var(--ease-out), text-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.file-link:hover { color: var(--accent); text-shadow: 0 0 12px var(--accent-glow); transform: translateX(2px); }
+.file-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
 .detail-title { font-size: 20px; font-weight: 700; letter-spacing: .08em; color: var(--text); }
 .detail-dates { margin-top: 6px; font-size: 12px; color: var(--text-dim); letter-spacing: .06em; }
 .detail-dates span { margin-left: 12px; color: var(--accent); }

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api, type Playlist, type PlaylistMode, type PlaylistPage, type Preset, type PresetRule, type ReaderKey } from '../api/client'
 import { isWriter } from '../stores/auth'
+import { ui } from '../stores/ui'
 import SegmentedControl from '../components/SegmentedControl.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -14,7 +15,8 @@ type Tab = 'music' | 'presets' | 'theme' | 'keys'
 const tabs = computed(() => isWriter.value
   ? [{ value: 'music', label: '歌单' }, { value: 'presets', label: '权限预设' }, { value: 'theme', label: '主题' }, { value: 'keys', label: '密钥' }]
   : [{ value: 'theme', label: '主题' }, { value: 'music', label: '音乐' }])
-const tab = ref<Tab>(isWriter.value ? 'music' : 'theme')
+const tab = ref<Tab>((ui.pendingSettingsTab as Tab) || (isWriter.value ? 'music' : 'theme'))
+ui.pendingSettingsTab = ''
 const error = ref('')
 const volume = ref(Number(localStorage.getItem('cyberlife-volume') || 70))
 const carouselSeconds = ref(Math.round(Number(localStorage.getItem('now-plan-carousel-ms') || 6000) / 1000))

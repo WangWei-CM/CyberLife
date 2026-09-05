@@ -1,6 +1,6 @@
 export type ActorType = 'admin' | 'writer' | 'reader'
 export type Actor = { sessionId: string; type: ActorType; id: string; lifeId: string; nickname: string; lifeCreatedAt: string }
-export type Notice = { id: string; type: string; refID?: string; text: string; createdAt: string; read: boolean }
+export type Notice = { id: string; type: string; refID?: string; refDate?: string; text: string; createdAt: string; read: boolean }
 type ApiError = { error: { code: string; message: string } }
 
 /** 后端 Actor 结构体没有 json 标签，返回的是 PascalCase 字段；这里统一归一化。 */
@@ -49,6 +49,9 @@ export const api = {
   createPlan: (payload: Pick<Plan, 'name' | 'startDate' | 'endDate' | 'intro'>) => request<Plan>('/api/v1/now/plans', { method: 'POST', body: JSON.stringify({ name: payload.name, start_date: payload.startDate, end_date: payload.endDate, intro: payload.intro }) }),
   updatePlan: (id: string, payload: Pick<Plan, 'name' | 'startDate' | 'endDate' | 'intro'>) => request<Plan>(`/api/v1/now/plans/${encode(id)}`, { method: 'PUT', body: JSON.stringify({ name: payload.name, start_date: payload.startDate, end_date: payload.endDate, intro: payload.intro }) }),
   setPlanProgress: (id: string, date: string, percent: number) => request<Plan>(`/api/v1/now/plans/${encode(id)}/progress`, { method: 'POST', body: JSON.stringify({ date, percent }) }),
+  uploadPlanImage: (id: string, kind: 'cover' | 'icon', file: File) => upload<Plan>(`/api/v1/now/plans/${encode(id)}/${kind}`, file),
+  uploadPlanFile: (id: string, file: File) => upload<PlanFile>(`/api/v1/now/plans/${encode(id)}/files`, file),
+  deletePlanFile: (id: string, fileID: string) => request<void>(`/api/v1/now/plans/${encode(id)}/files/${encode(fileID)}`, { method: 'DELETE' }),
   calendar: (from: string, to: string) => request<{ items: FutureTask[] }>(`/api/v1/calendar?from=${encode(from)}&to=${encode(to)}`),
   notifications: () => request<{ items: Notice[] }>('/api/v1/notifications'),
   markNotificationRead: (id: string) => request<void>(`/api/v1/notifications/${encode(id)}/read`, { method: 'POST' }),
@@ -99,8 +102,9 @@ export type Comment = { id: string; targetType: string; targetId: string; author
 export type Milestone = { id: string; targetType: string; targetId: string; description: string; detail: string; presetId: string; secret: boolean }
 export type Task = { id: string; taskDate: string; title: string; description: string; priority: 'low' | 'normal' | 'high'; done: boolean; presetId?: string; secret?: boolean; commentable?: boolean }
 export type NowData = { diary: Diary; secretDiary?: Diary; moods: MoodRecord[]; bodies: BodyRecord[]; tasks: Task[] }
-export type Plan = { id: string; name: string; startDate: string; endDate: string; intro: string; progress: number; timeProgress: number }
-export type FutureTask = { id: string; date: string; title: string; priority: string; done: boolean }
+export type PlanFile = { id: string; planId: string; originalName: string; mimeType: string; byteSize: number; url: string }
+export type Plan = { id: string; name: string; startDate: string; endDate: string; intro: string; progress: number; timeProgress: number; secret?: boolean; presetId?: string; coverUrl?: string; iconUrl?: string; files?: PlanFile[] }
+export type FutureTask = { id: string; date: string; title: string; priority: string; done: boolean; presetId?: string; secret?: boolean }
 export type HistoryDay = { date: string; diary: Diary; secretDiary?: Diary | null; tasks: Task[]; moodCount: number; bodyCount: number; milestoneCount: number }
 export type TrendPoint = { date: string; mood: number | null; body: number | null }
 export type HistoryRange = { from: string; to: string; days: HistoryDay[]; points: TrendPoint[] }

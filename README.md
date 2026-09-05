@@ -81,8 +81,18 @@ pnpm dev
 | POST | `/api/v1/now/tasks` | 创建任务（可带 `date`，默认今天） |
 | POST | `/api/v1/now/tasks/:id/done` | 更新任务完成状态（带 `date` 定位月库） |
 | PUT | `/api/v1/now/plans/:id` | 编辑规划名称、起止日期与简介 |
+| POST | `/api/v1/now/plans/:id/cover` · `/icon` · `/files` | 上传规划封面 / 图标 / 文件（DELETE `/files/:fileID` 删除） |
+| GET | `/api/v1/plans/:id/cover` · `/icon` · `/files/:fileID` | 读取规划封面 / 图标 / 文件（经 ACL） |
 | GET | `/api/v1/history` | 过去页按日期范围读取（≤ 366 天/次） |
-| GET | `/api/v1/plans` · `/api/v1/calendar` | 规划列表 · 待办日历 |
+| GET | `/api/v1/plans` · `/api/v1/calendar` | 规划列表 · 待办日历（阅读者经 ACL 过滤） |
+| GET | `/api/v1/notifications` | 通知列表（读取时自动生成规划到期 / 密钥到期提醒） |
+
+## 测试
+
+```powershell
+cd server; go test ./...
+cd web; $env:CYBERLIFE_E2E_KEY = "<书写者主密钥>"; pnpm e2e   # 需要本机 Chrome/Edge，截图输出到 web/e2e/shots/
+```
 
 ## 安全边界
 

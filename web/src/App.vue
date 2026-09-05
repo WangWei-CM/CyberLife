@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { authState, displayName, isAdmin, isWriter, logout, restoreSession } from './stores/auth'
+import { ui } from './stores/ui'
+import type { Notice } from './api/client'
 import { DUR, reducedMotion, transitionTheme } from './lib/motion'
 import { isDaytime } from './lib/dates'
 import AppIcon from './components/AppIcon.vue'
@@ -69,6 +71,12 @@ function step(direction: -1 | 1) {
   const target = screens[index]
   if (target) navigate(target.key)
 }
+/** 通知中心跳转：评论→过去页该日，规划到期→未来页该规划，密钥到期→设置页密钥。 */
+function onNoticeNavigate(notice: Notice) {
+  if (notice.type === 'comment' && notice.refDate) { ui.pendingPastDate = notice.refDate; navigate('past') }
+  else if (notice.type === 'plan_due' && notice.refID) { ui.pendingPlanId = notice.refID; navigate('future') }
+  else if (notice.type === 'key_expired') { ui.pendingSettingsTab = 'keys'; navigate('settings') }
+}
 function setAppearance(next: Appearance) { transitionTheme(shell.value ?? null, () => { appearance.value = next }) }
 function toggleAppearance() { setAppearance(resolvedAppearance.value === 'dark' ? 'light' : 'dark') }
 function toggleSecret() { transitionTheme(shell.value ?? null, () => { secretMode.value = !secretMode.value }) }
@@ -132,7 +140,7 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
           <span class="icon-morph"><AppIcon name="sun" :class="{ on: resolvedAppearance === 'light' }" /><AppIcon name="moon" :class="{ on: resolvedAppearance === 'dark' }" /></span>
         </button>
         <button v-if="!isAdmin" v-glow class="icon-button" :class="{ active: screen === 'settings' }" aria-label="设置" @click="navigate('settings')"><AppIcon name="gear" /></button>
-        <NotificationCenter v-if="!isAdmin" />
+        <NotificationCenter v-if="!isAdmin" @navigate="onNoticeNavigate" />
         <button v-if="isWriter" v-glow class="icon-button secret-toggle" :class="{ active: secretMode }" :aria-label="secretMode ? '退出绝密模式' : '进入绝密模式'" :title="secretMode ? '绝密模式已开启' : '绝密模式'" @click="toggleSecret">
           <span class="icon-morph"><AppIcon name="lock" :class="{ on: secretMode }" /><AppIcon name="unlock" :class="{ on: !secretMode }" /></span>
         </button>
