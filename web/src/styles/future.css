@@ -157,7 +157,9 @@
 .zoom-calendar.zooming .cal-selected, .zoom-calendar.dragging .cal-selected { transition: none; }
 .cal-today { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); pointer-events: none; }
 
-.day-panel { display: grid; gap: 10px; }
+.day-panel { min-height: 0; }
+.day-frame { max-height: min(34vh, 260px); overflow: auto; transform: skewX(var(--future-skew)); transform-origin: center; }
+.day-content { display: grid; gap: 10px; padding: 10px 14px; transform: skewX(15deg); transform-origin: center; }
 .day-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
 .day-col { display: grid; gap: 8px; min-width: 0; padding: 10px 14px; background: color-mix(in srgb, var(--surface-2) 72%, transparent); transform: skewX(var(--future-skew)); transform-origin: center; }
 .day-col > * { transform: skewX(15deg); }
@@ -225,7 +227,7 @@
   .future-bottom { height: 100%; min-height: 0; margin-inline: var(--future-frame-safe); grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
   .future-bottom > .zoom-calendar-wrap { min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
   .future-bottom .zoom-calendar { height: auto; min-height: 0; }
-  .future-bottom .day-panel { max-height: min(34vh, 260px); overflow: auto; }
+  .future-bottom .day-panel { min-height: 0; }
   .cyber-panel { padding: 12px 14px; }
   .detail-body { gap: 12px; }
   .plan-cover { height: min(120px, 16vh); margin: -12px -14px 0; }
