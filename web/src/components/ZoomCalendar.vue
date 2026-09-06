@@ -172,7 +172,7 @@ defineExpose({ zoomBy, goToday, rangeLabel })
     <div ref="root" class="zoom-calendar" :class="[`level-${level}`, { zooming, dragging }]" tabindex="0" role="application" aria-label="待办日历，滚轮缩放，拖动平移，点击选中日期" @wheel="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp">
       <div class="cal-content">
         <TransitionGroup name="tick" tag="div" class="cal-columns">
-          <div v-for="column in columns" :key="column.key" class="cal-col" :class="[`col-${column.level}`, { past: column.past, today: column.today, weekend: column.weekend }]" :style="{ transform: `translateX(${column.left}px) skewX(-15deg)`, width: `${column.width}px` }">
+          <div v-for="column in columns" :key="column.key" class="cal-col" :class="[`col-${column.level}`, { past: column.past, today: column.today, weekend: column.weekend }]" :style="{ transform: `translateX(${column.left}px)`, width: `${column.width}px` }">
             <div class="cal-col-content">
               <Transition name="tick"><header v-if="column.label" class="cal-label"><b>{{ column.label }}</b><small v-if="column.sub">{{ column.sub }}</small></header></Transition>
               <div class="cal-events">
@@ -194,8 +194,8 @@ defineExpose({ zoomBy, goToday, rangeLabel })
             </button>
           </TransitionGroup>
         </div>
-        <i class="cal-selected" :style="{ transform: `translateX(${selectedX.left}px) skewX(-15deg)`, width: `${selectedX.width}px` }" aria-hidden="true" />
-        <i class="cal-today" :style="{ transform: `translateX(${todayX}px) skewX(-15deg)` }" aria-hidden="true" />
+        <i class="cal-selected" :style="{ transform: `translateX(${selectedX.left}px)`, width: `${selectedX.width}px` }" aria-hidden="true" />
+        <i class="cal-today" :style="{ transform: `translateX(${todayX}px)` }" aria-hidden="true" />
       </div>
     </div>
   </div>
