@@ -197,9 +197,9 @@
 }
 
 @media (min-width: 901px) {
-  .future-page { grid-template-rows: minmax(0, 3fr) 6px minmax(0, 2fr); height: 100%; overflow: hidden; }
+  .future-page { grid-template-rows: minmax(220px, var(--future-top-height, 340px)) 6px minmax(220px, 1fr); height: 100%; overflow: hidden; }
   .future-page .page-error { position: absolute; z-index: 6; top: var(--page-pad); left: var(--page-inline-pad); right: var(--page-inline-pad); }
-  .future-top { height: auto !important; min-height: 0; }
+  .future-top { min-height: 0; }
   .future-list, .future-detail, .future-bottom { min-height: 0; overflow: auto; }
   .cyber-panel { padding: 12px 14px; }
   .detail-body { gap: 12px; }

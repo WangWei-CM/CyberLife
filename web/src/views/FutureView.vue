@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/preview.css'
 import ZoomCalendar from '../components/ZoomCalendar.vue'
 import ProgressBar from '../components/ProgressBar.vue'
+import MarkdownPreview from '../components/MarkdownPreview.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { api, type FutureTask, type Plan } from '../api/client'
@@ -27,7 +26,7 @@ const form = ref({ name: '', startDate: today, endDate: addDaysISO(today, 30), i
 const newTask = ref('')
 const error = ref('')
 const listWidth = ref(Number(localStorage.getItem('future-list-width') || 30))
-const topHeight = ref(Number(localStorage.getItem('future-top-height') || 420))
+const topHeight = ref(Number(localStorage.getItem('future-top-height-v2') || 340))
 const dragging = ref<'col' | 'row' | null>(null)
 const busy = ref(false)
 const uploading = ref('')
@@ -140,13 +139,18 @@ function startResize(kind: 'col' | 'row', event: PointerEvent) {
   const container = (event.currentTarget as HTMLElement).parentElement!.getBoundingClientRect()
   const move = (next: PointerEvent) => {
     if (kind === 'col') listWidth.value = Math.max(22, Math.min(50, ((next.clientX - container.left) / container.width) * 100))
-    else topHeight.value = Math.max(260, Math.min(720, next.clientY - container.top))
+    else {
+      const minTop = 220
+      const minBottom = 240
+      const maxTop = Math.max(minTop, Math.min(720, container.height - 6 - minBottom))
+      topHeight.value = Math.max(minTop, Math.min(maxTop, next.clientY - container.top))
+    }
   }
   const up = () => {
     dragging.value = null
     document.body.classList.remove('resizing-col', 'resizing-row')
     localStorage.setItem('future-list-width', String(listWidth.value))
-    localStorage.setItem('future-top-height', String(topHeight.value))
+    localStorage.setItem('future-top-height-v2', String(topHeight.value))
     window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
   }
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
@@ -158,7 +162,7 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
 </script>
 
 <template>
-  <main class="page future-page">
+  <main class="page future-page" :style="{ '--future-top-height': `${topHeight}px` }">
     <div class="scanlines" aria-hidden="true" />
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
     <section class="future-top" :style="{ '--list-width': `${listWidth}%`, height: `${topHeight}px` }">
@@ -220,7 +224,7 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
                 <div class="form-row"><input v-model="progressDate" type="date" :max="today" aria-label="标记日期" /><button class="primary" type="submit" :disabled="busy || !edit.name.trim()">保存</button></div>
               </form>
               <section v-else class="detail-intro">
-                <MdPreview v-if="selectedPlan.intro" :editor-id="`plan-${selectedPlan.id}`" :model-value="selectedPlan.intro" theme="dark" language="zh-CN" :no-img-zoom-in="true" />
+                <MarkdownPreview v-if="selectedPlan.intro" :editor-id="`plan-${selectedPlan.id}`" :model-value="selectedPlan.intro" theme="dark" theme-class="theme-future" />
                 <EmptyState v-else icon="book" text="这项规划还没有简介" compact />
               </section>
             </Transition>
