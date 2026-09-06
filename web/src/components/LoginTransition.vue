@@ -25,9 +25,9 @@ const quoteGlyphs = ref<ScrambleGlyph[]>([])
 let scene: ReturnType<typeof createLoginTransition> | undefined
 let scrambleFrame = 0
 
-const SCRAMBLE_DURATION_MS = 450
-const SCRAMBLE_SETTLE_START_MS = 180
-const SCRAMBLE_SETTLE_END_MS = 440
+const SCRAMBLE_DURATION_MS = 800
+const SCRAMBLE_SETTLE_START_MS = 260
+const SCRAMBLE_SETTLE_END_MS = 760
 const SCRAMBLE_STEP_MS = 34
 const SCRAMBLE_POOL = Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789&$#@%?+*<>/')
 

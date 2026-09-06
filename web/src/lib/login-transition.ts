@@ -17,7 +17,9 @@ type SceneOptions = {
 }
 
 const CLOUD_GATHER_MS = 700
-const NODE_REVEAL_MS = 1_150
+const NODE_REVEAL_ANIMATION_MS = 1_150
+const NODE_REVEAL_HOLD_MS = 800
+const NODE_REVEAL_MS = NODE_REVEAL_ANIMATION_MS + NODE_REVEAL_HOLD_MS
 const NODE_FALL_MS = 1_650
 const PAGE_ENTER_MS = 720
 const TAU = Math.PI * 2
@@ -638,7 +640,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     if (destroyed) return
     const elapsed = time - stageStarted
     const gatherProgress = easeOutCubic(elapsed / CLOUD_GATHER_MS)
-    const revealLinear = clamp(elapsed / NODE_REVEAL_MS)
+    const revealLinear = clamp(elapsed / NODE_REVEAL_ANIMATION_MS)
     const chipRevealProgress = easeOutCubic((revealLinear - .06) / .58)
     const contentRevealProgress = easeInOutCubic((revealLinear - .46) / .54)
     const fallLinear = clamp(elapsed / NODE_FALL_MS)
