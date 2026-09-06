@@ -1,6 +1,6 @@
 Cyberlife 可迁移 Web 产物
 
-运行：双击“启动 Cyberlife.cmd”。脚本会启动本目录 bin\cyberlife.exe，并打开 http://127.0.0.1:8080/。
+运行：双击“启动 Cyberlife.cmd”。脚本会启动本目录 bin\cyberlife.exe，并打开 http://127.0.0.1:9000/。
 首次运行会提示设置管理员密码；之后数据保存在本目录 runtime-data\，请定期备份该目录。
 
 停止：双击“停止 Cyberlife.cmd”。
