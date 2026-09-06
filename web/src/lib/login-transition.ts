@@ -4,6 +4,7 @@ export type LoginTransitionStage =
   | 'idle'
   | 'authenticating'
   | 'orbital-login'
+  | 'cloud-gather'
   | 'node-reveal'
   | 'node-fall'
   | 'page-enter'
@@ -15,6 +16,7 @@ type SceneOptions = {
   onComplete?: (fallback: boolean) => void
 }
 
+const CLOUD_GATHER_MS = 700
 const NODE_REVEAL_MS = 1_150
 const NODE_FALL_MS = 1_650
 const PAGE_ENTER_MS = 720
@@ -630,10 +632,11 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const render = (time: number) => {
     if (destroyed) return
     const elapsed = time - stageStarted
+    const gatherProgress = easeOutCubic(elapsed / CLOUD_GATHER_MS)
     const revealLinear = clamp(elapsed / NODE_REVEAL_MS)
     const revealProgress = easeOutCubic(elapsed / NODE_REVEAL_MS)
-    const chipRevealProgress = easeOutCubic((revealLinear - .18) / .62)
-    const contentRevealProgress = easeInOutCubic((revealLinear - .52) / .48)
+    const chipRevealProgress = easeOutCubic((revealLinear - .06) / .58)
+    const contentRevealProgress = easeInOutCubic((revealLinear - .46) / .54)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
     const pageProgress = easeOutCubic(elapsed / PAGE_ENTER_MS)
 
@@ -650,7 +653,25 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     cloudFieldMaterials.forEach((material, index) => {
       material.opacity = (.16 + index * .035) + Math.sin(time * (.00034 + index * .00004) + index) * .025
     })
-    if (stage === 'node-reveal') {
+    if (stage === 'cloud-gather') {
+      renderer.setClearColor(0x02060b, 1)
+      node.visible = false
+      transitionRoot?.style.setProperty('--node-copy-opacity', '0')
+      cloudField.visible = true
+      cloudFieldLayers.forEach((layer, index) => {
+        layer.position.copy(cloudFieldOrigins[index])
+        layer.scale.setScalar(.86 + gatherProgress * .14)
+        cloudFieldMaterials[index].opacity = (.24 + index * .04) * gatherProgress
+      })
+      earthGroup.visible = gatherProgress < .68
+      const earthFade = 1 - clamp(gatherProgress / .68)
+      ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
+      ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
+      ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
+      atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
+      camera.position.z += (9.35 - camera.position.z) * .055
+      if (elapsed >= CLOUD_GATHER_MS) setStage('node-reveal')
+    } else if (stage === 'node-reveal') {
       renderer.setClearColor(0x02060b, 1 - contentRevealProgress * .42)
       node.visible = chipRevealProgress > 0
       transitionRoot?.style.setProperty('--node-copy-opacity', String(chipRevealProgress))
@@ -659,13 +680,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
         layer.position.copy(cloudFieldOrigins[index])
         layer.scale.setScalar(1)
       })
-      earthGroup.visible = revealProgress < .48
-      const earthFade = 1 - clamp((revealProgress - .04) / .44)
-      ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
-      ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
-      ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
-      atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
-      cloudFieldMaterials.forEach((material, index) => { material.opacity = (.16 + index * .035) * clamp(revealLinear / .22) })
+      earthGroup.visible = false
+      cloudFieldMaterials.forEach((material, index) => { material.opacity = .24 + index * .04 })
       node.position.set(0, .2 + (1 - chipRevealProgress) * .8, .3)
       node.scale.setScalar(.28 + chipRevealProgress * .72)
       sweep.position.x = -.75 + chipRevealProgress * 1.5
@@ -701,7 +717,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
         )
         layer.scale.setScalar(1 + fallProgress * (.34 + index * .07))
         layer.rotation.z += (index % 2 ? 1 : -1) * .0025
-        cloudFieldMaterials[index].opacity = (.19 + index * .035) * Math.pow(1 - fallProgress, 1.35)
+        cloudFieldMaterials[index].opacity = (.24 + index * .04) * Math.pow(1 - fallProgress, 1.35)
       })
       if (elapsed >= NODE_FALL_MS) setStage('page-enter')
     } else if (stage === 'page-enter') {

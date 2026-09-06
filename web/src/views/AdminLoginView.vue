@@ -14,7 +14,7 @@ async function submit() {
   try {
     const result = await api.adminLogin(password.value)
     window.history.replaceState({}, '', '/')
-    signIn(result.actor)
+    signIn(result.actor, true)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : '管理员凭证无效'
   } finally {

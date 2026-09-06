@@ -30,9 +30,9 @@ export async function restoreSession() {
     authState.loading = false
   }
 }
-export function signIn(actor: Actor) {
+export function signIn(actor: Actor, animate = false) {
   authState.actor = actor
-  authState.justLoggedIn = true
+  authState.justLoggedIn = animate
 }
 export async function logout() {
   try { await api.logout() } finally { authState.actor = null; authState.justLoggedIn = false }

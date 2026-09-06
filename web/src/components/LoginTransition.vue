@@ -34,11 +34,12 @@ async function beginTransition() {
     return
   }
   scene?.setStage('authenticating')
-  await wait(220)
-  scene?.setStage('orbital-login')
-  await wait(520)
-  scene?.setStage('node-reveal')
-  if (reducedMotion()) await wait(50)
+  await wait(180)
+  scene?.setStage('cloud-gather')
+  if (reducedMotion()) {
+    await wait(50)
+    scene?.setStage('node-reveal')
+  }
 }
 
 function onSubmit() {
@@ -74,7 +75,7 @@ defineExpose({
 </script>
 
 <template>
-  <main class="login-transition" :class="{ 'scene-failed': sceneFailed, 'transition-started': started, 'node-reveal': stage === 'node-reveal', 'node-fall': stage === 'node-fall', 'page-enter': stage === 'page-enter' }">
+  <main class="login-transition" :class="{ 'scene-failed': sceneFailed, 'transition-started': started, 'cloud-gather': stage === 'cloud-gather', 'node-reveal': stage === 'node-reveal', 'node-fall': stage === 'node-fall', 'page-enter': stage === 'page-enter' }">
     <canvas ref="canvas" class="login-canvas" aria-hidden="true" />
     <div class="login-scanlines" aria-hidden="true" />
     <div class="login-vignette" aria-hidden="true" />
