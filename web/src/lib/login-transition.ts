@@ -607,6 +607,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   let completionTimer: number | undefined
   const transitionRoot = canvas.closest<HTMLElement>('.login-transition')
   const nodeScreenPosition = new THREE.Vector3()
+  const nodeAngularVelocity = new THREE.Vector3()
+  const fallStartRotation = new THREE.Euler()
+  const fallStartAngularVelocity = new THREE.Vector3()
+  const cloudFallPositions = cloudFieldLayers.map(layer => layer.position.clone())
+  const cloudFallScales = cloudFieldLayers.map(layer => layer.scale.x)
+  const cloudFallRotations = cloudFieldLayers.map(layer => layer.rotation.z)
 
   const resize = () => {
     const bounds = canvas.getBoundingClientRect()
@@ -629,6 +635,15 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     if (destroyed) return
     if (completionTimer) window.clearTimeout(completionTimer)
     completionTimer = undefined
+    if (next === 'node-fall') {
+      fallStartRotation.copy(node.rotation)
+      fallStartAngularVelocity.copy(nodeAngularVelocity)
+      cloudFieldLayers.forEach((layer, index) => {
+        cloudFallPositions[index].copy(layer.position)
+        cloudFallScales[index] = layer.scale.x
+        cloudFallRotations[index] = layer.rotation.z
+      })
+    }
     stage = next
     stageStarted = performance.now()
     options.onStage?.(next)
@@ -643,6 +658,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const revealLinear = clamp(elapsed / NODE_REVEAL_ANIMATION_MS)
     const chipRevealProgress = easeOutCubic((revealLinear - .06) / .58)
     const contentRevealProgress = easeInOutCubic((revealLinear - .46) / .54)
+    const chipSettledElapsed = Math.max(0, elapsed - NODE_REVEAL_ANIMATION_MS * .64)
     const fallLinear = clamp(elapsed / NODE_FALL_MS)
     const chipExitProgress = clamp(fallLinear * 2)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
@@ -694,11 +710,34 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       sweepMaterial.opacity = .48 * Math.sin(chipRevealProgress * Math.PI)
       nodeGlow.intensity = 16 * Math.sin(chipRevealProgress * Math.PI)
       const faceTilt = Math.sin(chipRevealProgress * Math.PI)
-      node.rotation.set(
-        -.16 * faceTilt,
-        .24 * Math.sin(chipRevealProgress * TAU),
-        -.3 + chipRevealProgress * 1.25,
-      )
+      if (chipRevealProgress < 1) {
+        node.rotation.set(
+          -.16 * faceTilt,
+          .24 * Math.sin(chipRevealProgress * TAU),
+          -.3 + chipRevealProgress * 1.25,
+        )
+        nodeAngularVelocity.set(0, 0, 0)
+      } else {
+        const idleSeconds = chipSettledElapsed / 1_000
+        node.rotation.set(
+          -.035 * Math.sin(idleSeconds * 1.15),
+          .09 * Math.sin(idleSeconds * .85),
+          .95 + idleSeconds * .18,
+        )
+        nodeAngularVelocity.set(
+          -.035 * 1.15 * Math.cos(idleSeconds * 1.15),
+          .09 * .85 * Math.cos(idleSeconds * .85),
+          .18,
+        )
+      }
+      const cloudIdleSeconds = elapsed / 1_000
+      cloudFieldLayers.forEach((layer, index) => {
+        const direction = index % 2 ? 1 : -1
+        layer.position.copy(cloudFieldOrigins[index])
+        layer.scale.setScalar(1 + .008 * Math.sin(cloudIdleSeconds * (.72 + index * .06)))
+        layer.rotation.z = cloudFieldRotations[index]
+          + direction * .008 * Math.sin(cloudIdleSeconds * (.58 + index * .05))
+      })
       camera.position.z = 8.75
       clouds.material.opacity = .78 + Math.sin(time * .0005) * .1
       cloudHighlight.material.opacity = .22 + Math.sin(time * .0007 + 1) * .06
@@ -715,19 +754,24 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       earthGroup.visible = false
       node.position.set(0, .2, .3)
       node.scale.setScalar(1 - chipExitProgress)
-      sweepMaterial.opacity = .26 * (1 - chipExitProgress)
-      nodeGlow.intensity = 8 * (1 - chipExitProgress)
-      node.rotation.x = -.16 + chipExitProgress * .56
-      node.rotation.y += .012 + chipExitProgress * .014
-      node.rotation.z += .005 + chipExitProgress * .007
+      const exitPulse = Math.sin(chipExitProgress * Math.PI)
+      sweepMaterial.opacity = .26 * exitPulse
+      nodeGlow.intensity = 8 * exitPulse
+      const fallSeconds = elapsed / 1_000
+      const exitSpin = chipExitProgress ** 3
+      node.rotation.set(
+        fallStartRotation.x + fallStartAngularVelocity.x * fallSeconds + exitSpin * .56,
+        fallStartRotation.y + fallStartAngularVelocity.y * fallSeconds + exitSpin * 2.6,
+        fallStartRotation.z + fallStartAngularVelocity.z * fallSeconds + exitSpin * 1.2,
+      )
       camera.position.z = 8.75
       cloudFieldLayers.forEach((layer, index) => {
         // Expand the existing cloud banks in place. Translating these oversized
         // planes pulled previously off-screen texture back into view, which read
         // as a second cloud entrance instead of one continuous dispersal.
-        layer.position.copy(cloudFieldOrigins[index])
-        layer.scale.setScalar(1 + fallProgress * (1.05 + index * .14))
-        layer.rotation.z = cloudFieldRotations[index] + (index % 2 ? 1 : -1) * fallProgress * .12
+        layer.position.copy(cloudFallPositions[index])
+        layer.scale.setScalar(cloudFallScales[index] * (1 + fallProgress * (1.05 + index * .14)))
+        layer.rotation.z = cloudFallRotations[index] + (index % 2 ? 1 : -1) * fallProgress * .12
         cloudFieldMaterials[index].opacity = (.24 + index * .04) * Math.pow(1 - fallProgress, 1.35)
       })
       if (elapsed >= NODE_FALL_MS) setStage('page-enter')
