@@ -677,6 +677,9 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       renderer.setClearColor(0x02060b, 1 - contentRevealProgress * .42)
       node.visible = chipRevealProgress > 0
       transitionRoot?.style.setProperty('--node-copy-opacity', String(chipRevealProgress))
+      transitionRoot?.style.setProperty('--node-copy-exit-x', '0px')
+      transitionRoot?.style.setProperty('--node-copy-exit-y', '0px')
+      transitionRoot?.style.setProperty('--node-copy-exit-scale', '1')
       cloudField.visible = true
       // Keep the exact cloud state produced by cloud-gather. Reapplying its
       // transforms or opacity here creates a visible second cloud pulse.
@@ -694,7 +697,11 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     } else if (stage === 'node-fall') {
       renderer.setClearColor(0x02060b, .58 * Math.pow(1 - fallProgress, 1.15))
       node.visible = true
-      transitionRoot?.style.setProperty('--node-copy-opacity', '1')
+      const copyExitProgress = easeInOutCubic((fallProgress - .06) / .94)
+      transitionRoot?.style.setProperty('--node-copy-opacity', String(Math.pow(1 - copyExitProgress, 1.15)))
+      transitionRoot?.style.setProperty('--node-copy-exit-x', `${-width * .34 * copyExitProgress}px`)
+      transitionRoot?.style.setProperty('--node-copy-exit-y', `${height * .42 * copyExitProgress}px`)
+      transitionRoot?.style.setProperty('--node-copy-exit-scale', String(1 + copyExitProgress * 2.8))
       cloudField.visible = true
       earthGroup.visible = false
       node.position.set(0, .2, .3)
@@ -731,6 +738,9 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       renderer.setClearColor(0x02060b, 1)
       node.visible = false
       transitionRoot?.style.setProperty('--node-copy-opacity', '0')
+      transitionRoot?.style.setProperty('--node-copy-exit-x', '0px')
+      transitionRoot?.style.setProperty('--node-copy-exit-y', '0px')
+      transitionRoot?.style.setProperty('--node-copy-exit-scale', '1')
       sweepMaterial.opacity = 0
       nodeGlow.intensity = 0
       earthGroup.visible = true
@@ -786,6 +796,9 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       transitionRoot?.style.removeProperty('--node-copy-rotate-y')
       transitionRoot?.style.removeProperty('--node-copy-rotate-z')
       transitionRoot?.style.removeProperty('--node-copy-opacity')
+      transitionRoot?.style.removeProperty('--node-copy-exit-x')
+      transitionRoot?.style.removeProperty('--node-copy-exit-y')
+      transitionRoot?.style.removeProperty('--node-copy-exit-scale')
       disposeObject(scene)
       renderer.renderLists.dispose()
       renderer.dispose()

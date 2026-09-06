@@ -24,12 +24,12 @@
 .login-welcome {
   position: absolute; z-index: 3; top: 0; left: 0; width: min(620px, 38vw); display: grid; justify-items: start; gap: 14px;
   text-align: left; opacity: 0; pointer-events: none; will-change: transform, opacity; transform-style: preserve-3d; transform-origin: right center;
-  transform: translate3d(calc(var(--node-screen-x, 50vw) - 100% - clamp(72px, 6vw, 150px)), calc(var(--node-screen-y, 50vh) - 50% + clamp(48px, 7vh, 96px)), 0)
-    perspective(900px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1));
+  transform: translate3d(calc(var(--node-screen-x, 50vw) - 100% - clamp(72px, 6vw, 150px) + var(--node-copy-exit-x, 0px)), calc(var(--node-screen-y, 50vh) - 50% + clamp(48px, 7vh, 96px) + var(--node-copy-exit-y, 0px)), 0)
+    perspective(900px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1));
   transition: opacity .28s var(--ease-out);
 }
 .login-transition.node-reveal .login-welcome { opacity: var(--node-copy-opacity, 0); }
-.login-transition.node-fall .login-welcome { opacity: 1; }
+.login-transition.node-fall .login-welcome { opacity: var(--node-copy-opacity, 1); transition: none; }
 .login-welcome .login-node-caption, .login-welcome .login-greeting, .login-welcome .login-quote { margin: 0; }
 .login-stage-label, .login-node-caption { font-family: var(--font-mono); letter-spacing: .18em; }
 .login-brand-image {
@@ -71,7 +71,7 @@
   .login-interface { width: min(390px, calc(100vw - 32px)); margin: -12vh 16px 0; }
   .login-brand-image { width: min(360px, 100%); }
   .login-form-orbital { width: min(330px, 100%); }
-  .login-welcome { width: calc(100vw - 32px); justify-items: center; gap: 9px; text-align: center; transform-origin: center top; transform: translate3d(calc(var(--node-screen-x, 50vw) - 50%), calc(var(--node-screen-y, 50vh) + clamp(92px, 15vh, 150px)), 0) perspective(700px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1)); }
+  .login-welcome { width: calc(100vw - 32px); justify-items: center; gap: 9px; text-align: center; transform-origin: center top; transform: translate3d(calc(var(--node-screen-x, 50vw) - 50% + var(--node-copy-exit-x, 0px)), calc(var(--node-screen-y, 50vh) + clamp(92px, 15vh, 150px) + var(--node-copy-exit-y, 0px)), 0) perspective(700px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1)); }
   .login-node-caption { font-size: 8px; }
   .login-greeting { font-size: clamp(28px, 8vw, 42px); }
   .login-quote { font-size: clamp(15px, 4.2vw, 19px); line-height: 1.55; }
