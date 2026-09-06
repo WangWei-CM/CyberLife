@@ -117,8 +117,8 @@
 .zoom-scale { font-size: 11px; color: var(--text-faint); }
 .zoom-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .zoom-actions .icon-button { width: 30px; height: 30px; }
-.zoom-calendar { position: relative; z-index: 0; isolation: isolate; height: 230px; overflow: hidden; cursor: grab; user-select: none; touch-action: none; outline: 0; background: transparent; clip-path: none; }
-.zoom-calendar::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, var(--surface-2), transparent); transform: skewX(var(--future-skew)); transform-origin: center; }
+.zoom-calendar { position: relative; z-index: 0; isolation: isolate; height: 230px; overflow: hidden; cursor: grab; user-select: none; touch-action: none; outline: 0; background: linear-gradient(180deg, var(--surface-2), transparent); clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center; }
+.cal-content { position: absolute; inset: 0; transform: skewX(15deg); transform-origin: center; }
 .zoom-calendar:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-soft); }
 .zoom-calendar.dragging { cursor: grabbing; }
 .cal-columns { position: absolute; inset: 0; }
