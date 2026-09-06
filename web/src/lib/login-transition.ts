@@ -641,6 +641,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const revealLinear = clamp(elapsed / NODE_REVEAL_MS)
     const chipRevealProgress = easeOutCubic((revealLinear - .06) / .58)
     const contentRevealProgress = easeInOutCubic((revealLinear - .46) / .54)
+    const fallLinear = clamp(elapsed / NODE_FALL_MS)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
     const pageProgress = easeOutCubic(elapsed / PAGE_ENTER_MS)
 
@@ -705,12 +706,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       cloudField.visible = true
       earthGroup.visible = false
       node.position.set(0, .2, .3)
-      node.scale.setScalar(1 - fallProgress * .82)
-      sweepMaterial.opacity = .26 * (1 - fallProgress)
-      nodeGlow.intensity = 8 * (1 - fallProgress)
-      node.rotation.x = -.16 + fallProgress * .56
-      node.rotation.y += .012 + fallProgress * .014
-      node.rotation.z += .005 + fallProgress * .007
+      node.scale.setScalar(1 - fallLinear * .82)
+      sweepMaterial.opacity = .26 * (1 - fallLinear)
+      nodeGlow.intensity = 8 * (1 - fallLinear)
+      node.rotation.x = -.16 + fallLinear * .56
+      node.rotation.y += .012 + fallLinear * .014
+      node.rotation.z += .005 + fallLinear * .007
       camera.position.z = 8.75
       cloudFieldLayers.forEach((layer, index) => {
         // Expand the existing cloud banks in place. Translating these oversized
