@@ -642,6 +642,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const chipRevealProgress = easeOutCubic((revealLinear - .06) / .58)
     const contentRevealProgress = easeInOutCubic((revealLinear - .46) / .54)
     const fallLinear = clamp(elapsed / NODE_FALL_MS)
+    const chipExitProgress = clamp(fallLinear * 2)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
     const pageProgress = easeOutCubic(elapsed / PAGE_ENTER_MS)
 
@@ -697,7 +698,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       if (elapsed >= NODE_REVEAL_MS) setStage('node-fall')
     } else if (stage === 'node-fall') {
       renderer.setClearColor(0x02060b, .58 * Math.pow(1 - fallProgress, 1.15))
-      node.visible = true
+      node.visible = chipExitProgress < 1
       const copyExitProgress = fallLinear
       transitionRoot?.style.setProperty('--node-copy-opacity', String(Math.pow(1 - copyExitProgress, 2.4)))
       transitionRoot?.style.setProperty('--node-copy-exit-x', `${-width * .14 * copyExitProgress}px`)
@@ -706,12 +707,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       cloudField.visible = true
       earthGroup.visible = false
       node.position.set(0, .2, .3)
-      node.scale.setScalar(1 - fallLinear * .82)
-      sweepMaterial.opacity = .26 * (1 - fallLinear)
-      nodeGlow.intensity = 8 * (1 - fallLinear)
-      node.rotation.x = -.16 + fallLinear * .56
-      node.rotation.y += .012 + fallLinear * .014
-      node.rotation.z += .005 + fallLinear * .007
+      node.scale.setScalar(1 - chipExitProgress)
+      sweepMaterial.opacity = .26 * (1 - chipExitProgress)
+      nodeGlow.intensity = 8 * (1 - chipExitProgress)
+      node.rotation.x = -.16 + chipExitProgress * .56
+      node.rotation.y += .012 + chipExitProgress * .014
+      node.rotation.z += .005 + chipExitProgress * .007
       camera.position.z = 8.75
       cloudFieldLayers.forEach((layer, index) => {
         // Expand the existing cloud banks in place. Translating these oversized
@@ -725,14 +726,11 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       if (elapsed >= NODE_FALL_MS) setStage('page-enter')
     } else if (stage === 'page-enter') {
       renderer.setClearColor(0x02060b, 0)
-      node.visible = true
+      node.visible = false
       transitionRoot?.style.setProperty('--node-copy-opacity', '0')
       cloudField.visible = false
       earthGroup.visible = false
       node.position.set(0, .2, .3)
-      node.scale.setScalar(.18 * (1 - pageProgress))
-      node.rotation.y += .026
-      node.rotation.z += .012
       renderer.toneMappingExposure = 1.05 + pageProgress * 2.2
       canvas.style.opacity = String(1 - pageProgress * .96)
     } else if (stage === 'orbital-login' || stage === 'authenticating') {
