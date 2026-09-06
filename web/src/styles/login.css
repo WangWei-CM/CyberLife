@@ -24,6 +24,7 @@
 .login-welcome {
   position: absolute; z-index: 3; top: 0; left: 0; width: min(620px, 38vw); display: grid; justify-items: start; gap: 14px;
   text-align: left; opacity: 0; pointer-events: none; will-change: transform, opacity; transform-style: preserve-3d; transform-origin: right center;
+  font-family: "Source Han Sans SC Heavy", "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", sans-serif; font-synthesis: weight;
   transform: translate3d(calc(var(--node-screen-x, 50vw) - 100% - clamp(72px, 6vw, 150px) + var(--node-copy-exit-x, 0px)), calc(var(--node-screen-y, 50vh) - 50% + clamp(48px, 7vh, 96px) + var(--node-copy-exit-y, 0px)), 0)
     perspective(900px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1));
   transition: opacity .28s var(--ease-out);
@@ -52,8 +53,8 @@
 .login-key:focus-within .login-key-ring { transform: scaleX(1); }
 .login-error { min-height: 18px; margin: 0; color: #e8aa86; font: 11px/1.5 var(--font-mono); }
 .login-node-caption { color: rgba(240, 210, 155, .72); font-size: 11px; }
-.login-greeting { color: #f4fffc; font: 600 clamp(40px, 4.5vw, 64px)/1.12 var(--font-serif); letter-spacing: .07em; text-shadow: 0 8px 30px rgba(0, 0, 0, .56); }
-.login-quote { max-width: 780px; color: rgba(238, 248, 245, .82); font: 400 clamp(19px, 1.8vw, 26px)/1.65 var(--font-serif); letter-spacing: .045em; text-shadow: 0 6px 24px rgba(0, 0, 0, .62); }
+.login-greeting { color: #f4fffc; font-size: clamp(40px, 4.5vw, 64px); font-weight: 900; line-height: 1.06; letter-spacing: -.025em; -webkit-text-stroke: .35px currentColor; text-shadow: 0 8px 30px rgba(0, 0, 0, .62); }
+.login-quote { max-width: 780px; color: rgba(238, 248, 245, .88); font-size: clamp(19px, 1.8vw, 26px); font-weight: 800; line-height: 1.48; letter-spacing: .005em; -webkit-text-stroke: .18px currentColor; text-shadow: 0 6px 24px rgba(0, 0, 0, .68); }
 .login-quote::before { content: '“'; color: rgba(118, 222, 210, .7); margin-right: 6px; }
 .login-quote::after { content: '”'; color: rgba(118, 222, 210, .7); margin-left: 4px; }
 .login-fallback { position: absolute; z-index: 5; bottom: 42px; left: 50%; transform: translateX(-50%); padding: 9px 16px; border: 1px solid var(--login-line); color: var(--login-accent); background: rgba(3, 15, 20, .8); font: 11px var(--font-mono); letter-spacing: .08em; }
