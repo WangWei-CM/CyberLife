@@ -4,7 +4,7 @@ import { createLoginTransition, type LoginTransitionStage } from '../lib/login-t
 import { reducedMotion, wait } from '../lib/motion'
 import AppIcon from './AppIcon.vue'
 
-const props = defineProps<{ credential: string; busy: boolean; error: string }>()
+const props = defineProps<{ credential: string; busy: boolean; error: string; greeting: string; quote: string }>()
 const emit = defineEmits<{
   'update:credential': [value: string]
   submit: []
@@ -76,12 +76,10 @@ defineExpose({
 </script>
 
 <template>
-  <main class="login-transition" :class="{ 'scene-failed': sceneFailed, 'transition-started': started }">
+  <main class="login-transition" :class="{ 'scene-failed': sceneFailed, 'transition-started': started, 'node-reveal': stage === 'node-reveal', 'node-fall': stage === 'node-fall' }">
     <canvas ref="canvas" class="login-canvas" aria-hidden="true" />
     <div class="login-scanlines" aria-hidden="true" />
     <div class="login-vignette" aria-hidden="true" />
-    <div class="login-corner login-corner-tl" aria-hidden="true" />
-    <div class="login-corner login-corner-br" aria-hidden="true" />
 
     <section class="login-interface" aria-label="CyberLife 登录">
       <p class="login-kicker">LIFE OPERATING SYSTEM</p>
@@ -109,8 +107,12 @@ defineExpose({
         </button>
       </form>
       <p class="login-error" role="alert" aria-live="polite">{{ error }}</p>
-      <p v-if="started" class="login-node-caption">CYBERLIFE NODE / PRIMARY LIFE SYSTEM</p>
-      <p v-else class="login-footnote">SECURE ORBITAL ACCESS // SESSION READY</p>
+      <p v-if="!started" class="login-footnote">SECURE ORBITAL ACCESS // SESSION READY</p>
     </section>
+    <div v-if="started" class="login-welcome">
+      <p class="login-node-caption">CYBERLIFE NODE / PRIMARY LIFE SYSTEM</p>
+      <p class="login-greeting">{{ greeting }}</p>
+      <p class="login-quote">{{ quote }}</p>
+    </div>
   </main>
 </template>

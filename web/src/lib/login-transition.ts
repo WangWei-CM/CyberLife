@@ -190,6 +190,55 @@ function createLogoTexture(size = 512) {
   })
 }
 
+function createChipFaceTexture(size = 1024) {
+  return canvasTexture(size, size, context => {
+    context.fillStyle = '#050607'
+    context.fillRect(0, 0, size, size)
+    context.strokeStyle = '#f2f3ef'
+    context.lineWidth = size * .018
+    context.strokeRect(size * .06, size * .06, size * .88, size * .88)
+    context.strokeStyle = '#aeb2ad'
+    context.lineWidth = size * .008
+    context.strokeRect(size * .11, size * .11, size * .78, size * .78)
+
+    context.strokeStyle = '#f6f7f3'
+    context.lineWidth = size * .012
+    const routes = [
+      [[.16, .22], [.34, .22], [.44, .32], [.84, .32]],
+      [[.16, .5], [.28, .5], [.38, .4], [.84, .4]],
+      [[.16, .78], [.35, .78], [.46, .68], [.84, .68]],
+      [[.22, .16], [.22, .34], [.32, .44], [.32, .84]],
+      [[.5, .16], [.5, .3], [.6, .4], [.6, .84]],
+      [[.78, .16], [.78, .34], [.68, .44], [.68, .84]],
+    ]
+    for (const route of routes) {
+      context.beginPath()
+      route.forEach(([x, y], index) => index === 0 ? context.moveTo(x * size, y * size) : context.lineTo(x * size, y * size))
+      context.stroke()
+    }
+
+    context.fillStyle = '#f1f2ee'
+    for (const [x, y] of [[.16, .22], [.84, .32], [.16, .5], [.84, .4], [.16, .78], [.84, .68], [.22, .16], [.32, .84], [.5, .16], [.6, .84], [.78, .16], [.68, .84]]) {
+      context.beginPath()
+      context.arc(x * size, y * size, size * .028, 0, TAU)
+      context.fill()
+    }
+
+    context.strokeStyle = '#ffffff'
+    context.lineWidth = size * .022
+    context.beginPath()
+    context.arc(size / 2, size / 2, size * .14, 0, TAU)
+    context.stroke()
+    context.fillStyle = '#ffffff'
+    context.beginPath()
+    context.arc(size / 2, size / 2, size * .045, 0, TAU)
+    context.fill()
+    context.font = `700 ${size * .065}px monospace`
+    context.textAlign = 'center'
+    context.fillText('CL // NODE 01', size / 2, size * .94)
+  })
+}
+
 function createOrbit(radius: number, color: number, opacity: number) {
   const points = Array.from({ length: 129 }, (_, index) => {
     const angle = index / 128 * TAU
@@ -226,17 +275,19 @@ function createChipLine(points: Array<[number, number]>, z: number, material: TH
 }
 
 function disposeObject(root: THREE.Object3D) {
+  const textures = new Set<THREE.Texture>()
   root.traverse(object => {
     const mesh = object as THREE.Mesh
     mesh.geometry?.dispose()
     const materials = mesh.material ? (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) : []
     for (const material of materials) {
       for (const value of Object.values(material)) {
-        if (value instanceof THREE.Texture) value.dispose()
+        if (value instanceof THREE.Texture) textures.add(value)
       }
       material.dispose()
     }
   })
+  textures.forEach(texture => texture.dispose())
 }
 
 /** CyberLife WebGL scene with original geometry and an attributed public-domain Earth texture. */
@@ -264,7 +315,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const ambient = new THREE.HemisphereLight(0xa7e6df, 0x020711, 1.2)
   const keyLight = new THREE.DirectionalLight(0xd8fff8, 3.2)
   keyLight.position.set(-5, 5, 7)
-  const rimLight = new THREE.PointLight(0x55cfc5, 35, 24, 2)
+  const rimLight = new THREE.PointLight(0x9fc7d2, 12, 24, 2)
   rimLight.position.set(5, 1, 3)
   const warmLight = new THREE.PointLight(0xe8bd82, 18, 18, 2)
   warmLight.position.set(-4, -3, 4)
@@ -291,17 +342,21 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .035 : .045, vertexColors: true, transparent: true, opacity: .82, sizeAttenuation: true }))
   scene.add(stars)
 
-  const textureQuality = mobile ? 768 : 1536
+  // Keep the procedural fallback light; the high-resolution public-domain map
+  // below replaces it as soon as the browser finishes loading the asset.
+  const textureQuality = mobile ? 512 : 768
   const earthTexture = createEarthTexture(textureQuality)
-  const earthBumpTexture = createEarthBumpTexture(mobile ? 384 : 768)
-  const cloudTexture = createCloudTexture(textureQuality)
+  const earthBumpTexture = createEarthBumpTexture(mobile ? 256 : 384)
+  const surfaceCloudFallback = createCloudTexture(textureQuality)
+  const backdropCloudTexture = createCloudTexture(textureQuality)
   const sphereSegments = mobile ? 48 : 72
 
   // The opening shot uses a deliberately oversized Earth: only its right and
   // lower arc enters frame, leaving negative space for the orbital subject.
-  const earthRadius = mobile ? 6.25 : 7.1
+  // Fourfold scale keeps the planet as a cropped foreground arc, not a small globe.
+  const earthRadius = mobile ? 17.2 : 21.6
   const earthGroup = new THREE.Group()
-  earthGroup.position.set(mobile ? 4.75 : 7.05, mobile ? -4.8 : -5.25, -2.35)
+  earthGroup.position.set(mobile ? 7.2 : 10.2, mobile ? -11.5 : -12.8, -2.35)
   earthGroup.rotation.z = -.16
   scene.add(earthGroup)
 
@@ -311,43 +366,66 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   )
   earth.rotation.z = -.22
   earthGroup.add(earth)
+  let earthTextureDisposed = false
   new THREE.TextureLoader().load('/textures/earth-day-blue-marble.jpg', texture => {
+    if (earthTextureDisposed) { texture.dispose(); return }
     texture.colorSpace = THREE.SRGBColorSpace
     texture.wrapS = THREE.RepeatWrapping
     texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
     const material = earth.material as THREE.MeshStandardMaterial
-    material.map?.dispose()
-    material.bumpMap?.dispose()
-    material.map = texture
+    const previousMap = material.map
+    const previousBump = material.bumpMap
+    if (previousMap && previousMap !== previousBump) previousMap.dispose()
+    if (previousBump) previousBump.dispose()
     material.bumpMap = texture
+    material.map = texture
     material.bumpScale = .075
     material.needsUpdate = true
   })
 
   const clouds = new THREE.Mesh(
     new THREE.SphereGeometry(earthRadius * 1.018, sphereSegments, sphereSegments),
-    new THREE.MeshPhongMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .82, depthWrite: false, color: 0xe9fff7, shininess: 18 }),
+    new THREE.MeshPhongMaterial({ map: surfaceCloudFallback, alphaMap: surfaceCloudFallback, transparent: true, opacity: .82, depthWrite: false, color: 0xe9fff7, shininess: 18 }),
   )
   clouds.rotation.z = -.22
-  clouds.visible = false
+  clouds.visible = true
   earthGroup.add(clouds)
-
   const cloudHighlight = new THREE.Mesh(
     new THREE.SphereGeometry(earthRadius * 1.034, sphereSegments, sphereSegments),
-    new THREE.MeshBasicMaterial({ map: cloudTexture, alphaMap: cloudTexture, transparent: true, opacity: .25, depthWrite: false, color: 0xb5fff0, blending: THREE.AdditiveBlending }),
+    new THREE.MeshBasicMaterial({ map: surfaceCloudFallback, alphaMap: surfaceCloudFallback, transparent: true, opacity: .25, depthWrite: false, color: 0xb5fff0, blending: THREE.AdditiveBlending }),
   )
   cloudHighlight.rotation.z = -.22
-  cloudHighlight.visible = false
+  cloudHighlight.visible = true
   earthGroup.add(cloudHighlight)
+  let surfaceCloudTextureDisposed = false
+  new THREE.TextureLoader().load('/textures/earth-clouds-alpha.png', texture => {
+    if (surfaceCloudTextureDisposed) { texture.dispose(); return }
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.wrapS = THREE.RepeatWrapping
+    texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy())
+    const material = clouds.material as THREE.MeshPhongMaterial
+    const previousMap = material.map
+    const previousAlpha = material.alphaMap
+    if (previousMap && previousMap !== previousAlpha) previousMap.dispose()
+    if (previousAlpha) previousAlpha.dispose()
+    material.map = texture
+    material.alphaMap = texture
+    material.opacity = .62
+    material.needsUpdate = true
+    const highlight = cloudHighlight.material as THREE.MeshBasicMaterial
+    highlight.map = texture
+    highlight.alphaMap = texture
+    highlight.needsUpdate = true
+  })
 
   const atmosphereMaterial = new THREE.ShaderMaterial({
     transparent: true,
     side: THREE.BackSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { uOpacity: { value: .48 } },
+    uniforms: { uOpacity: { value: .16 } },
     vertexShader: `varying vec3 vNormal; void main(){ vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `uniform float uOpacity; varying vec3 vNormal; void main(){ float rim = pow(0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.2); gl_FragColor = vec4(0.23, 0.86, 0.82, rim * uOpacity); }`,
+    fragmentShader: `uniform float uOpacity; varying vec3 vNormal; void main(){ float rim = pow(max(0.0, 0.72 - dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.2); gl_FragColor = vec4(0.42, 0.68, 0.76, rim * uOpacity); }`,
   })
   const atmosphere = new THREE.Mesh(
     new THREE.SphereGeometry(earthRadius * 1.05, sphereSegments, sphereSegments),
@@ -363,8 +441,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const cloudFieldMaterials: THREE.MeshBasicMaterial[] = []
   for (let index = 0; index < (mobile ? 3 : 4); index += 1) {
     const material = new THREE.MeshBasicMaterial({
-      map: cloudTexture,
-      alphaMap: cloudTexture,
+      map: backdropCloudTexture,
+      alphaMap: backdropCloudTexture,
       transparent: true,
       depthWrite: false,
       opacity: .18 + index * .035,
@@ -379,23 +457,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   }
   scene.add(cloudField)
 
-  const orbitGroup = new THREE.Group()
-  orbitGroup.position.copy(earthGroup.position)
-  orbitGroup.rotation.set(.28, 0, -.34)
-  const orbitA = createOrbit(4.45, 0x6edbd0, .3)
-  const orbitB = createOrbit(5.15, 0x92b8b7, .17)
-  orbitB.rotation.x = .24
-  orbitB.rotation.z = .16
-  orbitGroup.add(orbitA, orbitB)
-  scene.add(orbitGroup)
-
   const logoTexture = createLogoTexture(mobile ? 256 : 512)
-  const logoMaterial = new THREE.SpriteMaterial({ map: logoTexture, transparent: true, opacity: .92, depthWrite: false, blending: THREE.AdditiveBlending })
-  const orbitalLogo = new THREE.Sprite(logoMaterial)
-  orbitalLogo.position.set(0, .25, 1.2)
-  orbitalLogo.scale.set(2.3, 2.3, 1)
-  scene.add(orbitalLogo)
-
+  const chipFaceTexture = createChipFaceTexture(mobile ? 512 : 1024)
   const node = new THREE.Group()
   node.visible = false
   const whiteMetal = new THREE.MeshPhysicalMaterial({ color: 0xf0f1ed, metalness: .82, roughness: .2, clearcoat: .85, clearcoatRoughness: .12 })
@@ -410,6 +473,11 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   nodeInset.position.z = .3
   const facePlate = createChamferedPlate(1.72, .18, .035, matteWhite)
   facePlate.position.z = .38
+  const chipFace = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.48, 1.48),
+    new THREE.MeshStandardMaterial({ map: chipFaceTexture, emissive: 0x252827, emissiveIntensity: .16, metalness: .25, roughness: .44, transparent: true }),
+  )
+  chipFace.position.z = .425
   const outerEdge = new THREE.LineSegments(new THREE.EdgesGeometry(nodeCore.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .82 }))
   const innerEdge = new THREE.LineSegments(new THREE.EdgesGeometry(nodeInset.geometry), new THREE.LineBasicMaterial({ color: 0x070809, transparent: true, opacity: .95 }))
   innerEdge.position.copy(nodeInset.position)
@@ -437,7 +505,14 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       return fastener
     })
 
-  node.add(rearPlate, nodeCore, nodeInset, facePlate, outerEdge, innerEdge, circuitLines, hub, ...fasteners)
+  const sweepMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
+  const sweep = new THREE.Mesh(new THREE.PlaneGeometry(.16, 1.82), sweepMaterial)
+  sweep.position.set(-.72, 0, .445)
+  sweep.rotation.z = -.42
+  const nodeGlow = new THREE.PointLight(0xe9fff8, 0, 7, 2)
+  nodeGlow.position.set(-.55, .7, 1.7)
+
+  node.add(rearPlate, nodeCore, nodeInset, facePlate, chipFace, outerEdge, innerEdge, circuitLines, hub, sweep, nodeGlow, ...fasteners)
   scene.add(node)
 
   let width = 1
@@ -485,8 +560,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
 
     stars.rotation.y = time * .000008
     earth.rotation.y = time * .000035
-    clouds.visible = stage !== 'orbital-login' && stage !== 'authenticating'
-    cloudHighlight.visible = clouds.visible
+    clouds.visible = true
+    cloudHighlight.visible = true
     clouds.rotation.y = time * .000052
     cloudHighlight.rotation.y = -time * .000032
     cloudHighlight.rotation.x = Math.sin(time * .00011) * .035
@@ -496,10 +571,6 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     cloudFieldMaterials.forEach((material, index) => {
       material.opacity = (.16 + index * .035) + Math.sin(time * (.00034 + index * .00004) + index) * .025
     })
-    orbitGroup.rotation.y = Math.sin(time * .00009) * .08
-    orbitalLogo.position.y = .25 + Math.sin(time * .0007) * .08
-    orbitalLogo.material.opacity = stage === 'authenticating' ? .38 : stage === 'orbital-login' ? .92 : Math.max(0, 1 - revealProgress * 1.8)
-
     if (stage === 'node-reveal') {
       node.visible = true
       cloudField.visible = true
@@ -508,10 +579,13 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
-      atmosphereMaterial.uniforms.uOpacity.value = .48 * earthFade
+      atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
       cloudFieldMaterials.forEach((material, index) => { material.opacity = (.16 + index * .035) * clamp((revealProgress - .18) / .3) })
       node.position.set(0, .2 + (1 - revealProgress) * .8, .3)
       node.scale.setScalar(.38 + revealProgress * .62)
+      sweep.position.x = -.75 + revealProgress * 1.5
+      sweepMaterial.opacity = .48 * Math.sin(revealProgress * Math.PI)
+      nodeGlow.intensity = 16 * Math.sin(revealProgress * Math.PI)
       node.rotation.set(-.32 + revealProgress * .16, .65 + time * .00016, .12 + time * .00008)
       camera.position.z = 10 - revealProgress * 1.25
       camera.lookAt(0, -.55 + revealProgress * .35, 0)
@@ -524,6 +598,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       earthGroup.visible = false
       node.position.set(0, .2 - fallProgress * 7.4, .3 + fallProgress * 7.25)
       node.scale.setScalar(1 + fallProgress * 1.85)
+      sweepMaterial.opacity = .26 * (1 - fallProgress)
+      nodeGlow.intensity = 8 * (1 - fallProgress)
       node.rotation.x = -.16 + fallProgress * .78
       node.rotation.y += .008
       node.rotation.z += .004
@@ -538,11 +614,13 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       canvas.style.opacity = String(1 - pageProgress * .96)
     } else if (stage === 'orbital-login' || stage === 'authenticating') {
       node.visible = false
+      sweepMaterial.opacity = 0
+      nodeGlow.intensity = 0
       earthGroup.visible = true
       ;(earth.material as THREE.MeshStandardMaterial).opacity = 1
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
-      atmosphereMaterial.uniforms.uOpacity.value = .48
+      atmosphereMaterial.uniforms.uOpacity.value = .16
       cloudField.visible = false
       camera.position.z += (10 - camera.position.z) * .06
       renderer.toneMappingExposure = 1.05
@@ -566,6 +644,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       if (frame) window.cancelAnimationFrame(frame)
       if (completionTimer) window.clearTimeout(completionTimer)
       window.removeEventListener('resize', resize)
+      earthTextureDisposed = true
+      surfaceCloudTextureDisposed = true
       disposeObject(scene)
       renderer.renderLists.dispose()
       renderer.dispose()

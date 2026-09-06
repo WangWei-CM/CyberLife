@@ -8,15 +8,15 @@
 .login-canvas { z-index: -3; display: block; }
 .login-scanlines { z-index: -2; pointer-events: none; opacity: .18; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(190, 255, 244, .04) 4px, transparent 5px); mix-blend-mode: screen; }
 .login-vignette { z-index: -1; pointer-events: none; background: radial-gradient(ellipse at center, transparent 18%, rgba(0, 3, 8, .16) 58%, rgba(0, 2, 5, .82) 100%); }
-.login-corner { position: absolute; z-index: 1; width: 56px; height: 56px; border-color: var(--login-line); pointer-events: none; }
-.login-corner-tl { top: 28px; left: 28px; border-top: 1px solid; border-left: 1px solid; }
-.login-corner-br { right: 28px; bottom: 28px; border-right: 1px solid; border-bottom: 1px solid; }
 .login-interface {
-  position: relative; z-index: 2; width: min(470px, calc(100vw - 40px)); display: grid; justify-items: center; gap: 14px;
-  margin-top: -8vh; text-align: center; text-shadow: 0 2px 18px rgba(0, 0, 0, .65);
+  position: relative; z-index: 2; width: min(470px, calc(100vw - 40px)); display: grid; justify-items: start; gap: 14px;
+  margin: -8vh auto 0 max(32px, 8vw); text-align: left; text-shadow: 0 2px 18px rgba(0, 0, 0, .65);
   transition: opacity .55s var(--ease-out), transform .8s var(--ease-out);
 }
 .login-transition.transition-started .login-interface { transform: translateY(-3vh) scale(.94); opacity: .28; pointer-events: none; }
+.login-welcome { position: absolute; z-index: 3; left: max(32px, 8vw); bottom: 10vh; width: min(430px, 32vw); display: grid; gap: 10px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .45s var(--ease-out), transform .45s var(--ease-out); }
+.login-transition.node-reveal .login-welcome, .login-transition.node-fall .login-welcome { opacity: 1; transform: none; }
+.login-welcome .login-node-caption, .login-welcome .login-greeting, .login-welcome .login-quote { margin: 0; }
 .login-kicker, .login-stage-label, .login-footnote, .login-node-caption { font-family: var(--font-mono); letter-spacing: .18em; }
 .login-kicker { color: var(--login-accent); font-size: 10px; font-weight: 600; }
 .login-logo {
@@ -29,6 +29,7 @@
 .login-stage-label.loading { color: #f0d29b; }
 .login-form-orbital { width: min(360px, 100%); margin-top: 12px; }
 .login-key { position: relative; display: block; flex: 1; min-width: 0; }
+.login-form-orbital .login-key-input { text-align: left; }
 .login-key-input {
   width: 100%; border: 0; border-bottom: 1px solid rgba(185, 226, 220, .42); border-radius: 0; padding: 14px 10px; background: rgba(1, 8, 14, .38);
   color: #f4fffc; caret-color: var(--login-accent); font-family: var(--font-mono); font-size: 13px; letter-spacing: .08em; text-align: center;
@@ -48,7 +49,11 @@
 .login-spinner { width: 16px; height: 16px; border: 1px solid rgba(236, 255, 251, .32); border-top-color: var(--login-accent); border-radius: 50%; animation: spin .65s linear infinite; }
 .login-error { min-height: 18px; margin: 0; color: #e8aa86; font: 11px/1.5 var(--font-mono); }
 .login-footnote, .login-node-caption { color: rgba(202, 231, 229, .42); font-size: 9px; }
-.login-node-caption { color: rgba(240, 210, 155, .72); animation: login-caption-in .6s var(--ease-out) both; }
+.login-node-caption { color: rgba(240, 210, 155, .72); }
+.login-greeting { color: #f4fffc; font: 600 clamp(22px, 3vw, 32px)/1.2 var(--font-serif); letter-spacing: .06em; }
+.login-quote { max-width: 410px; color: rgba(230, 244, 239, .74); font: 400 13px/1.8 var(--font-serif); letter-spacing: .04em; }
+.login-quote::before { content: '“'; color: rgba(118, 222, 210, .7); margin-right: 6px; }
+.login-quote::after { content: '”'; color: rgba(118, 222, 210, .7); margin-left: 4px; }
 .login-fallback { position: absolute; z-index: 5; bottom: 42px; left: 50%; transform: translateX(-50%); padding: 9px 16px; border: 1px solid var(--login-line); color: var(--login-accent); background: rgba(3, 15, 20, .8); font: 11px var(--font-mono); letter-spacing: .08em; }
 .login-fallback:hover, .login-fallback:focus-visible { background: rgba(38, 92, 91, .55); }
 
@@ -62,12 +67,9 @@
 @keyframes login-caption-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 600px) {
-  .login-interface { width: min(390px, calc(100vw - 32px)); margin-top: -12vh; }
+  .login-interface { width: min(390px, calc(100vw - 32px)); margin: -12vh 16px 0; }
   .login-logo { font-size: clamp(27px, 9vw, 42px); letter-spacing: .13em; padding-left: .13em; }
   .login-form-orbital { width: min(330px, 100%); }
-  .login-corner { width: 34px; height: 34px; }
-  .login-corner-tl { top: 18px; left: 18px; }
-  .login-corner-br { right: 18px; bottom: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
