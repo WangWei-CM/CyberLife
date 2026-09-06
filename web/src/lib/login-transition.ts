@@ -493,6 +493,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const cloudFieldMaterials: THREE.MeshBasicMaterial[] = []
   const cloudFieldLayers: THREE.Mesh[] = []
   const cloudFieldOrigins: THREE.Vector3[] = []
+  const cloudFieldRotations: number[] = []
   for (let index = 0; index < (mobile ? 3 : 4); index += 1) {
     const material = new THREE.MeshBasicMaterial({
       map: backdropCloudTexture,
@@ -501,7 +502,10 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       depthWrite: false,
       opacity: .18 + index * .035,
       color: index % 2 ? 0xcbe9e5 : 0xeaf8f2,
-      blending: THREE.AdditiveBlending,
+      // Normal alpha compositing keeps the cloud brightness stable while the
+      // interface underneath is revealed. Additive blending made it flare a
+      // second time as the WebGL clear alpha changed.
+      blending: THREE.NormalBlending,
     })
     const layer = new THREE.Mesh(new THREE.PlaneGeometry(22 + index * 5, 10 + index * 2.5), material)
     layer.position.set((index - 1.5) * 2.6, (index % 2 ? -.55 : .45) + index * .08, -index * .32)
@@ -510,6 +514,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     cloudFieldMaterials.push(material)
     cloudFieldLayers.push(layer)
     cloudFieldOrigins.push(layer.position.clone())
+    cloudFieldRotations.push(layer.rotation.z)
   }
   scene.add(cloudField)
 
@@ -658,6 +663,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       cloudFieldLayers.forEach((layer, index) => {
         layer.position.copy(cloudFieldOrigins[index])
         layer.scale.setScalar(.86 + gatherProgress * .14)
+        layer.rotation.z = cloudFieldRotations[index]
         cloudFieldMaterials[index].opacity = (.24 + index * .04) * gatherProgress
       })
       earthGroup.visible = gatherProgress < .68
@@ -702,15 +708,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       node.rotation.z += .005 + fallProgress * .007
       camera.position.z = 8.75
       cloudFieldLayers.forEach((layer, index) => {
-        const angle = index / cloudFieldLayers.length * TAU + .42
-        const distance = fallProgress * (7.5 + index * 1.35)
-        layer.position.set(
-          cloudFieldOrigins[index].x + Math.cos(angle) * distance,
-          cloudFieldOrigins[index].y + Math.sin(angle) * distance * .62,
-          cloudFieldOrigins[index].z - fallProgress * (index + 1) * .18,
-        )
-        layer.scale.setScalar(1 + fallProgress * (.34 + index * .07))
-        layer.rotation.z += (index % 2 ? 1 : -1) * .0025
+        // Expand the existing cloud banks in place. Translating these oversized
+        // planes pulled previously off-screen texture back into view, which read
+        // as a second cloud entrance instead of one continuous dispersal.
+        layer.position.copy(cloudFieldOrigins[index])
+        layer.scale.setScalar(1 + fallProgress * (1.05 + index * .14))
+        layer.rotation.z = cloudFieldRotations[index] + (index % 2 ? 1 : -1) * fallProgress * .12
         cloudFieldMaterials[index].opacity = (.24 + index * .04) * Math.pow(1 - fallProgress, 1.35)
       })
       if (elapsed >= NODE_FALL_MS) setStage('page-enter')
@@ -741,6 +744,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       cloudFieldLayers.forEach((layer, index) => {
         layer.position.copy(cloudFieldOrigins[index])
         layer.scale.setScalar(1)
+        layer.rotation.z = cloudFieldRotations[index]
       })
       camera.position.z += (10 - camera.position.z) * .06
       renderer.toneMappingExposure = 1.05
