@@ -47,6 +47,11 @@ func (s *Server) Router() *gin.Engine {
 	r.GET("/health/live", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	webDir, _ := filepath.Abs(s.cfg.WebDir)
 	r.Static("/assets", filepath.Join(webDir, "assets"))
+	// Vite copies public/ verbatim.  These texture and branding files are loaded by
+	// the login scene via absolute URLs, so they must be served as static files
+	// rather than falling through to the SPA document.
+	r.Static("/branding", filepath.Join(webDir, "branding"))
+	r.Static("/textures", filepath.Join(webDir, "textures"))
 	r.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
 			fail(c, http.StatusNotFound, "not_found", "接口不存在")
