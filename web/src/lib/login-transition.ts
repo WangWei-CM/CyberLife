@@ -192,50 +192,85 @@ function createLogoTexture(size = 512) {
 
 function createChipFaceTexture(size = 1024) {
   return canvasTexture(size, size, context => {
-    context.fillStyle = '#050607'
+    const metal = context.createLinearGradient(0, 0, size, size)
+    metal.addColorStop(0, '#f4f5f1')
+    metal.addColorStop(.42, '#c8ccc9')
+    metal.addColorStop(.7, '#eef0ec')
+    metal.addColorStop(1, '#adb3b1')
+    context.fillStyle = metal
     context.fillRect(0, 0, size, size)
-    context.strokeStyle = '#f2f3ef'
-    context.lineWidth = size * .018
-    context.strokeRect(size * .06, size * .06, size * .88, size * .88)
-    context.strokeStyle = '#aeb2ad'
-    context.lineWidth = size * .008
-    context.strokeRect(size * .11, size * .11, size * .78, size * .78)
 
-    context.strokeStyle = '#f6f7f3'
-    context.lineWidth = size * .012
+    context.globalAlpha = .12
+    for (let index = 0; index < 72; index += 1) {
+      const offset = seeded(index + 760) * size
+      context.strokeStyle = index % 3 ? '#ffffff' : '#56605e'
+      context.lineWidth = Math.max(1, size * .0012)
+      context.beginPath()
+      context.moveTo(0, offset)
+      context.lineTo(size, offset - size * .12)
+      context.stroke()
+    }
+    context.globalAlpha = 1
+
+    context.lineJoin = 'round'
+    context.lineCap = 'square'
+    context.strokeStyle = '#080a0b'
+    context.lineWidth = size * .055
+    context.beginPath()
+    context.moveTo(size * .19, size * .055)
+    context.lineTo(size * .81, size * .055)
+    context.lineTo(size * .945, size * .19)
+    context.lineTo(size * .945, size * .81)
+    context.lineTo(size * .81, size * .945)
+    context.lineTo(size * .19, size * .945)
+    context.lineTo(size * .055, size * .81)
+    context.lineTo(size * .055, size * .19)
+    context.closePath()
+    context.stroke()
+
     const routes = [
-      [[.16, .22], [.34, .22], [.44, .32], [.84, .32]],
-      [[.16, .5], [.28, .5], [.38, .4], [.84, .4]],
-      [[.16, .78], [.35, .78], [.46, .68], [.84, .68]],
-      [[.22, .16], [.22, .34], [.32, .44], [.32, .84]],
-      [[.5, .16], [.5, .3], [.6, .4], [.6, .84]],
-      [[.78, .16], [.78, .34], [.68, .44], [.68, .84]],
+      [[.1, .22], [.29, .22], [.41, .34], [.47, .34]],
+      [[.1, .34], [.25, .34], [.37, .46]],
+      [[.1, .72], [.3, .72], [.43, .59]],
+      [[.18, .88], [.18, .65], [.34, .49]],
+      [[.31, .9], [.31, .76], [.46, .61]],
+      [[.9, .18], [.72, .18], [.58, .32]],
+      [[.9, .32], [.78, .32], [.64, .46]],
+      [[.9, .65], [.73, .65], [.61, .53]],
+      [[.82, .9], [.82, .76], [.65, .59]],
+      [[.63, .9], [.63, .72], [.54, .63]],
     ]
-    for (const route of routes) {
+    routes.forEach((route, index) => {
+      context.strokeStyle = index % 3 === 0 ? '#050607' : '#171b1c'
+      context.lineWidth = size * (index % 4 === 0 ? .032 : .019)
       context.beginPath()
       route.forEach(([x, y], index) => index === 0 ? context.moveTo(x * size, y * size) : context.lineTo(x * size, y * size))
       context.stroke()
-    }
+    })
 
-    context.fillStyle = '#f1f2ee'
-    for (const [x, y] of [[.16, .22], [.84, .32], [.16, .5], [.84, .4], [.16, .78], [.84, .68], [.22, .16], [.32, .84], [.5, .16], [.6, .84], [.78, .16], [.68, .84]]) {
+    context.fillStyle = '#080a0b'
+    for (const [x, y] of [[.1, .22], [.1, .34], [.1, .72], [.18, .88], [.31, .9], [.9, .18], [.9, .32], [.9, .65], [.82, .9], [.63, .9]]) {
       context.beginPath()
-      context.arc(x * size, y * size, size * .028, 0, TAU)
+      context.arc(x * size, y * size, size * .024, 0, TAU)
       context.fill()
     }
 
-    context.strokeStyle = '#ffffff'
-    context.lineWidth = size * .022
+    context.fillStyle = '#07090a'
     context.beginPath()
-    context.arc(size / 2, size / 2, size * .14, 0, TAU)
-    context.stroke()
-    context.fillStyle = '#ffffff'
-    context.beginPath()
-    context.arc(size / 2, size / 2, size * .045, 0, TAU)
+    context.arc(size / 2, size / 2, size * .135, 0, TAU)
     context.fill()
-    context.font = `700 ${size * .065}px monospace`
+    context.strokeStyle = '#5c6664'
+    context.lineWidth = size * .016
+    context.beginPath()
+    context.arc(size / 2, size / 2, size * .18, 0, TAU)
+    context.stroke()
+    context.fillStyle = '#e8ebe7'
+    context.fillRect(size * .475, size * .475, size * .05, size * .05)
+
+    context.fillStyle = '#151919'
+    context.font = `700 ${size * .034}px monospace`
     context.textAlign = 'center'
-    context.fillText('CL // NODE 01', size / 2, size * .94)
+    context.fillText('CL PRIMARY // 07', size / 2, size * .91)
   })
 }
 
@@ -267,11 +302,24 @@ function createChamferedPlate(width: number, chamfer: number, depth: number, mat
   return new THREE.Mesh(geometry, material)
 }
 
-function createChipLine(points: Array<[number, number]>, z: number, material: THREE.Material) {
-  return new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(points.map(([x, y]) => new THREE.Vector3(x, y, z))),
-    material,
-  )
+function createRaisedChipTrace(points: Array<[number, number]>, z: number, material: THREE.Material, width = .032) {
+  const trace = new THREE.Group()
+  for (let index = 1; index < points.length; index += 1) {
+    const [fromX, fromY] = points[index - 1]
+    const [toX, toY] = points[index]
+    const length = Math.hypot(toX - fromX, toY - fromY)
+    const segment = new THREE.Mesh(new THREE.BoxGeometry(length, width, .028), material)
+    segment.position.set((fromX + toX) / 2, (fromY + toY) / 2, z)
+    segment.rotation.z = Math.atan2(toY - fromY, toX - fromX)
+    trace.add(segment)
+  }
+  points.forEach(([x, y]) => {
+    const joint = new THREE.Mesh(new THREE.CylinderGeometry(width * .62, width * .62, .03, 12), material)
+    joint.rotation.x = Math.PI / 2
+    joint.position.set(x, y, z + .002)
+    trace.add(joint)
+  })
+  return trace
 }
 
 function disposeObject(root: THREE.Object3D) {
@@ -461,12 +509,15 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
 
   const logoTexture = createLogoTexture(mobile ? 256 : 512)
   const chipFaceTexture = createChipFaceTexture(mobile ? 512 : 1024)
+  const chipFaceBumpTexture = chipFaceTexture.clone()
+  chipFaceBumpTexture.colorSpace = THREE.NoColorSpace
+  chipFaceBumpTexture.needsUpdate = true
   const node = new THREE.Group()
   node.visible = false
   const whiteMetal = new THREE.MeshPhysicalMaterial({ color: 0xf0f1ed, metalness: .82, roughness: .2, clearcoat: .85, clearcoatRoughness: .12 })
   const darkMetal = new THREE.MeshPhysicalMaterial({ color: 0x050607, metalness: .75, roughness: .3, clearcoat: .5 })
   const matteWhite = new THREE.MeshStandardMaterial({ color: 0xd8dad7, metalness: .36, roughness: .48 })
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x080a0b, transparent: true, opacity: .92 })
+  const traceMetal = new THREE.MeshPhysicalMaterial({ color: 0x050607, metalness: .78, roughness: .26, clearcoat: .7, clearcoatRoughness: .18 })
 
   const nodeCore = createChamferedPlate(2.5, .25, .44, whiteMetal)
   const rearPlate = createChamferedPlate(2.72, .3, .16, matteWhite)
@@ -477,26 +528,43 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   facePlate.position.z = .38
   const chipFace = new THREE.Mesh(
     new THREE.PlaneGeometry(1.48, 1.48),
-    new THREE.MeshStandardMaterial({ map: chipFaceTexture, emissive: 0x252827, emissiveIntensity: .16, metalness: .25, roughness: .44, transparent: true }),
+    new THREE.MeshPhysicalMaterial({
+      map: chipFaceTexture,
+      bumpMap: chipFaceBumpTexture,
+      bumpScale: .025,
+      metalness: .34,
+      roughness: .42,
+      clearcoat: .58,
+      clearcoatRoughness: .24,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+    }),
   )
-  chipFace.position.z = .425
+  chipFace.position.z = .48
   const outerEdge = new THREE.LineSegments(new THREE.EdgesGeometry(nodeCore.geometry), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .82 }))
   const innerEdge = new THREE.LineSegments(new THREE.EdgesGeometry(nodeInset.geometry), new THREE.LineBasicMaterial({ color: 0x070809, transparent: true, opacity: .95 }))
   innerEdge.position.copy(nodeInset.position)
 
-  const circuitLines = new THREE.Group()
+  const raisedCircuits = new THREE.Group()
   const routes: Array<Array<[number, number]>> = [
-    [[-.66, .6], [-.18, .6], [.02, .32], [.62, .32]],
-    [[-.7, .25], [-.36, .25], [-.02, -.06], [.7, -.06]],
-    [[-.7, -.18], [-.24, -.18], [.08, -.5], [.64, -.5]],
-    [[-.48, .7], [-.48, .38], [-.12, .02], [-.12, -.7]],
-    [[.38, .68], [.38, .38], [.02, .02], [.02, -.68]],
-    [[.68, .5], [.5, .5], [.22, .2], [.22, -.65]],
+    [[-.67, .48], [-.36, .48], [-.18, .3], [-.11, .3]],
+    [[-.67, .24], [-.42, .24], [-.23, .06]],
+    [[-.67, -.42], [-.38, -.42], [-.18, -.23]],
+    [[-.45, -.67], [-.45, -.46], [-.23, -.24]],
+    [[.67, .52], [.42, .52], [.22, .31], [.11, .31]],
+    [[.67, .22], [.47, .22], [.25, .02]],
+    [[.67, -.34], [.42, -.34], [.23, -.16]],
+    [[.46, -.67], [.46, -.48], [.23, -.25]],
   ]
-  for (const route of routes) circuitLines.add(createChipLine(route, .407, lineMaterial))
+  routes.forEach((route, index) => raisedCircuits.add(createRaisedChipTrace(route, .505, traceMetal, index % 3 === 0 ? .043 : .028)))
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(.17, .17, .045, 32), darkMetal)
   hub.rotation.x = Math.PI / 2
-  hub.position.set(0, 0, .43)
+  hub.position.set(0, 0, .515)
+  const hubRing = new THREE.Mesh(new THREE.TorusGeometry(.215, .022, 10, 40), whiteMetal)
+  hubRing.position.z = .535
+  const hubCore = new THREE.Mesh(new THREE.CylinderGeometry(.052, .052, .028, 20), whiteMetal)
+  hubCore.rotation.x = Math.PI / 2
+  hubCore.position.z = .548
 
   const fastenerGeometry = new THREE.CylinderGeometry(.075, .075, .055, 20)
   const fasteners = [[-.98, -.98], [.98, -.98], [-.98, .98], [.98, .98]]
@@ -509,12 +577,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
 
   const sweepMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })
   const sweep = new THREE.Mesh(new THREE.PlaneGeometry(.16, 1.82), sweepMaterial)
-  sweep.position.set(-.72, 0, .445)
+  sweep.position.set(-.72, 0, .565)
   sweep.rotation.z = -.42
   const nodeGlow = new THREE.PointLight(0xe9fff8, 0, 7, 2)
   nodeGlow.position.set(-.55, .7, 1.7)
 
-  node.add(rearPlate, nodeCore, nodeInset, facePlate, chipFace, outerEdge, innerEdge, circuitLines, hub, sweep, nodeGlow, ...fasteners)
+  node.add(rearPlate, nodeCore, nodeInset, facePlate, chipFace, outerEdge, innerEdge, raisedCircuits, hub, hubRing, hubCore, sweep, nodeGlow, ...fasteners)
   scene.add(node)
 
   let width = 1
