@@ -189,7 +189,7 @@ defineExpose({ zoomBy, goToday, rangeLabel })
         </TransitionGroup>
         <div class="cal-plans">
           <TransitionGroup name="tick">
-            <button v-for="item in planBars" :key="item.plan.id" class="cal-plan" :class="{ active: item.plan.id === selectedPlan, done: item.plan.progress >= 100 }" :data-plan="item.plan.id" :style="{ transform: `translateX(${item.left}px) skewX(-15deg)`, width: `${item.width}px`, top: `${item.lane * 22}px` }" :title="item.plan.name" type="button">
+            <button v-for="item in planBars" :key="item.plan.id" class="cal-plan" :class="{ active: item.plan.id === selectedPlan, done: item.plan.progress >= 100 }" :data-plan="item.plan.id" :style="{ transform: `translateX(${item.left}px)`, width: `${item.width}px`, top: `${item.lane * 22}px` }" :title="item.plan.name" type="button">
               <i :style="{ width: `${item.plan.progress}%` }" /><span v-if="item.width > 60">{{ item.plan.name }}</span>
             </button>
           </TransitionGroup>

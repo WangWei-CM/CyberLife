@@ -159,7 +159,7 @@
 .cal-count i.done { opacity: .35; box-shadow: none; }
 .cal-count i.overdue { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
 .cal-count b { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
-.cal-plans { position: absolute; left: 0; right: 0; top: 34px; height: 66px; pointer-events: none; }
+.cal-plans { position: absolute; left: 0; right: 0; top: 34px; height: 66px; pointer-events: none; transform: skewX(var(--future-skew)); transform-origin: center; }
 .cal-plan { position: absolute; left: 0; height: 18px; padding: 0; overflow: hidden; background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text); font-size: 10px; letter-spacing: .06em; text-align: left; white-space: nowrap; pointer-events: auto; will-change: transform; clip-path: none; transform-origin: center; transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out); }
 .cal-plan i { position: absolute; inset: 0; width: 0; background: color-mix(in srgb, var(--accent) 28%, transparent); transition: width var(--dur-slow) var(--ease-out); }
 .cal-plan span { position: relative; display: block; padding: 0 8px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; transform: skewX(15deg); transform-origin: center; }
