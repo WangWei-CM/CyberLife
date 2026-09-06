@@ -18,12 +18,14 @@
 .scanlines { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 255, 245, .03) 2px 3px); animation: scan-light var(--dur-slow) var(--ease-out) both; }
 
 /* ---------- 面板：全局平行四边形 + 连续霓虹轮廓 ---------- */
-.future-page { --future-slant: 28px; --future-slant-small: 12px; }
-.cyber-panel { position: relative; background: var(--surface); padding: 16px 18px; clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%); transition: box-shadow var(--dur-mid) var(--ease-out), background-color var(--dur-mid) var(--ease-out); }
-.cyber-panel.glass { background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.future-page { --future-edge-angle: 75deg; --future-skew: -15deg; --future-slant: 16px; --future-slant-small: 10px; }
+.cyber-panel { position: relative; z-index: 0; isolation: isolate; background: transparent; padding: 16px 18px; clip-path: none; transition: box-shadow var(--dur-mid) var(--ease-out), background-color var(--dur-mid) var(--ease-out); }
+.cyber-panel::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--surface); transform: skewX(var(--future-skew)); transform-origin: center; transition: background-color var(--dur-mid) var(--ease-out); }
+.cyber-panel.glass { background: transparent; }
+.cyber-panel.glass::after { background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .bracket::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: .7;
-  clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%);
+  clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center;
   box-shadow: inset 0 0 0 1px var(--accent);
   transition: opacity var(--dur-mid) var(--ease-out);
 }
@@ -35,9 +37,9 @@
 .cyber-heading::before { content: ""; width: 3px; height: 12px; background: currentColor; transform: skewX(-15deg); box-shadow: 0 0 8px currentColor; }
 
 /* ---------- 上部：3:7 左右分栏 ---------- */
-.future-top { --future-slant: clamp(48px, 5vw, 96px); display: grid; grid-template-columns: var(--list-width, 30%) 6px minmax(0, 1fr); gap: 0 10px; min-height: 260px; }
+.future-top { display: grid; grid-template-columns: var(--list-width, 30%) 6px minmax(0, 1fr); gap: 0 10px; min-height: 260px; }
 .future-top .divider-v { z-index: 2; overflow: visible; }
-.future-top .divider-v::before { border-radius: 0; transform: skewX(-9deg); transform-origin: center; }
+.future-top .divider-v::before { border-radius: 0; transform: skewX(var(--future-skew)); transform-origin: center; }
 .future-list { display: grid; align-content: start; gap: 10px; overflow: auto; }
 .plan-form { display: grid; gap: 8px; padding: 12px; background: var(--surface-2); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); }
 .plan-form .primary { justify-self: end; }
@@ -45,13 +47,13 @@
 .plan-card {
   display: block; width: calc(100% - 12px); margin: 0 6px; text-align: left;
   background: var(--surface-2); color: var(--text);
-  clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%);
+  clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center;
   transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 .plan-card:hover, .plan-card:focus-visible { box-shadow: 0 0 12px var(--accent-soft), 0 0 28px var(--accent-soft); background: var(--surface-3); }
 .plan-card.active { box-shadow: inset 3px 0 0 var(--accent), 0 0 14px var(--accent-soft), 0 0 32px var(--accent-soft); background: var(--accent-soft); }
 .plan-card.done { opacity: .6; }
-.plan-card-inner { display: grid; gap: 6px; padding: 12px 16px; }
+.plan-card-inner { display: grid; gap: 6px; padding: 12px 16px; transform: skewX(15deg); }
 .plan-name { font-size: 13px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plan-dates { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-dim); }
 .plan-dates em { font-style: normal; color: var(--text-faint); }
@@ -62,7 +64,7 @@
 .detail-body { display: grid; gap: 18px; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .detail-title-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.plan-cover { --future-slant: clamp(24px, 2.5vw, 48px); height: 160px; margin: -16px -18px 0; background: var(--surface-2) center / cover no-repeat; clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%); box-shadow: inset 0 -60px 60px -30px var(--surface); animation: scan-light var(--dur-slow) var(--ease-out) both; }
+.plan-cover { height: 160px; margin: -16px -18px 0; background: var(--surface-2) center / cover no-repeat; clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center; box-shadow: inset 0 -60px 60px -30px var(--surface); animation: scan-light var(--dur-slow) var(--ease-out) both; }
 .plan-icon { width: 44px; height: 44px; object-fit: cover; flex: 0 0 auto; clip-path: polygon(20% 0, 100% 0, 80% 100%, 0 100%); box-shadow: 0 0 12px var(--accent-soft); }
 .plan-icon.small { width: 20px; height: 20px; }
 .plan-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -98,13 +100,15 @@
 .glitch-text:hover::after { animation: glitch-2 var(--glitch-duration) infinite steps(1); }
 
 /* ---------- 下部：可缩放待办日历 ---------- */
-.future-bottom { --future-slant: clamp(32px, 3vw, 64px); display: grid; gap: 12px; }
+.future-bottom { display: grid; gap: 12px; }
 .zoom-calendar-wrap { display: grid; gap: 8px; }
-.zoom-toolbar { display: flex; align-items: center; gap: 14px; padding: 4px 8px; background: var(--surface-2); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); }
+.zoom-toolbar { display: flex; align-items: center; gap: 14px; padding: 4px 8px; background: var(--surface-2); transform: skewX(var(--future-skew)); transform-origin: center; }
+.zoom-toolbar > * { transform: skewX(15deg); }
 .zoom-scale { font-size: 11px; color: var(--text-faint); }
 .zoom-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .zoom-actions .icon-button { width: 30px; height: 30px; }
-.zoom-calendar { position: relative; height: 230px; overflow: hidden; cursor: grab; user-select: none; touch-action: none; outline: 0; background: linear-gradient(180deg, var(--surface-2), transparent); clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%); }
+.zoom-calendar { position: relative; z-index: 0; isolation: isolate; height: 230px; overflow: hidden; cursor: grab; user-select: none; touch-action: none; outline: 0; background: transparent; clip-path: none; }
+.zoom-calendar::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, var(--surface-2), transparent); transform: skewX(var(--future-skew)); transform-origin: center; }
 .zoom-calendar:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-soft); }
 .zoom-calendar.dragging { cursor: grabbing; }
 .cal-columns { position: absolute; inset: 0; }
@@ -144,15 +148,17 @@
 
 .day-panel { display: grid; gap: 10px; }
 .day-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
-.day-col { display: grid; gap: 8px; min-width: 0; padding: 10px 14px; background: color-mix(in srgb, var(--surface-2) 72%, transparent); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); }
+.day-col { display: grid; gap: 8px; min-width: 0; padding: 10px 14px; background: color-mix(in srgb, var(--surface-2) 72%, transparent); transform: skewX(var(--future-skew)); transform-origin: center; }
+.day-col > * { transform: skewX(15deg); }
 .day-tasks { display: grid; }
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .day-tasks li:last-child { box-shadow: none; }
 .day-tasks .task-row { padding: 8px 0; }
 .day-plan-list { display: grid; gap: 6px; }
-.day-plan { display: grid; gap: 5px; width: 100%; padding: 10px 12px; text-align: left; background: var(--surface-2); color: var(--text); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.day-plan { display: grid; gap: 5px; width: 100%; padding: 10px 12px; text-align: left; background: var(--surface-2); color: var(--text); clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center; transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.day-plan > * { transform: skewX(15deg); }
 .day-plan b { font-size: 12px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.day-plan:hover { background: var(--surface-3); box-shadow: 0 0 12px var(--accent-soft); transform: translateX(2px); }
+.day-plan:hover { background: var(--surface-3); box-shadow: 0 0 12px var(--accent-soft); transform: skewX(var(--future-skew)) translateX(2px); }
 .day-plan.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 .reader-future { min-height: 240px; display: grid; place-items: center; }
 
@@ -168,7 +174,6 @@
 .theme-future .metric { color: var(--accent); }
 
 @media (max-width: 900px) {
-  .future-top { --future-slant: 28px; }
   .future-top { grid-template-columns: 1fr; height: auto !important; }
   .future-top .divider-v { display: none; }
   .future-list { max-height: 360px; }
