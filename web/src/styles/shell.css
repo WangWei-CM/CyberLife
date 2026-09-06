@@ -189,17 +189,11 @@
     width: var(--side-dock-w); height: auto; padding: 15px 0 28px; align-items: flex-start;
   }
   .nav-left .topbar::before {
-    clip-path: polygon(110px 0, 110px 320px, 62px 400px, 62px 100%, 66px 100%, 66px 398px, 114px 318px, 114px 0);
+    clip-path: polygon(110px 0, 110px 250px, 62px 330px, 62px 100%, 66px 100%, 66px 328px, 114px 248px, 114px 0);
   }
   .nav-right .topbar::before {
-    clip-path: polygon(30px 0, 30px 320px, 78px 400px, 78px 100%, 74px 100%, 74px 398px, 26px 318px, 26px 0);
+    clip-path: polygon(30px 0, 30px 250px, 78px 330px, 78px 100%, 74px 100%, 74px 328px, 26px 248px, 26px 0);
   }
-  .nav-left .topbar::after, .nav-right .topbar::after {
-    content: ""; position: absolute; z-index: 0; top: 0; bottom: 0;
-    width: 1px; background: var(--divider);
-  }
-  .nav-left .topbar::after { right: 0; }
-  .nav-right .topbar::after { left: 0; }
   .nav-left .screen { margin-left: var(--side-dock-w); }
   .nav-right .screen { margin-left: 0; margin-right: var(--side-dock-w); }
   .nav-left .brand-lockup, .nav-right .brand-lockup {
@@ -231,6 +225,8 @@
   .nav-left .brand-mark:hover, .nav-left .brand-mark:focus-visible,
   .nav-right .brand-mark:hover, .nav-right .brand-mark:focus-visible { background: transparent; color: var(--accent-hover); filter: drop-shadow(0 0 8px var(--accent-glow)); outline: 0; }
   .nav-left .topbar-center, .nav-right .topbar-center { position: absolute; z-index: 2; margin: 0; }
+  .nav-left .music-control, .nav-right .music-control { flex-direction: column; gap: 4px; }
+  .nav-left .topbar-tools .text-button span, .nav-right .topbar-tools .text-button span { display: none; }
   .nav-left .topbar-tools { align-self: flex-start; margin: auto 0 0 4px; }
   .nav-right .topbar-tools { align-self: flex-end; margin: auto 4px 0 0; }
 }
