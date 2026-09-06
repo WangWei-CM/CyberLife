@@ -691,8 +691,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       sweep.position.x = -.75 + chipRevealProgress * 1.5
       sweepMaterial.opacity = .48 * Math.sin(chipRevealProgress * Math.PI)
       nodeGlow.intensity = 16 * Math.sin(chipRevealProgress * Math.PI)
-      const chipTiltProgress = easeInOutCubic((chipRevealProgress - .42) / .58)
-      node.rotation.set(-.16 * chipTiltProgress, .38 * chipTiltProgress, .08 * chipTiltProgress)
+      const faceTilt = Math.sin(chipRevealProgress * Math.PI)
+      node.rotation.set(
+        -.16 * faceTilt,
+        .24 * Math.sin(chipRevealProgress * TAU),
+        -.3 + chipRevealProgress * 1.25,
+      )
       camera.position.z = 8.75
       clouds.material.opacity = .78 + Math.sin(time * .0005) * .1
       cloudHighlight.material.opacity = .22 + Math.sin(time * .0007 + 1) * .06
