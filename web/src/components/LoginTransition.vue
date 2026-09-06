@@ -11,10 +11,15 @@ const emit = defineEmits<{
 }>()
 
 const canvas = ref<HTMLCanvasElement>()
+const greetingLine = ref<HTMLElement>()
+const quoteLine = ref<HTMLElement>()
+const greetingMeasure = ref<HTMLElement>()
+const quoteMeasure = ref<HTMLElement>()
 const sceneFailed = ref(false)
 const stage = ref<LoginTransitionStage>('orbital-login')
 const started = ref(false)
 const scrambling = ref(false)
+const scramblePositioned = ref(false)
 const greetingGlyphs = ref<ScrambleGlyph[]>([])
 const quoteGlyphs = ref<ScrambleGlyph[]>([])
 let scene: ReturnType<typeof createLoginTransition> | undefined
@@ -36,6 +41,10 @@ type ScrambleGlyph = {
   state: GlyphState
   startAt: number
   settleAt: number
+  left: number
+  top: number
+  width: number
+  height: number
 }
 
 function glyphKind(character: string): ScrambleGlyph['kind'] {
@@ -52,7 +61,39 @@ function createGlyphs(text: string, prefix: string): ScrambleGlyph[] {
     state: /\s/u.test(character) ? 'settled' : 'waiting',
     startAt: 0,
     settleAt: 0,
+    left: 0,
+    top: 0,
+    width: 0,
+    height: 0,
   }))
+}
+
+function positionGlyphs(glyphs: ScrambleGlyph[], line: HTMLElement | undefined, measure: HTMLElement | undefined) {
+  const textNode = measure?.firstChild
+  if (!line || !textNode) return
+
+  const lineRect = line.getBoundingClientRect()
+  const lineStyle = getComputedStyle(line)
+  const layoutWidth = Number.parseFloat(lineStyle.width)
+  const layoutHeight = Number.parseFloat(lineStyle.height)
+  const scaleX = layoutWidth > 0 ? lineRect.width / layoutWidth : 1
+  const scaleY = layoutHeight > 0 ? lineRect.height / layoutHeight : scaleX
+  const range = document.createRange()
+  let textOffset = 0
+
+  glyphs.forEach(glyph => {
+    const nextOffset = textOffset + glyph.final.length
+    range.setStart(textNode, textOffset)
+    range.setEnd(textNode, nextOffset)
+    const rect = range.getBoundingClientRect()
+    glyph.left = (rect.left - lineRect.left) / scaleX
+    glyph.top = (rect.top - lineRect.top) / scaleY
+    glyph.width = rect.width / scaleX
+    glyph.height = rect.height / scaleY
+    textOffset = nextOffset
+  })
+
+  range.detach()
 }
 
 function renderGlyphs(glyphs: ScrambleGlyph[], elapsed: number) {
@@ -71,7 +112,7 @@ function renderGlyphs(glyphs: ScrambleGlyph[], elapsed: number) {
   })
 }
 
-function startTextScramble() {
+async function startTextScramble() {
   if (scrambleFrame) cancelAnimationFrame(scrambleFrame)
 
   const greetingPlan = createGlyphs(props.greeting, 'greeting')
@@ -92,13 +133,21 @@ function startTextScramble() {
 
   if (reducedMotion()) {
     scrambling.value = false
+    scramblePositioned.value = false
     scrambleFrame = 0
     return
   }
 
   scrambling.value = true
+  scramblePositioned.value = false
   greetingGlyphs.value = renderGlyphs(greetingPlan, 0)
   quoteGlyphs.value = renderGlyphs(quotePlan, 0)
+  await nextTick()
+  positionGlyphs(greetingPlan, greetingLine.value, greetingMeasure.value)
+  positionGlyphs(quotePlan, quoteLine.value, quoteMeasure.value)
+  greetingGlyphs.value = renderGlyphs(greetingPlan, 0)
+  quoteGlyphs.value = renderGlyphs(quotePlan, 0)
+  scramblePositioned.value = true
   const startedAt = performance.now()
   let lastStepAt = -SCRAMBLE_STEP_MS
 
@@ -106,6 +155,7 @@ function startTextScramble() {
     const elapsed = now - startedAt
     if (elapsed >= SCRAMBLE_DURATION_MS) {
       scrambling.value = false
+      scramblePositioned.value = false
       scrambleFrame = 0
       return
     }
@@ -158,7 +208,7 @@ onMounted(async () => {
     scene = createLoginTransition(canvas.value, {
       onStage: value => {
         stage.value = value
-        if (value === 'node-reveal') startTextScramble()
+        if (value === 'node-reveal') void startTextScramble()
       },
       onComplete: fallback => {
         if (fallback) sceneFailed.value = true
@@ -212,25 +262,29 @@ defineExpose({
     </section>
     <div v-if="started" class="login-welcome" :class="{ scrambling }">
       <p class="login-node-caption">CYBERLIFE NODE / PRIMARY LIFE SYSTEM</p>
-      <p class="login-greeting" :aria-label="greeting">
+      <p ref="greetingLine" class="login-greeting" :aria-label="greeting">
         <template v-if="scrambling">
+          <span ref="greetingMeasure" class="login-scramble-measure" aria-hidden="true">{{ greeting }}</span>
           <span
             v-for="glyph in greetingGlyphs"
             :key="glyph.id"
             class="login-scramble-glyph"
             :class="[`is-${glyph.kind}`, `is-${glyph.state}`]"
+            :style="{ left: `${glyph.left}px`, top: `${glyph.top}px`, width: `${glyph.width}px`, height: `${glyph.height}px`, visibility: scramblePositioned ? 'visible' : 'hidden' }"
             aria-hidden="true"
           >{{ glyph.value }}</span>
         </template>
         <template v-else>{{ greeting }}</template>
       </p>
-      <p class="login-quote" :aria-label="quote">
+      <p ref="quoteLine" class="login-quote" :aria-label="quote">
         <template v-if="scrambling">
+          <span ref="quoteMeasure" class="login-scramble-measure" aria-hidden="true">{{ quote }}</span>
           <span
             v-for="glyph in quoteGlyphs"
             :key="glyph.id"
             class="login-scramble-glyph"
             :class="[`is-${glyph.kind}`, `is-${glyph.state}`]"
+            :style="{ left: `${glyph.left}px`, top: `${glyph.top}px`, width: `${glyph.width}px`, height: `${glyph.height}px`, visibility: scramblePositioned ? 'visible' : 'hidden' }"
             aria-hidden="true"
           >{{ glyph.value }}</span>
         </template>
