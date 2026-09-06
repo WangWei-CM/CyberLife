@@ -26,7 +26,7 @@
   text-align: left; opacity: 0; pointer-events: none; will-change: transform, opacity; transform-style: preserve-3d; transform-origin: right center;
   font-family: "Source Han Sans SC Heavy", "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", sans-serif; font-synthesis: weight;
   transform: translate3d(calc(var(--node-screen-x, 50vw) - 100% - clamp(72px, 6vw, 150px) + var(--node-copy-exit-x, 0px)), calc(var(--node-screen-y, 50vh) - 50% + clamp(48px, 7vh, 96px) + var(--node-copy-exit-y, 0px)), 0)
-    perspective(900px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1));
+    scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1));
   transition: opacity .28s var(--ease-out);
 }
 .login-transition.node-reveal .login-welcome { opacity: var(--node-copy-opacity, 0); }
@@ -72,7 +72,7 @@
   .login-interface { width: min(390px, calc(100vw - 32px)); margin: -12vh 16px 0; }
   .login-brand-image { width: min(360px, 100%); }
   .login-form-orbital { width: min(330px, 100%); }
-  .login-welcome { width: calc(100vw - 32px); justify-items: center; gap: 9px; text-align: center; transform-origin: center top; transform: translate3d(calc(var(--node-screen-x, 50vw) - 50% + var(--node-copy-exit-x, 0px)), calc(var(--node-screen-y, 50vh) + clamp(92px, 15vh, 150px) + var(--node-copy-exit-y, 0px)), 0) perspective(700px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1)); }
+  .login-welcome { width: calc(100vw - 32px); justify-items: center; gap: 9px; text-align: center; transform-origin: center top; transform: translate3d(calc(var(--node-screen-x, 50vw) - 50% + var(--node-copy-exit-x, 0px)), calc(var(--node-screen-y, 50vh) + clamp(92px, 15vh, 150px) + var(--node-copy-exit-y, 0px)), 0) scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1)); }
   .login-node-caption { font-size: 8px; }
   .login-greeting { font-size: clamp(28px, 8vw, 42px); }
   .login-quote { font-size: clamp(15px, 4.2vw, 19px); line-height: 1.55; }

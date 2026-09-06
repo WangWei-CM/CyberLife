@@ -771,14 +771,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
         // The copy exits as a flat graphic and no longer inherits the shrinking,
         // rotating chip transform, so it can grow immediately without a dip.
         transitionRoot.style.setProperty('--node-copy-scale', '1.02')
-        transitionRoot.style.setProperty('--node-copy-rotate-x', '0deg')
-        transitionRoot.style.setProperty('--node-copy-rotate-y', '0deg')
-        transitionRoot.style.setProperty('--node-copy-rotate-z', '0deg')
       } else {
         transitionRoot.style.setProperty('--node-copy-scale', String(Math.min(1.24, .9 + node.scale.x * .12)))
-        transitionRoot.style.setProperty('--node-copy-rotate-x', `${THREE.MathUtils.radToDeg(node.rotation.x) * .13}deg`)
-        transitionRoot.style.setProperty('--node-copy-rotate-y', `${Math.sin(node.rotation.y) * 4.5}deg`)
-        transitionRoot.style.setProperty('--node-copy-rotate-z', `${Math.sin(node.rotation.z) * 2.5}deg`)
       }
     }
     renderer.render(scene, camera)
@@ -802,9 +796,6 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       transitionRoot?.style.removeProperty('--node-screen-x')
       transitionRoot?.style.removeProperty('--node-screen-y')
       transitionRoot?.style.removeProperty('--node-copy-scale')
-      transitionRoot?.style.removeProperty('--node-copy-rotate-x')
-      transitionRoot?.style.removeProperty('--node-copy-rotate-y')
-      transitionRoot?.style.removeProperty('--node-copy-rotate-z')
       transitionRoot?.style.removeProperty('--node-copy-opacity')
       transitionRoot?.style.removeProperty('--node-copy-exit-x')
       transitionRoot?.style.removeProperty('--node-copy-exit-y')
