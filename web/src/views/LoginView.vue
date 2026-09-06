@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../api/client'
 import LoginTransition from '../components/LoginTransition.vue'
 import { beijingNow } from '../lib/dates'
@@ -30,7 +30,22 @@ function greetingForMoment(name: string) {
 const busy = ref(false)
 const authenticatedActor = ref<Awaited<ReturnType<typeof api.keyLogin>>['actor']>()
 const transition = ref<InstanceType<typeof LoginTransition>>()
+const underlayFrame = ref<HTMLIFrameElement>()
 const underlayReady = ref(false)
+const underlayParams = new URLSearchParams({
+  'login-underlay': 'true',
+  'underlay-screen': sessionStorage.getItem('cyberlife-underlay-screen') || 'now',
+  'underlay-appearance': sessionStorage.getItem('cyberlife-underlay-appearance') || 'light',
+})
+const underlaySrc = `/?${underlayParams.toString()}`
+
+function onUnderlayMessage(event: MessageEvent) {
+  if (event.origin !== window.location.origin || event.source !== underlayFrame.value?.contentWindow) return
+  if ((event.data as { type?: string } | null)?.type === 'cyberlife-underlay-ready') underlayReady.value = true
+}
+
+onMounted(() => window.addEventListener('message', onUnderlayMessage))
+onBeforeUnmount(() => window.removeEventListener('message', onUnderlayMessage))
 
 async function waitForUnderlay() {
   const deadline = performance.now() + 1_600
@@ -71,12 +86,12 @@ function completeTransition() {
   <div class="login-composite">
     <iframe
       v-if="authenticatedActor"
+      ref="underlayFrame"
       class="login-underlay"
-      src="/"
+      :src="underlaySrc"
       title=""
       tabindex="-1"
       aria-hidden="true"
-      @load="underlayReady = true"
     />
     <LoginTransition
       ref="transition"

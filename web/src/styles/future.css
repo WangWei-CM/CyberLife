@@ -18,7 +18,7 @@
 .scanlines { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 255, 245, .03) 2px 3px); animation: scan-light var(--dur-slow) var(--ease-out) both; }
 
 /* ---------- 面板：全局平行四边形 + 连续霓虹轮廓 ---------- */
-.future-page { --future-edge-angle: 75deg; --future-skew: -15deg; --future-slant: 16px; --future-slant-small: 10px; }
+.future-page { --future-edge-angle: 75deg; --future-skew: -15deg; --future-slant: 16px; --future-slant-small: 10px; --future-frame-safe: clamp(30px, 14vh, 160px); }
 .cyber-panel { position: relative; z-index: 0; isolation: isolate; background: var(--surface); padding: 16px 18px; clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center; transition: box-shadow var(--dur-mid) var(--ease-out), background-color var(--dur-mid) var(--ease-out); }
 .cyber-panel > * { transform: skewX(15deg); }
 .cyber-panel.glass { background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
@@ -206,9 +206,9 @@
   .future-page { display: block; height: 100%; overflow: hidden; }
   .future-page .page-error { position: absolute; z-index: 6; top: var(--page-pad); left: var(--page-inline-pad); right: var(--page-inline-pad); }
   .future-top { min-height: 0; }
-  .plan-dialog { height: auto !important; grid-template-columns: var(--list-width, 30%) 6px minmax(0, 1fr); padding: 18px 20px; }
+  .plan-dialog { inset: 8px var(--future-frame-safe); height: auto !important; grid-template-columns: var(--list-width, 30%) 6px minmax(0, 1fr); padding: 18px 20px; }
   .plan-dialog .future-list, .plan-dialog .future-detail { min-height: 0; overflow: auto; }
-  .future-bottom { height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
+  .future-bottom { height: 100%; min-height: 0; margin-inline: var(--future-frame-safe); grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
   .future-bottom > .zoom-calendar-wrap { min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
   .future-bottom .zoom-calendar { height: auto; min-height: 0; }
   .future-bottom .day-panel { max-height: min(34vh, 260px); overflow: auto; }
