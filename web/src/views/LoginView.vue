@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import { api } from '../api/client'
 import LoginTransition from '../components/LoginTransition.vue'
 import { beijingNow } from '../lib/dates'
+import { wait } from '../lib/motion'
 
 const emit = defineEmits<{ authenticated: [actor: Awaited<ReturnType<typeof api.keyLogin>>['actor']] }>()
 const credential = ref('')
@@ -29,6 +30,13 @@ function greetingForMoment(name: string) {
 const busy = ref(false)
 const authenticatedActor = ref<Awaited<ReturnType<typeof api.keyLogin>>['actor']>()
 const transition = ref<InstanceType<typeof LoginTransition>>()
+const underlayReady = ref(false)
+
+async function waitForUnderlay() {
+  const deadline = performance.now() + 1_600
+  while (!underlayReady.value && performance.now() < deadline) await wait(50)
+  if (underlayReady.value) await wait(100)
+}
 
 async function submit() {
   const key = credential.value.trim()
@@ -43,6 +51,7 @@ async function submit() {
     greeting.value = greetingForMoment(result.actor.nickname)
     quote.value = quotes[Math.floor(Math.random() * quotes.length)]
     await nextTick()
+    await waitForUnderlay()
     await transition.value?.beginTransition()
   } catch (cause) {
     transition.value?.setStage('orbital-login')
@@ -67,6 +76,7 @@ function completeTransition() {
       title=""
       tabindex="-1"
       aria-hidden="true"
+      @load="underlayReady = true"
     />
     <LoginTransition
       ref="transition"

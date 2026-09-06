@@ -648,7 +648,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       material.opacity = (.16 + index * .035) + Math.sin(time * (.00034 + index * .00004) + index) * .025
     })
     if (stage === 'node-reveal') {
-      renderer.setClearColor(0x02060b, 1)
+      renderer.setClearColor(0x02060b, 1 - clamp(revealProgress / .18))
       node.visible = true
       cloudField.visible = true
       cloudFieldLayers.forEach((layer, index) => {

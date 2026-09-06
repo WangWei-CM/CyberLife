@@ -6,21 +6,21 @@
   position: relative; min-height: 100vh; overflow: hidden; display: grid; place-items: center;
   isolation: isolate; background: #02050a; color: #ecfffb;
   --login-accent: #76ded2; --login-muted: rgba(202, 231, 229, .62); --login-line: rgba(118, 222, 210, .34);
-  transition: background-color 1.45s var(--ease-out);
+  transition: background-color .32s var(--ease-out);
 }
-.login-transition.node-fall, .login-transition.page-enter { background-color: transparent; }
+.login-transition.node-reveal, .login-transition.node-fall, .login-transition.page-enter { background-color: transparent; }
 .login-canvas, .login-scanlines, .login-vignette { position: absolute; inset: 0; width: 100%; height: 100%; }
 .login-canvas { z-index: -3; display: block; }
-.login-scanlines { z-index: -2; pointer-events: none; opacity: .18; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(190, 255, 244, .04) 4px, transparent 5px); mix-blend-mode: screen; transition: opacity 1.3s var(--ease-out); }
-.login-vignette { z-index: -1; pointer-events: none; opacity: 1; background: radial-gradient(ellipse at center, transparent 18%, rgba(0, 3, 8, .16) 58%, rgba(0, 2, 5, .82) 100%); transition: opacity 1.3s var(--ease-out); }
-.login-transition.node-fall .login-scanlines, .login-transition.node-fall .login-vignette, .login-transition.page-enter .login-scanlines, .login-transition.page-enter .login-vignette { opacity: 0; }
+.login-scanlines { z-index: -2; pointer-events: none; opacity: .18; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(190, 255, 244, .04) 4px, transparent 5px); mix-blend-mode: screen; transition: opacity .4s var(--ease-out); }
+.login-vignette { z-index: -1; pointer-events: none; opacity: 1; background: radial-gradient(ellipse at center, transparent 18%, rgba(0, 3, 8, .16) 58%, rgba(0, 2, 5, .82) 100%); transition: opacity .4s var(--ease-out); }
+.login-transition.node-reveal .login-scanlines, .login-transition.node-reveal .login-vignette, .login-transition.node-fall .login-scanlines, .login-transition.node-fall .login-vignette, .login-transition.page-enter .login-scanlines, .login-transition.page-enter .login-vignette { opacity: 0; }
 .login-interface {
   position: relative; z-index: 2; width: min(820px, calc(100vw - 40px)); display: grid; justify-items: start; gap: 14px;
   margin: -8vh auto 0 max(32px, 8vw); text-align: left; text-shadow: 0 2px 18px rgba(0, 0, 0, .65);
   transition: opacity .55s var(--ease-out), transform .8s var(--ease-out);
 }
 .login-transition.transition-started .login-interface { transform: translateY(-3vh) scale(.94); opacity: .28; pointer-events: none; }
-.login-transition.node-fall .login-interface, .login-transition.page-enter .login-interface { opacity: 0; }
+.login-transition.node-reveal .login-interface, .login-transition.node-fall .login-interface, .login-transition.page-enter .login-interface { opacity: 0; }
 .login-welcome {
   position: absolute; z-index: 3; top: 0; left: 0; width: min(620px, 38vw); display: grid; justify-items: start; gap: 14px;
   text-align: left; opacity: 0; pointer-events: none; will-change: transform, opacity; transform-style: preserve-3d; transform-origin: right center;
