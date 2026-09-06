@@ -18,6 +18,7 @@ const fetched = ref(new Set<string>())
 const selectedPlanId = ref('')
 const selectedDate = ref(today)
 const editMode = ref(false)
+const planDialogOpen = ref(false)
 const progress = ref(0)
 const progressDate = ref(today)
 const edit = ref({ name: '', startDate: today, endDate: today, intro: '' })
@@ -79,6 +80,8 @@ async function ensureTasks(from: string, to: string) {
 function onRange(from: string, to: string) { ensureTasks(from, to) }
 function choose(plan: Plan) { selectedPlanId.value = plan.id; progress.value = plan.progress; progressDate.value = today; editMode.value = false; edit.value = { name: plan.name, startDate: plan.startDate, endDate: plan.endDate, intro: plan.intro } }
 function choosePlanById(id: string) { const plan = plans.value.find(item => item.id === id); if (plan) choose(plan) }
+function openPlanDialog() { if (!selectedPlan.value && sortedPlans.value.length) choose(sortedPlans.value.find(isOngoing) ?? sortedPlans.value[0]); planDialogOpen.value = true }
+function closePlanDialog() { planDialogOpen.value = false; editMode.value = false }
 function replacePlan(next: Plan) { plans.value = plans.value.map(plan => plan.id === next.id ? { ...plan, ...next } : plan) }
 async function createPlan() {
   if (!form.value.name.trim() || busy.value) return
@@ -165,7 +168,8 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
   <main class="page future-page" :style="{ '--future-top-height': `${topHeight}px` }">
     <div class="scanlines" aria-hidden="true" />
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
-    <section class="future-top" :style="{ '--list-width': `${listWidth}%`, height: `${topHeight}px` }">
+    <section v-if="planDialogOpen" class="future-top plan-dialog cyber-panel bracket" :style="{ '--list-width': `${listWidth}%`, height: `${topHeight}px` }" role="dialog" aria-modal="true" aria-label="规划详情与编辑">
+      <button class="icon-button plan-dialog-close" aria-label="关闭规划面板" @click="closePlanDialog"><AppIcon name="close" :size="16" /></button>
       <aside v-stagger class="future-list cyber-panel bracket">
         <header class="cyber-head"><span class="cyber-heading"><AppIcon name="target" :size="14" />规划</span><small class="mono faint">{{ sortedPlans.filter(isOngoing).length }} 进行中 / {{ plans.length }}</small><button v-if="isWriter" class="text-button" :aria-expanded="creating" @click="creating = !creating"><AppIcon :name="creating ? 'close' : 'plus'" :size="14" />{{ creating ? '取消' : '新建' }}</button></header>
         <Transition name="fade-slide">
@@ -242,7 +246,6 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
         </Transition>
       </section>
     </section>
-    <div class="divider-h" :class="{ dragging: dragging === 'row' }" role="separator" aria-orientation="horizontal" @pointerdown="startResize('row', $event)" />
     <section class="future-bottom cyber-panel bracket">
       <ZoomCalendar v-model:selected="selectedDate" :tasks="taskList" :plans="plans" :selected-plan="selectedPlanId" :today="today" @range="onRange" @select-plan="choosePlanById" />
       <Transition name="fade-slide" mode="out-in">
@@ -257,7 +260,7 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
               <EmptyState v-else icon="check" :text="selectedDate === today ? '今天还没有待办' : '这一天还没有待办'" compact />
             </div>
             <div class="day-col day-plans">
-              <span class="cyber-heading">当天进行中的规划</span>
+              <header class="day-plan-head"><span class="cyber-heading">当天进行中的规划</span><button class="icon-button plan-editor-trigger" aria-label="查看或编辑规划" title="查看或编辑规划" @click="openPlanDialog"><AppIcon name="edit" :size="14" /></button></header>
               <ul v-if="dayPlans.length" class="day-plan-list">
                 <li v-for="plan in dayPlans" :key="plan.id"><button class="day-plan" :class="{ active: plan.id === selectedPlanId }" @click="choose(plan)"><b>{{ plan.name }}</b><ProgressBar :value="plan.timeProgress" :height="3" /><ProgressBar :value="plan.progress" tone="accent-2" :height="3" /></button></li>
               </ul>
