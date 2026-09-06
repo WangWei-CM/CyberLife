@@ -112,7 +112,7 @@
 /* ---------- 下部：可缩放待办日历 ---------- */
 .future-bottom { display: grid; gap: 12px; }
 .zoom-calendar-wrap { display: grid; gap: 8px; }
-.zoom-toolbar { display: flex; align-items: center; gap: 14px; padding: 4px 8px; background: var(--surface-2); transform: skewX(var(--future-skew)); transform-origin: center; }
+.zoom-toolbar { display: flex; align-items: center; gap: 14px; padding: 4px 8px 4px clamp(38px, 4vh, 56px); background: var(--surface-2); transform: skewX(var(--future-skew)); transform-origin: center; }
 .zoom-toolbar > * { transform: skewX(15deg); }
 .zoom-scale { font-size: 11px; color: var(--text-faint); }
 .zoom-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
