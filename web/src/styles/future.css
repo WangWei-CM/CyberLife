@@ -17,17 +17,14 @@
 }
 .scanlines { position: fixed; inset: 0; z-index: 5; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0, 255, 245, .03) 2px 3px); animation: scan-light var(--dur-slow) var(--ease-out) both; }
 
-/* ---------- 面板：切角 + L 形角标（细 hairline，非连续边框） ---------- */
-.cyber-panel { position: relative; background: var(--surface); padding: 16px 18px; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px)); transition: box-shadow var(--dur-mid) var(--ease-out), background-color var(--dur-mid) var(--ease-out); }
+/* ---------- 面板：全局平行四边形 + 连续霓虹轮廓 ---------- */
+.future-page { --future-slant: 18px; --future-slant-small: 10px; }
+.cyber-panel { position: relative; background: var(--surface); padding: 16px 18px; clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%); transition: box-shadow var(--dur-mid) var(--ease-out), background-color var(--dur-mid) var(--ease-out); }
 .cyber-panel.glass { background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
 .bracket::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: .7;
-  background:
-    conic-gradient(from 90deg at 1px 1px, var(--accent) 90deg, transparent 0) 0 0 / 14px 14px,
-    conic-gradient(from 180deg at calc(100% - 1px) 1px, var(--accent) 90deg, transparent 0) 100% 0 / 14px 14px,
-    conic-gradient(from 0deg at 1px calc(100% - 1px), var(--accent) 90deg, transparent 0) 0 100% / 14px 14px,
-    conic-gradient(from 270deg at calc(100% - 1px) calc(100% - 1px), var(--accent) 90deg, transparent 0) 100% 100% / 14px 14px;
-  background-repeat: no-repeat;
+  clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px var(--accent);
   transition: opacity var(--dur-mid) var(--ease-out);
 }
 .cyber-panel:hover.bracket::before { opacity: 1; }
@@ -40,19 +37,19 @@
 /* ---------- 上部：3:7 左右分栏 ---------- */
 .future-top { display: grid; grid-template-columns: var(--list-width, 30%) 6px minmax(0, 1fr); gap: 0 10px; min-height: 260px; }
 .future-list { display: grid; align-content: start; gap: 10px; overflow: auto; }
-.plan-form { display: grid; gap: 8px; padding: 12px; background: var(--surface-2); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+.plan-form { display: grid; gap: 8px; padding: 12px; background: var(--surface-2); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); }
 .plan-form .primary { justify-self: end; }
 .plan-list { display: grid; gap: 8px; position: relative; }
 .plan-card {
   display: block; width: calc(100% - 12px); margin: 0 6px; text-align: left;
   background: var(--surface-2); color: var(--text);
-  transform: skewX(-12deg); /* 竖边内倾 ≈ 78°，平行四边形 */
+  clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%);
   transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
 .plan-card:hover, .plan-card:focus-visible { box-shadow: 0 0 12px var(--accent-soft), 0 0 28px var(--accent-soft); background: var(--surface-3); }
 .plan-card.active { box-shadow: inset 3px 0 0 var(--accent), 0 0 14px var(--accent-soft), 0 0 32px var(--accent-soft); background: var(--accent-soft); }
 .plan-card.done { opacity: .6; }
-.plan-card-inner { display: grid; gap: 6px; padding: 12px 16px; transform: skewX(12deg); }
+.plan-card-inner { display: grid; gap: 6px; padding: 12px 16px; }
 .plan-name { font-size: 13px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plan-dates { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-dim); }
 .plan-dates em { font-style: normal; color: var(--text-faint); }
@@ -63,8 +60,8 @@
 .detail-body { display: grid; gap: 18px; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .detail-title-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.plan-cover { height: 160px; margin: -16px -18px 0; background: var(--surface-2) center / cover no-repeat; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); box-shadow: inset 0 -60px 60px -30px var(--surface); animation: scan-light var(--dur-slow) var(--ease-out) both; }
-.plan-icon { width: 44px; height: 44px; object-fit: cover; flex: 0 0 auto; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); box-shadow: 0 0 12px var(--accent-soft); }
+.plan-cover { height: 160px; margin: -16px -18px 0; background: var(--surface-2) center / cover no-repeat; clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%); box-shadow: inset 0 -60px 60px -30px var(--surface); animation: scan-light var(--dur-slow) var(--ease-out) both; }
+.plan-icon { width: 44px; height: 44px; object-fit: cover; flex: 0 0 auto; clip-path: polygon(20% 0, 100% 0, 80% 100%, 0 100%); box-shadow: 0 0 12px var(--accent-soft); }
 .plan-icon.small { width: 20px; height: 20px; }
 .plan-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .asset-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
@@ -84,7 +81,7 @@
 .dual-progress { display: grid; gap: 10px; }
 .dual-row { display: grid; grid-template-columns: 96px 1fr 48px; align-items: center; gap: 12px; }
 .dual-row b { text-align: right; font-size: 13px; color: var(--text); }
-.progress-form { display: grid; gap: 10px; padding: 14px; background: var(--surface-2); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+.progress-form { display: grid; gap: 10px; padding: 14px; background: var(--surface-2); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); }
 .detail-intro .md-editor { border: 0 !important; background: transparent !important; min-height: 0; }
 .detail-intro .md-editor-preview-wrapper { padding: 0 !important; }
 .detail-intro .md-editor-preview { font-family: var(--font-mono) !important; font-size: 13px !important; }
@@ -101,15 +98,15 @@
 /* ---------- 下部：可缩放待办日历 ---------- */
 .future-bottom { display: grid; gap: 12px; }
 .zoom-calendar-wrap { display: grid; gap: 8px; }
-.zoom-toolbar { display: flex; align-items: center; gap: 14px; }
+.zoom-toolbar { display: flex; align-items: center; gap: 14px; padding: 4px 8px; background: var(--surface-2); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); }
 .zoom-scale { font-size: 11px; color: var(--text-faint); }
 .zoom-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .zoom-actions .icon-button { width: 30px; height: 30px; }
-.zoom-calendar { position: relative; height: 230px; overflow: hidden; cursor: grab; user-select: none; touch-action: none; outline: 0; background: linear-gradient(180deg, var(--surface-2), transparent); }
+.zoom-calendar { position: relative; height: 230px; overflow: hidden; cursor: grab; user-select: none; touch-action: none; outline: 0; background: linear-gradient(180deg, var(--surface-2), transparent); clip-path: polygon(var(--future-slant) 0, 100% 0, calc(100% - var(--future-slant)) 100%, 0 100%); }
 .zoom-calendar:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-soft); }
 .zoom-calendar.dragging { cursor: grabbing; }
 .cal-columns { position: absolute; inset: 0; }
-.cal-col { position: absolute; top: 0; bottom: 0; left: 0; display: grid; grid-template-rows: auto 1fr; box-shadow: inset 1px 0 0 var(--divider); will-change: transform; transition: background var(--dur-mid) var(--ease-out); }
+.cal-col { position: absolute; top: 0; bottom: 0; left: 0; display: grid; grid-template-rows: auto 1fr; box-shadow: inset 1px 0 0 var(--divider); will-change: transform; transition: background var(--dur-mid) var(--ease-out); clip-path: polygon(7% 0, 100% 0, 93% 100%, 0 100%); }
 .cal-col.weekend { background: rgba(255, 255, 255, .015); }
 .cal-col.past { opacity: .55; }
 .cal-col.today { background: var(--accent-soft); box-shadow: inset 1px 0 0 var(--accent), inset -1px 0 0 var(--accent); }
@@ -121,7 +118,7 @@
 .col-year .cal-label b { font-size: 14px; letter-spacing: .16em; }
 .cal-col.today .cal-label b { color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); }
 .cal-events { display: grid; align-content: start; gap: 3px; padding: 68px 3px 6px; overflow: hidden; }
-.cal-event { display: block; padding: 2px 6px; font-size: 11px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); color: var(--text); transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
+.cal-event { display: block; padding: 2px 8px; font-size: 11px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); color: var(--text); clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
 .cal-event:hover { transform: translateX(2px); box-shadow: inset 2px 0 0 var(--accent), 0 0 10px var(--accent-soft); }
 .cal-event.high { box-shadow: inset 2px 0 0 var(--warn); }
 .cal-event.done { opacity: .4; text-decoration: line-through; }
@@ -134,24 +131,24 @@
 .cal-count i.overdue { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
 .cal-count b { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
 .cal-plans { position: absolute; left: 0; right: 0; top: 34px; height: 66px; pointer-events: none; }
-.cal-plan { position: absolute; left: 0; height: 18px; padding: 0; overflow: hidden; background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text); font-size: 10px; letter-spacing: .06em; text-align: left; white-space: nowrap; pointer-events: auto; will-change: transform; transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out); }
+.cal-plan { position: absolute; left: 0; height: 18px; padding: 0; overflow: hidden; background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text); font-size: 10px; letter-spacing: .06em; text-align: left; white-space: nowrap; pointer-events: auto; will-change: transform; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out); }
 .cal-plan i { position: absolute; inset: 0; width: 0; background: color-mix(in srgb, var(--accent) 28%, transparent); transition: width var(--dur-slow) var(--ease-out); }
 .cal-plan span { position: relative; display: block; padding: 0 8px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
 .cal-plan:hover, .cal-plan.active { box-shadow: inset 0 0 0 1px var(--accent), 0 0 12px var(--accent-soft); background: var(--accent-soft); }
 .cal-plan.done { opacity: .45; }
-.cal-selected { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent-2-soft); box-shadow: inset 0 -2px 0 var(--accent-2); pointer-events: none; transition: transform var(--dur-mid) var(--ease-out), width var(--dur-mid) var(--ease-out); }
+.cal-selected { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent-2-soft); box-shadow: inset 0 -2px 0 var(--accent-2); pointer-events: none; clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%); transition: transform var(--dur-mid) var(--ease-out), width var(--dur-mid) var(--ease-out); }
 .zoom-calendar.zooming .cal-selected, .zoom-calendar.dragging .cal-selected { transition: none; }
 .cal-today { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); pointer-events: none; }
 
 .day-panel { display: grid; gap: 10px; }
 .day-columns { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 20px; align-items: start; }
-.day-col { display: grid; gap: 8px; min-width: 0; }
+.day-col { display: grid; gap: 8px; min-width: 0; padding: 10px 14px; background: color-mix(in srgb, var(--surface-2) 72%, transparent); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); }
 .day-tasks { display: grid; }
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .day-tasks li:last-child { box-shadow: none; }
 .day-tasks .task-row { padding: 8px 0; }
 .day-plan-list { display: grid; gap: 6px; }
-.day-plan { display: grid; gap: 5px; width: 100%; padding: 10px 12px; text-align: left; background: var(--surface-2); color: var(--text); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.day-plan { display: grid; gap: 5px; width: 100%; padding: 10px 12px; text-align: left; background: var(--surface-2); color: var(--text); clip-path: polygon(var(--future-slant-small) 0, 100% 0, calc(100% - var(--future-slant-small)) 100%, 0 100%); transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
 .day-plan b { font-size: 12px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .day-plan:hover { background: var(--surface-3); box-shadow: 0 0 12px var(--accent-soft); transform: translateX(2px); }
 .day-plan.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
@@ -159,6 +156,8 @@
 
 /* ---------- 未来页：全 UI 等宽、零圆角、发光代替阴影 ---------- */
 .theme-future .card, .theme-future .btn, .theme-future .primary, .theme-future input, .theme-future textarea, .theme-future select, .theme-future .text-button, .theme-future .icon-button { border-radius: 0; }
+.theme-future .future-page .btn, .theme-future .future-page .primary, .theme-future .future-page input, .theme-future .future-page textarea, .theme-future .future-page select, .theme-future .future-page .text-button, .theme-future .future-page .icon-button { clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.theme-future .future-page .progress, .theme-future .future-page .progress > i { clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
 .theme-future .primary { background: var(--accent); color: var(--bg); letter-spacing: .12em; text-transform: uppercase; font-size: 12px; }
 .theme-future .primary:hover { box-shadow: 0 0 18px var(--accent-glow); }
 .theme-future input:focus, .theme-future textarea:focus, .theme-future select:focus { box-shadow: 0 0 0 1px var(--accent), 0 0 12px var(--accent-soft); }
