@@ -21,10 +21,24 @@ type Screen = 'past' | 'now' | 'future' | 'settings'
 type NavPosition = 'top' | 'left' | 'right' | 'bottom'
 export type Appearance = 'dark' | 'light' | 'auto'
 
+const startupParams = new URLSearchParams(window.location.search)
+const requestedUnderlayScreen = startupParams.get('underlay-screen')
+const requestedUnderlayAppearance = startupParams.get('underlay-appearance')
+const isLoginUnderlay = startupParams.get('login-underlay') === 'true'
+const initialScreen: Screen = requestedUnderlayScreen === 'past'
+  || requestedUnderlayScreen === 'future'
+  || requestedUnderlayScreen === 'settings'
+  || requestedUnderlayScreen === 'now'
+  ? requestedUnderlayScreen
+  : 'now'
+const initialAppearance: Appearance = requestedUnderlayAppearance === 'dark' || requestedUnderlayAppearance === 'light'
+  ? requestedUnderlayAppearance
+  : (localStorage.getItem('cyberlife-theme') as Appearance) || 'light'
+
 const screens: { key: Screen; label: string }[] = [{ key: 'past', label: '过去' }, { key: 'now', label: '现在' }, { key: 'future', label: '未来' }]
-const screen = ref<Screen>('now')
+const screen = ref<Screen>(initialScreen)
 const navPosition = ref<NavPosition>((localStorage.getItem('cyberlife-nav-position') as NavPosition) || 'top')
-const appearance = ref<Appearance>((localStorage.getItem('cyberlife-theme') as Appearance) || 'light')
+const appearance = ref<Appearance>(initialAppearance)
 const storedPageInset = Number(localStorage.getItem('cyberlife-page-inset'))
 const pageInset = ref(Number.isFinite(storedPageInset) ? Math.min(20, Math.max(0, storedPageInset)) : 5)
 const secretMode = ref(localStorage.getItem('cyberlife-secret-mode') === 'true')
@@ -106,6 +120,10 @@ watch(pageInset, value => localStorage.setItem('cyberlife-page-inset', String(va
 watch(secretMode, value => localStorage.setItem('cyberlife-secret-mode', String(value)))
 watch(navPosition, value => { localStorage.setItem('cyberlife-nav-position', value); nextTick(updateIndicator) })
 watch(screen, () => nextTick(updateIndicator))
+watch([screen, resolvedAppearance], ([currentScreen, currentAppearance]) => {
+  sessionStorage.setItem('cyberlife-underlay-screen', currentScreen)
+  sessionStorage.setItem('cyberlife-underlay-appearance', currentAppearance)
+}, { immediate: true })
 watch(() => authState.actor, actor => {
   if (!actor) { navObserver?.disconnect(); navObserver = undefined; return }
   if (authState.justLoggedIn) {
@@ -116,6 +134,9 @@ watch(() => authState.actor, actor => {
   nextTick(() => {
     updateIndicator()
     if (nav.value && 'ResizeObserver' in window) { navObserver = new ResizeObserver(updateIndicator); navObserver.observe(nav.value) }
+    if (isLoginUnderlay) {
+      requestAnimationFrame(() => window.parent.postMessage({ type: 'cyberlife-underlay-ready' }, window.location.origin))
+    }
   })
 })
 onMounted(() => {
