@@ -489,6 +489,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   cloudField.position.set(0, .15, -1.35)
   cloudField.visible = false
   const cloudFieldMaterials: THREE.MeshBasicMaterial[] = []
+  const cloudFieldLayers: THREE.Mesh[] = []
+  const cloudFieldOrigins: THREE.Vector3[] = []
   for (let index = 0; index < (mobile ? 3 : 4); index += 1) {
     const material = new THREE.MeshBasicMaterial({
       map: backdropCloudTexture,
@@ -504,6 +506,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     layer.rotation.z = (index - 1.5) * .045
     cloudField.add(layer)
     cloudFieldMaterials.push(material)
+    cloudFieldLayers.push(layer)
+    cloudFieldOrigins.push(layer.position.clone())
   }
   scene.add(cloudField)
 
@@ -646,6 +650,10 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     if (stage === 'node-reveal') {
       node.visible = true
       cloudField.visible = true
+      cloudFieldLayers.forEach((layer, index) => {
+        layer.position.copy(cloudFieldOrigins[index])
+        layer.scale.setScalar(1)
+      })
       earthGroup.visible = revealProgress < .48
       const earthFade = 1 - clamp((revealProgress - .04) / .44)
       ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
@@ -668,20 +676,35 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       node.visible = true
       cloudField.visible = true
       earthGroup.visible = false
-      node.position.set(0, .2 - fallProgress * 7.4, .3 + fallProgress * 7.25)
-      node.scale.setScalar(1 + fallProgress * 1.85)
+      node.position.set(0, .2, .3)
+      node.scale.setScalar(1 - fallProgress * .82)
       sweepMaterial.opacity = .26 * (1 - fallProgress)
       nodeGlow.intensity = 8 * (1 - fallProgress)
-      node.rotation.x = -.16 + fallProgress * .78
-      node.rotation.y += .008
-      node.rotation.z += .004
-      camera.position.z = 8.75 - fallProgress * .55
-      earthGroup.position.y -= .0018
+      node.rotation.x = -.16 + fallProgress * .56
+      node.rotation.y += .012 + fallProgress * .014
+      node.rotation.z += .005 + fallProgress * .007
+      camera.position.z = 8.75
+      cloudFieldLayers.forEach((layer, index) => {
+        const angle = index / cloudFieldLayers.length * TAU + .42
+        const distance = fallProgress * (7.5 + index * 1.35)
+        layer.position.set(
+          cloudFieldOrigins[index].x + Math.cos(angle) * distance,
+          cloudFieldOrigins[index].y + Math.sin(angle) * distance * .62,
+          cloudFieldOrigins[index].z - fallProgress * (index + 1) * .18,
+        )
+        layer.scale.setScalar(1 + fallProgress * (.34 + index * .07))
+        layer.rotation.z += (index % 2 ? 1 : -1) * .0025
+        cloudFieldMaterials[index].opacity = (.19 + index * .035) * Math.pow(1 - fallProgress, 1.35)
+      })
       if (elapsed >= NODE_FALL_MS) setStage('page-enter')
     } else if (stage === 'page-enter') {
       node.visible = true
-      cloudField.visible = true
+      cloudField.visible = false
       earthGroup.visible = false
+      node.position.set(0, .2, .3)
+      node.scale.setScalar(.18 * (1 - pageProgress))
+      node.rotation.y += .026
+      node.rotation.z += .012
       renderer.toneMappingExposure = 1.05 + pageProgress * 2.2
       canvas.style.opacity = String(1 - pageProgress * .96)
     } else if (stage === 'orbital-login' || stage === 'authenticating') {
@@ -694,6 +717,10 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
       atmosphereMaterial.uniforms.uOpacity.value = .16
       cloudField.visible = false
+      cloudFieldLayers.forEach((layer, index) => {
+        layer.position.copy(cloudFieldOrigins[index])
+        layer.scale.setScalar(1)
+      })
       camera.position.z += (10 - camera.position.z) * .06
       renderer.toneMappingExposure = 1.05
       canvas.style.opacity = '1'
