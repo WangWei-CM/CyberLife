@@ -657,7 +657,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const gatherProgress = easeOutCubic(elapsed / CLOUD_GATHER_MS)
     const revealLinear = clamp(elapsed / NODE_REVEAL_ANIMATION_MS)
     const chipRevealProgress = easeOutCubic((revealLinear - .06) / .58)
-    const contentRevealProgress = easeInOutCubic((revealLinear - .46) / .54)
+    const contentRevealStart = NODE_REVEAL_ANIMATION_MS * .06
+    const contentRevealProgress = clamp((elapsed - contentRevealStart) / (NODE_REVEAL_MS - contentRevealStart))
     const chipSettledElapsed = Math.max(0, elapsed - NODE_REVEAL_ANIMATION_MS * .64)
     const fallLinear = clamp(elapsed / NODE_FALL_MS)
     const chipExitProgress = clamp(fallLinear * 2)
