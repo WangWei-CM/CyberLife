@@ -698,7 +698,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     } else if (stage === 'node-fall') {
       renderer.setClearColor(0x02060b, .58 * Math.pow(1 - fallProgress, 1.15))
       node.visible = true
-      const copyExitProgress = easeInOutCubic((fallProgress - .06) / .94)
+      const copyExitProgress = fallLinear
       transitionRoot?.style.setProperty('--node-copy-opacity', String(Math.pow(1 - copyExitProgress, 2.4)))
       transitionRoot?.style.setProperty('--node-copy-exit-x', `${-width * .14 * copyExitProgress}px`)
       transitionRoot?.style.setProperty('--node-copy-exit-y', `${height * .3 * copyExitProgress}px`)
@@ -767,10 +767,19 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       nodeScreenPosition.setFromMatrixPosition(node.matrixWorld).project(camera)
       transitionRoot.style.setProperty('--node-screen-x', `${(nodeScreenPosition.x * .5 + .5) * width}px`)
       transitionRoot.style.setProperty('--node-screen-y', `${(-nodeScreenPosition.y * .5 + .5) * height}px`)
-      transitionRoot.style.setProperty('--node-copy-scale', String(Math.min(1.24, .9 + node.scale.x * .12)))
-      transitionRoot.style.setProperty('--node-copy-rotate-x', `${THREE.MathUtils.radToDeg(node.rotation.x) * .13}deg`)
-      transitionRoot.style.setProperty('--node-copy-rotate-y', `${Math.sin(node.rotation.y) * 4.5}deg`)
-      transitionRoot.style.setProperty('--node-copy-rotate-z', `${Math.sin(node.rotation.z) * 2.5}deg`)
+      if (stage === 'node-fall') {
+        // The copy exits as a flat graphic and no longer inherits the shrinking,
+        // rotating chip transform, so it can grow immediately without a dip.
+        transitionRoot.style.setProperty('--node-copy-scale', '1.02')
+        transitionRoot.style.setProperty('--node-copy-rotate-x', '0deg')
+        transitionRoot.style.setProperty('--node-copy-rotate-y', '0deg')
+        transitionRoot.style.setProperty('--node-copy-rotate-z', '0deg')
+      } else {
+        transitionRoot.style.setProperty('--node-copy-scale', String(Math.min(1.24, .9 + node.scale.x * .12)))
+        transitionRoot.style.setProperty('--node-copy-rotate-x', `${THREE.MathUtils.radToDeg(node.rotation.x) * .13}deg`)
+        transitionRoot.style.setProperty('--node-copy-rotate-y', `${Math.sin(node.rotation.y) * 4.5}deg`)
+        transitionRoot.style.setProperty('--node-copy-rotate-z', `${Math.sin(node.rotation.z) * 2.5}deg`)
+      }
     }
     renderer.render(scene, camera)
     frame = window.requestAnimationFrame(render)
