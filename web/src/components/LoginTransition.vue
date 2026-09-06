@@ -2,7 +2,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { createLoginTransition, type LoginTransitionStage } from '../lib/login-transition'
 import { reducedMotion, wait } from '../lib/motion'
-import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{ credential: string; busy: boolean; error: string; greeting: string; quote: string }>()
 const emit = defineEmits<{
@@ -19,9 +18,8 @@ let scene: ReturnType<typeof createLoginTransition> | undefined
 
 const stageLabel = computed(() => {
   if (stage.value === 'node-reveal') return 'CYBERLIFE NODE'
-  if (stage.value === 'node-fall' || stage.value === 'page-enter') return 'LIFE OPERATING SYSTEM'
   if (props.busy || stage.value === 'authenticating') return 'VERIFYING ACCESS'
-  return 'ENTER ACCESS KEY'
+  return ''
 })
 
 function onInput(event: Event) {
@@ -82,9 +80,8 @@ defineExpose({
     <div class="login-vignette" aria-hidden="true" />
 
     <section class="login-interface" aria-label="CyberLife 登录">
-      <p class="login-kicker">LIFE OPERATING SYSTEM</p>
-      <h1 class="login-logo" data-text="CYBERLIFE">CYBERLIFE</h1>
-      <p class="login-stage-label" :class="{ loading: busy }">{{ stageLabel }}</p>
+      <img class="login-brand-image" src="/branding/cyberlife-logo.png" alt="CyberLife" />
+      <p v-if="stageLabel" class="login-stage-label" :class="{ loading: busy }">{{ stageLabel }}</p>
       <form class="login-form login-form-orbital" @submit.prevent="onSubmit">
         <label class="login-key">
           <span class="visually-hidden">访问密钥</span>
@@ -94,20 +91,15 @@ defineExpose({
             type="password"
             autocomplete="current-password"
             spellcheck="false"
-            placeholder="ENTER ACCESS KEY"
             :disabled="busy || started"
             autofocus
             @input="onInput"
+            @keydown.enter.prevent="onSubmit"
           />
           <i class="login-key-ring" aria-hidden="true" />
         </label>
-        <button v-glow class="login-submit" type="submit" aria-label="验证访问密钥" :disabled="busy || started || !credential.trim()">
-          <AppIcon v-if="!busy" name="chevron-right" :size="20" />
-          <span v-else class="login-spinner" aria-hidden="true" />
-        </button>
       </form>
       <p class="login-error" role="alert" aria-live="polite">{{ error }}</p>
-      <p v-if="!started" class="login-footnote">SECURE ORBITAL ACCESS // SESSION READY</p>
     </section>
     <div v-if="started" class="login-welcome">
       <p class="login-node-caption">CYBERLIFE NODE / PRIMARY LIFE SYSTEM</p>

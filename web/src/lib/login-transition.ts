@@ -354,9 +354,11 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   // The opening shot uses a deliberately oversized Earth: only its right and
   // lower arc enters frame, leaving negative space for the orbital subject.
   // Fourfold scale keeps the planet as a cropped foreground arc, not a small globe.
-  const earthRadius = mobile ? 17.2 : 21.6
+  // Keep the oversized planet behind the camera while its right and lower arc
+  // remains prominent in the first frame.
+  const earthRadius = mobile ? 14.5 : 18.5
   const earthGroup = new THREE.Group()
-  earthGroup.position.set(mobile ? 7.2 : 10.2, mobile ? -11.5 : -12.8, -2.35)
+  earthGroup.position.set(mobile ? 7.2 : 10.5, mobile ? -9.2 : -9.5, -16.5)
   earthGroup.rotation.z = -.16
   scene.add(earthGroup)
 
@@ -522,6 +524,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   let stage: LoginTransitionStage = 'orbital-login'
   let stageStarted = performance.now()
   let completionTimer: number | undefined
+  const transitionRoot = canvas.closest<HTMLElement>('.login-transition')
+  const nodeScreenPosition = new THREE.Vector3()
 
   const resize = () => {
     const bounds = canvas.getBoundingClientRect()
@@ -628,6 +632,17 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     }
 
     camera.lookAt(0, -.15, 0)
+    if (node.visible && transitionRoot) {
+      camera.updateMatrixWorld()
+      node.updateWorldMatrix(true, false)
+      nodeScreenPosition.setFromMatrixPosition(node.matrixWorld).project(camera)
+      transitionRoot.style.setProperty('--node-screen-x', `${(nodeScreenPosition.x * .5 + .5) * width}px`)
+      transitionRoot.style.setProperty('--node-screen-y', `${(-nodeScreenPosition.y * .5 + .5) * height}px`)
+      transitionRoot.style.setProperty('--node-copy-scale', String(Math.min(1.24, .9 + node.scale.x * .12)))
+      transitionRoot.style.setProperty('--node-copy-rotate-x', `${THREE.MathUtils.radToDeg(node.rotation.x) * .13}deg`)
+      transitionRoot.style.setProperty('--node-copy-rotate-y', `${Math.sin(node.rotation.y) * 4.5}deg`)
+      transitionRoot.style.setProperty('--node-copy-rotate-z', `${Math.sin(node.rotation.z) * 2.5}deg`)
+    }
     renderer.render(scene, camera)
     frame = window.requestAnimationFrame(render)
   }
@@ -646,6 +661,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       window.removeEventListener('resize', resize)
       earthTextureDisposed = true
       surfaceCloudTextureDisposed = true
+      transitionRoot?.style.removeProperty('--node-screen-x')
+      transitionRoot?.style.removeProperty('--node-screen-y')
+      transitionRoot?.style.removeProperty('--node-copy-scale')
+      transitionRoot?.style.removeProperty('--node-copy-rotate-x')
+      transitionRoot?.style.removeProperty('--node-copy-rotate-y')
+      transitionRoot?.style.removeProperty('--node-copy-rotate-z')
       disposeObject(scene)
       renderer.renderLists.dispose()
       renderer.dispose()
