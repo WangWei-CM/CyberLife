@@ -168,7 +168,7 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
   <main class="page future-page" :style="{ '--future-top-height': `${topHeight}px` }">
     <div class="scanlines" aria-hidden="true" />
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
-    <section v-if="planDialogOpen" class="future-top plan-dialog cyber-panel bracket" :style="{ '--list-width': `${listWidth}%`, height: `${topHeight}px` }" role="dialog" aria-modal="true" aria-label="规划详情与编辑">
+    <section v-if="planDialogOpen" class="future-top plan-dialog" :style="{ '--list-width': `${listWidth}%`, height: `${topHeight}px` }" role="dialog" aria-modal="true" aria-label="规划详情与编辑">
       <button class="icon-button plan-dialog-close" aria-label="关闭规划面板" @click="closePlanDialog"><AppIcon name="close" :size="16" /></button>
       <aside v-stagger class="future-list cyber-panel bracket">
         <header class="cyber-head"><span class="cyber-heading"><AppIcon name="target" :size="14" />规划</span><small class="mono faint">{{ sortedPlans.filter(isOngoing).length }} 进行中 / {{ plans.length }}</small><button v-if="isWriter" class="text-button" :aria-expanded="creating" @click="creating = !creating"><AppIcon :name="creating ? 'close' : 'plus'" :size="14" />{{ creating ? '取消' : '新建' }}</button></header>

@@ -154,7 +154,8 @@
 .day-col > * { transform: skewX(15deg); }
 .day-plan-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .plan-editor-trigger { width: 28px; height: 28px; flex: 0 0 auto; }
-.plan-dialog { position: absolute; inset: 8px 0; z-index: 10; min-height: 0; }
+.plan-dialog { position: absolute; inset: 8px 0; z-index: 10; min-height: 0; isolation: isolate; background: transparent; }
+.plan-dialog::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--bg) 82%, transparent); box-shadow: inset 0 0 0 1px var(--accent); transform: skewX(var(--future-skew)); transform-origin: center; }
 .plan-dialog-close { position: absolute; top: 10px; right: 12px; z-index: 3; }
 .day-tasks { display: grid; }
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
