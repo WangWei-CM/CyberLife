@@ -74,7 +74,7 @@ defineExpose({
 </script>
 
 <template>
-  <main class="login-transition" :class="{ 'scene-failed': sceneFailed, 'transition-started': started, 'node-reveal': stage === 'node-reveal', 'node-fall': stage === 'node-fall' }">
+  <main class="login-transition" :class="{ 'scene-failed': sceneFailed, 'transition-started': started, 'node-reveal': stage === 'node-reveal', 'node-fall': stage === 'node-fall', 'page-enter': stage === 'page-enter' }">
     <canvas ref="canvas" class="login-canvas" aria-hidden="true" />
     <div class="login-scanlines" aria-hidden="true" />
     <div class="login-vignette" aria-hidden="true" />

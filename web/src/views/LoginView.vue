@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { api } from '../api/client'
 import LoginTransition from '../components/LoginTransition.vue'
 import { beijingNow } from '../lib/dates'
@@ -42,6 +42,7 @@ async function submit() {
     credential.value = ''
     greeting.value = greetingForMoment(result.actor.nickname)
     quote.value = quotes[Math.floor(Math.random() * quotes.length)]
+    await nextTick()
     await transition.value?.beginTransition()
   } catch (cause) {
     transition.value?.setStage('orbital-login')
@@ -58,14 +59,25 @@ function completeTransition() {
 </script>
 
 <template>
-  <LoginTransition
-    ref="transition"
-    v-model:credential="credential"
-    :busy="busy"
-    :error="error"
-    :greeting="greeting"
-    :quote="quote"
-    @submit="submit"
-    @transition-complete="completeTransition"
-  />
+  <div class="login-composite">
+    <iframe
+      v-if="authenticatedActor"
+      class="login-underlay"
+      src="/"
+      title=""
+      tabindex="-1"
+      aria-hidden="true"
+    />
+    <LoginTransition
+      ref="transition"
+      v-model:credential="credential"
+      class="login-overlay"
+      :busy="busy"
+      :error="error"
+      :greeting="greeting"
+      :quote="quote"
+      @submit="submit"
+      @transition-complete="completeTransition"
+    />
+  </div>
 </template>

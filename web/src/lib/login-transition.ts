@@ -342,7 +342,7 @@ function disposeObject(root: THREE.Object3D) {
 export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneOptions = {}) {
   let renderer: THREE.WebGLRenderer
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, alpha: false, antialias: window.innerWidth > 720, powerPreference: 'high-performance' })
+    renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: window.innerWidth > 720, powerPreference: 'high-performance' })
   } catch (error) {
     throw new Error(`WebGL initialization failed: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -350,7 +350,6 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const mobile = window.innerWidth < 720
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0x02060b)
   scene.fog = new THREE.FogExp2(0x02060b, .024)
   const camera = new THREE.PerspectiveCamera(42, 1, .1, 100)
   camera.position.set(0, .35, 10)
@@ -359,6 +358,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.05
+  renderer.setClearColor(0x02060b, 1)
 
   const ambient = new THREE.HemisphereLight(0xa7e6df, 0x020711, 1.2)
   const keyLight = new THREE.DirectionalLight(0xd8fff8, 3.2)
@@ -648,6 +648,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       material.opacity = (.16 + index * .035) + Math.sin(time * (.00034 + index * .00004) + index) * .025
     })
     if (stage === 'node-reveal') {
+      renderer.setClearColor(0x02060b, 1)
       node.visible = true
       cloudField.visible = true
       cloudFieldLayers.forEach((layer, index) => {
@@ -673,6 +674,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       cloudHighlight.material.opacity = .22 + Math.sin(time * .0007 + 1) * .06
       if (elapsed >= NODE_REVEAL_MS) setStage('node-fall')
     } else if (stage === 'node-fall') {
+      renderer.setClearColor(0x02060b, Math.pow(1 - fallProgress, 1.15))
       node.visible = true
       cloudField.visible = true
       earthGroup.visible = false
@@ -698,6 +700,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       })
       if (elapsed >= NODE_FALL_MS) setStage('page-enter')
     } else if (stage === 'page-enter') {
+      renderer.setClearColor(0x02060b, 0)
       node.visible = true
       cloudField.visible = false
       earthGroup.visible = false
@@ -708,6 +711,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       renderer.toneMappingExposure = 1.05 + pageProgress * 2.2
       canvas.style.opacity = String(1 - pageProgress * .96)
     } else if (stage === 'orbital-login' || stage === 'authenticating') {
+      renderer.setClearColor(0x02060b, 1)
       node.visible = false
       sweepMaterial.opacity = 0
       nodeGlow.intensity = 0
