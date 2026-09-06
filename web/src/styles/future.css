@@ -25,7 +25,11 @@
 .bracket::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1; opacity: .7;
   clip-path: none;
-  box-shadow: inset 0 0 0 1px var(--accent);
+  background:
+    linear-gradient(90deg, var(--accent) 0, color-mix(in srgb, var(--accent) 42%, transparent) 24%, transparent 58%) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent 42%, color-mix(in srgb, var(--accent) 42%, transparent) 76%, var(--accent) 100%) bottom / 100% 1px no-repeat,
+    linear-gradient(180deg, var(--accent) 0, color-mix(in srgb, var(--accent) 38%, transparent) 24%, transparent 58%) left / 1px 100% no-repeat,
+    linear-gradient(180deg, transparent 42%, color-mix(in srgb, var(--accent) 38%, transparent) 76%, var(--accent) 100%) right / 1px 100% no-repeat;
   transition: opacity var(--dur-mid) var(--ease-out);
 }
 .cyber-panel:hover.bracket::before { opacity: 1; }
@@ -42,7 +46,12 @@
 .future-list { display: grid; align-content: start; gap: 10px; overflow: auto; }
 .plan-form, .progress-form { position: relative; z-index: 0; isolation: isolate; display: grid; gap: 8px; background: transparent; clip-path: none; }
 .plan-form { padding: 12px; }
-.plan-form::before, .progress-form::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--accent-soft); transform: skewX(var(--future-skew)); transform-origin: center; }
+.plan-form::before, .progress-form::before { content: ""; position: absolute; inset: 0; z-index: -1; background:
+  linear-gradient(90deg, var(--accent-soft), color-mix(in srgb, var(--accent) 24%, transparent) 24%, transparent 58%) top / 100% 1px no-repeat,
+  linear-gradient(90deg, transparent 42%, color-mix(in srgb, var(--accent) 24%, transparent) 76%, var(--accent-soft)) bottom / 100% 1px no-repeat,
+  linear-gradient(180deg, var(--accent-soft), color-mix(in srgb, var(--accent) 24%, transparent) 24%, transparent 58%) left / 1px 100% no-repeat,
+  linear-gradient(180deg, transparent 42%, color-mix(in srgb, var(--accent) 24%, transparent) 76%, var(--accent-soft)) right / 1px 100% no-repeat,
+  var(--surface-2); transform: skewX(var(--future-skew)); transform-origin: center; }
 .plan-form .primary { justify-self: end; }
 .plan-list { display: grid; gap: 8px; position: relative; }
 .plan-card {
@@ -155,7 +164,12 @@
 .day-plan-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .plan-editor-trigger { width: 28px; height: 28px; flex: 0 0 auto; }
 .plan-dialog { position: absolute; inset: 8px 0; z-index: 10; min-height: 0; isolation: isolate; background: transparent; }
-.plan-dialog::before { content: ""; position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--bg) 82%, transparent); box-shadow: inset 0 0 0 1px var(--accent); transform: skewX(var(--future-skew)); transform-origin: center; }
+.plan-dialog::before { content: ""; position: absolute; inset: 0; z-index: -1; background:
+  linear-gradient(90deg, var(--accent) 0, color-mix(in srgb, var(--accent) 42%, transparent) 24%, transparent 58%) top / 100% 1px no-repeat,
+  linear-gradient(90deg, transparent 42%, color-mix(in srgb, var(--accent) 42%, transparent) 76%, var(--accent) 100%) bottom / 100% 1px no-repeat,
+  linear-gradient(180deg, var(--accent) 0, color-mix(in srgb, var(--accent) 38%, transparent) 24%, transparent 58%) left / 1px 100% no-repeat,
+  linear-gradient(180deg, transparent 42%, color-mix(in srgb, var(--accent) 38%, transparent) 76%, var(--accent) 100%) right / 1px 100% no-repeat,
+  color-mix(in srgb, var(--bg) 82%, transparent); transform: skewX(var(--future-skew)); transform-origin: center; }
 .plan-dialog-close { position: absolute; top: 10px; right: 12px; z-index: 3; }
 .day-tasks { display: grid; }
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
