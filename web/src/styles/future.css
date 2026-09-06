@@ -193,11 +193,17 @@
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .day-tasks li:last-child { box-shadow: none; }
 .day-tasks .task-row { padding: 8px 0; }
-.day-plan-list { display: grid; gap: 6px; }
+.day-plan-list { display: grid; gap: 6px; transform: none; transform-origin: left top; }
+.day-plan-list li { min-width: 0; transition: transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out); }
+.day-plan-list li.plan-drop-target { transform: translateX(8px); filter: drop-shadow(0 0 7px var(--accent-glow)); }
 .day-plan { display: grid; gap: 5px; width: 100%; padding: 10px 12px; text-align: left; background: var(--surface-2); color: var(--text); clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center; transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.day-plan-list .day-plan { transform: none; }
 .day-plan > * { transform: skewX(15deg); }
 .day-plan b { font-size: 12px; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .day-plan:hover { background: var(--surface-3); box-shadow: 0 0 12px var(--accent-soft); transform: skewX(var(--future-skew)) translateX(2px); }
+.day-plan-list .day-plan:hover { transform: translateX(2px); }
+.day-plan-list .day-plan[draggable="true"] { cursor: grab; }
+.day-plan-list .day-plan[draggable="true"]:active, .day-plan-list .day-plan.dragging { cursor: grabbing; opacity: .52; }
 .day-plan.active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 .reader-future { min-height: 240px; display: grid; place-items: center; }
 

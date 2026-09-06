@@ -35,11 +35,12 @@ const draggingPlanId = ref('')
 const dropPlanId = ref('')
 const planOrderBusy = ref(false)
 
-const sortedPlans = computed(() => [...plans.value].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.endDate.localeCompare(b.endDate)))
+const comparePlans = (a: Plan, b: Plan) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.endDate.localeCompare(b.endDate)
+const sortedPlans = computed(() => [...plans.value].sort(comparePlans))
 const selectedPlan = computed(() => plans.value.find(plan => plan.id === selectedPlanId.value) ?? null)
 const taskList = computed(() => [...tasks.value.values()])
 const dayTasks = computed(() => taskList.value.filter(task => task.date === selectedDate.value).sort((a, b) => Number(a.done) - Number(b.done)))
-const dayPlans = computed(() => plans.value.filter(plan => plan.startDate <= selectedDate.value && selectedDate.value <= plan.endDate))
+const dayPlans = computed(() => plans.value.filter(plan => plan.startDate <= selectedDate.value && selectedDate.value <= plan.endDate).sort(comparePlans))
 const timeDisplay = useCountUp(() => selectedPlan.value?.timeProgress ?? 0)
 const planDisplay = useCountUp(() => selectedPlan.value?.progress ?? 0)
 const remainingDays = computed(() => selectedPlan.value ? diffDays(today, selectedPlan.value.endDate) : 0)
@@ -299,7 +300,7 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
                 <div class="day-col day-plans">
                   <header class="day-plan-head"><span class="cyber-heading">当天进行中的规划</span><button class="icon-button plan-editor-trigger" aria-label="查看或编辑规划" title="查看或编辑规划" @click="openPlanDialog"><AppIcon name="edit" :size="14" /></button></header>
                   <ul v-if="dayPlans.length" class="day-plan-list">
-                    <li v-for="plan in dayPlans" :key="plan.id"><button class="day-plan" :class="{ active: plan.id === selectedPlanId }" @click="choose(plan)"><b>{{ plan.name }}</b><ProgressBar :value="plan.timeProgress" :height="3" /><ProgressBar :value="plan.progress" tone="accent-2" :height="3" /></button></li>
+                    <li v-for="plan in dayPlans" :key="plan.id" :class="{ 'plan-drop-target': dropPlanId === plan.id && draggingPlanId !== plan.id }" @dragover="hoverPlanDrop(plan, $event)" @drop="dropPlan(plan, $event)"><button class="day-plan" :class="{ active: plan.id === selectedPlanId, dragging: draggingPlanId === plan.id }" :draggable="isWriter && !planOrderBusy" @dragstart="startPlanDrag(plan, $event)" @dragend="endPlanDrag" @click="choose(plan)"><b>{{ plan.name }}</b><ProgressBar :value="plan.timeProgress" :height="3" /><ProgressBar :value="plan.progress" tone="accent-2" :height="3" /></button></li>
                   </ul>
                   <EmptyState v-else icon="target" text="这一天没有进行中的规划" compact />
                 </div>
