@@ -174,9 +174,9 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
         <header class="cyber-head"><span class="cyber-heading"><AppIcon name="target" :size="14" />规划</span><small class="mono faint">{{ sortedPlans.filter(isOngoing).length }} 进行中 / {{ plans.length }}</small><button v-if="isWriter" class="text-button" :aria-expanded="creating" @click="creating = !creating"><AppIcon :name="creating ? 'close' : 'plus'" :size="14" />{{ creating ? '取消' : '新建' }}</button></header>
         <Transition name="fade-slide">
           <form v-if="creating && isWriter" class="plan-form" @submit.prevent="createPlan">
-            <input v-model="form.name" placeholder="规划名称" maxlength="60" required />
+            <div class="form-control"><input v-model="form.name" placeholder="规划名称" maxlength="60" required /></div>
             <div class="form-row"><input v-model="form.startDate" type="date" required aria-label="开始日期" /><input v-model="form.endDate" type="date" required aria-label="截止日期" /></div>
-            <textarea v-model="form.intro" placeholder="简介（支持 Markdown）" rows="3" />
+            <div class="form-control"><textarea v-model="form.intro" placeholder="简介（支持 Markdown）" rows="3" /></div>
             <button class="primary" type="submit" :disabled="busy || !form.name.trim()">创建规划</button>
           </form>
         </Transition>
@@ -215,9 +215,9 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
             </div>
             <Transition name="fade-slide" mode="out-in">
               <form v-if="editMode && isWriter" class="progress-form" @submit.prevent="savePlan">
-                <input v-model="edit.name" placeholder="规划名称" maxlength="60" required aria-label="规划名称" />
+                <div class="form-control"><input v-model="edit.name" placeholder="规划名称" maxlength="60" required aria-label="规划名称" /></div>
                 <div class="form-row"><input v-model="edit.startDate" type="date" required aria-label="开始日期" /><input v-model="edit.endDate" type="date" required aria-label="截止日期" /></div>
-                <textarea v-model="edit.intro" rows="6" placeholder="简介（支持 Markdown）" aria-label="简介" />
+                <div class="form-control"><textarea v-model="edit.intro" rows="6" placeholder="简介（支持 Markdown）" aria-label="简介" /></div>
                 <div class="asset-row">
                   <label class="text-button upload-trigger" :class="{ busy: uploading === 'cover' }"><AppIcon name="image" :size="14" />{{ selectedPlan.coverUrl ? '更换封面' : '上传封面' }}<input type="file" accept="image/*" :disabled="!!uploading" @change="uploadImage('cover', $event)" /></label>
                   <label class="text-button upload-trigger" :class="{ busy: uploading === 'icon' }"><AppIcon name="spark" :size="14" />{{ selectedPlan.iconUrl ? '更换图标' : '上传图标' }}<input type="file" accept="image/*" :disabled="!!uploading" @change="uploadImage('icon', $event)" /></label>
