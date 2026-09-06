@@ -146,15 +146,16 @@
 .col-month .cal-label b, .col-year .cal-label b { color: var(--accent); }
 .col-year .cal-label b { font-size: 14px; letter-spacing: .16em; }
 .cal-col.today .cal-label b { color: var(--accent); text-shadow: 0 0 10px var(--accent-glow); }
-.cal-events { display: grid; align-content: start; gap: 3px; padding: 68px 3px 6px; overflow: hidden; }
-.cal-event { display: block; padding: 2px 8px; font-size: 11px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); color: var(--text); clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
+.cal-events { display: grid; align-content: start; gap: 3px; padding: 68px 3px 6px; overflow: hidden; transform: skewX(var(--future-skew)); transform-origin: center; }
+.cal-event { display: block; padding: 2px 8px; font-size: 11px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); color: var(--text); clip-path: none; transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out); }
+.cal-event-content { display: block; overflow: hidden; text-overflow: ellipsis; transform: skewX(15deg); transform-origin: center; }
 .cal-event:hover { transform: translateX(2px); box-shadow: inset 2px 0 0 var(--accent), 0 0 10px var(--accent-soft); }
 .cal-event.high { box-shadow: inset 2px 0 0 var(--warn); }
 .cal-event.done { opacity: .4; text-decoration: line-through; }
 .cal-event.overdue { box-shadow: inset 2px 0 0 var(--danger); }
 .cal-event.overdue::before { content: ""; display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 6px var(--danger); vertical-align: middle; }
-.cal-more { font-size: 10px; color: var(--text-faint); padding-left: 6px; }
-.cal-count { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 0 4px; }
+.cal-more { font-size: 10px; color: var(--text-faint); padding-left: 6px; transform: skewX(15deg); transform-origin: center; }
+.cal-count { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 0 4px; transform: skewX(15deg); transform-origin: center; }
 .cal-count i { width: 5px; height: 5px; background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .cal-count i.done { opacity: .35; box-shadow: none; }
 .cal-count i.overdue { background: var(--danger); box-shadow: 0 0 6px var(--danger); }

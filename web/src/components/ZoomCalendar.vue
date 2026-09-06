@@ -177,7 +177,7 @@ defineExpose({ zoomBy, goToday, rangeLabel })
               <Transition name="tick"><header v-if="column.label" class="cal-label"><b>{{ column.label }}</b><small v-if="column.sub">{{ column.sub }}</small></header></Transition>
               <div class="cal-events">
                 <template v-if="column.level === 'day'">
-                  <span v-for="task in tasksFor(column).slice(0, 6)" :key="task.id" class="cal-event" :class="{ done: task.done, overdue: !task.done && column.past, high: task.priority === 'high' }" :title="task.title">{{ task.title }}</span>
+                  <span v-for="task in tasksFor(column).slice(0, 6)" :key="task.id" class="cal-event" :class="{ done: task.done, overdue: !task.done && column.past, high: task.priority === 'high' }" :title="task.title"><span class="cal-event-content">{{ task.title }}</span></span>
                   <small v-if="tasksFor(column).length > 6" class="cal-more mono">+{{ tasksFor(column).length - 6 }}</small>
                 </template>
                 <template v-else>
