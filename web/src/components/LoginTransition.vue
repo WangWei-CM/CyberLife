@@ -20,7 +20,7 @@ const quoteGlyphs = ref<ScrambleGlyph[]>([])
 let scene: ReturnType<typeof createLoginTransition> | undefined
 let scrambleFrame = 0
 
-const SCRAMBLE_DURATION_MS = 470
+const SCRAMBLE_DURATION_MS = 450
 const SCRAMBLE_SETTLE_START_MS = 180
 const SCRAMBLE_SETTLE_END_MS = 440
 const SCRAMBLE_STEP_MS = 34
@@ -53,10 +53,6 @@ function createGlyphs(text: string, prefix: string): ScrambleGlyph[] {
     startAt: 0,
     settleAt: 0,
   }))
-}
-
-function settleGlyphs(glyphs: ScrambleGlyph[]) {
-  return glyphs.map(glyph => ({ ...glyph, value: glyph.final, state: 'settled' as const }))
 }
 
 function renderGlyphs(glyphs: ScrambleGlyph[], elapsed: number) {
@@ -95,8 +91,6 @@ function startTextScramble() {
   })
 
   if (reducedMotion()) {
-    greetingGlyphs.value = settleGlyphs(greetingPlan)
-    quoteGlyphs.value = settleGlyphs(quotePlan)
     scrambling.value = false
     scrambleFrame = 0
     return
@@ -111,8 +105,6 @@ function startTextScramble() {
   const tick = (now: number) => {
     const elapsed = now - startedAt
     if (elapsed >= SCRAMBLE_DURATION_MS) {
-      greetingGlyphs.value = settleGlyphs(greetingPlan)
-      quoteGlyphs.value = settleGlyphs(quotePlan)
       scrambling.value = false
       scrambleFrame = 0
       return
@@ -221,22 +213,28 @@ defineExpose({
     <div v-if="started" class="login-welcome" :class="{ scrambling }">
       <p class="login-node-caption">CYBERLIFE NODE / PRIMARY LIFE SYSTEM</p>
       <p class="login-greeting" :aria-label="greeting">
-        <span
-          v-for="glyph in greetingGlyphs"
-          :key="glyph.id"
-          class="login-scramble-glyph"
-          :class="[`is-${glyph.kind}`, `is-${glyph.state}`]"
-          aria-hidden="true"
-        >{{ glyph.value }}</span>
+        <template v-if="scrambling">
+          <span
+            v-for="glyph in greetingGlyphs"
+            :key="glyph.id"
+            class="login-scramble-glyph"
+            :class="[`is-${glyph.kind}`, `is-${glyph.state}`]"
+            aria-hidden="true"
+          >{{ glyph.value }}</span>
+        </template>
+        <template v-else>{{ greeting }}</template>
       </p>
       <p class="login-quote" :aria-label="quote">
-        <span
-          v-for="glyph in quoteGlyphs"
-          :key="glyph.id"
-          class="login-scramble-glyph"
-          :class="[`is-${glyph.kind}`, `is-${glyph.state}`]"
-          aria-hidden="true"
-        >{{ glyph.value }}</span>
+        <template v-if="scrambling">
+          <span
+            v-for="glyph in quoteGlyphs"
+            :key="glyph.id"
+            class="login-scramble-glyph"
+            :class="[`is-${glyph.kind}`, `is-${glyph.state}`]"
+            aria-hidden="true"
+          >{{ glyph.value }}</span>
+        </template>
+        <template v-else>{{ quote }}</template>
       </p>
     </div>
   </main>
