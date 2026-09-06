@@ -698,10 +698,10 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       renderer.setClearColor(0x02060b, .58 * Math.pow(1 - fallProgress, 1.15))
       node.visible = true
       const copyExitProgress = easeInOutCubic((fallProgress - .06) / .94)
-      transitionRoot?.style.setProperty('--node-copy-opacity', String(Math.pow(1 - copyExitProgress, 1.15)))
-      transitionRoot?.style.setProperty('--node-copy-exit-x', `${-width * .34 * copyExitProgress}px`)
-      transitionRoot?.style.setProperty('--node-copy-exit-y', `${height * .42 * copyExitProgress}px`)
-      transitionRoot?.style.setProperty('--node-copy-exit-scale', String(1 + copyExitProgress * 2.8))
+      transitionRoot?.style.setProperty('--node-copy-opacity', String(Math.pow(1 - copyExitProgress, 2.4)))
+      transitionRoot?.style.setProperty('--node-copy-exit-x', `${-width * .14 * copyExitProgress}px`)
+      transitionRoot?.style.setProperty('--node-copy-exit-y', `${height * .3 * copyExitProgress}px`)
+      transitionRoot?.style.setProperty('--node-copy-exit-scale', String(1 + copyExitProgress * 5.2))
       cloudField.visible = true
       earthGroup.visible = false
       node.position.set(0, .2, .3)
