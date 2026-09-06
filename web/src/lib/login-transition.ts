@@ -639,7 +639,6 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const elapsed = time - stageStarted
     const gatherProgress = easeOutCubic(elapsed / CLOUD_GATHER_MS)
     const revealLinear = clamp(elapsed / NODE_REVEAL_MS)
-    const revealProgress = easeOutCubic(elapsed / NODE_REVEAL_MS)
     const chipRevealProgress = easeOutCubic((revealLinear - .06) / .58)
     const contentRevealProgress = easeInOutCubic((revealLinear - .46) / .54)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
@@ -652,9 +651,6 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     clouds.rotation.y = time * .000052
     cloudHighlight.rotation.y = -time * .000032
     cloudHighlight.rotation.x = Math.sin(time * .00011) * .035
-    cloudField.rotation.z = Math.sin(time * .00008) * .025
-    cloudField.position.x = Math.sin(time * .00012) * .42
-    cloudField.position.y = .15 + Math.cos(time * .00017) * .14
     if (stage === 'cloud-gather') {
       renderer.setClearColor(0x02060b, 1)
       node.visible = false
@@ -672,7 +668,10 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
       atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
-      camera.position.z += (9.35 - camera.position.z) * .055
+      // Complete the only camera push while the clouds first enter. Keeping
+      // this motion out of node-reveal prevents the clouds from appearing to
+      // enter again alongside the chip.
+      camera.position.z = 10 - gatherProgress * 1.25
       if (elapsed >= CLOUD_GATHER_MS) setStage('node-reveal')
     } else if (stage === 'node-reveal') {
       renderer.setClearColor(0x02060b, 1 - contentRevealProgress * .42)
@@ -688,8 +687,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       sweepMaterial.opacity = .48 * Math.sin(chipRevealProgress * Math.PI)
       nodeGlow.intensity = 16 * Math.sin(chipRevealProgress * Math.PI)
       node.rotation.set(-.32 + chipRevealProgress * .16, .65 + time * .00016, .12 + time * .00008)
-      camera.position.z = 10 - revealProgress * 1.25
-      camera.lookAt(0, -.55 + revealProgress * .35, 0)
+      camera.position.z = 8.75
       clouds.material.opacity = .78 + Math.sin(time * .0005) * .1
       cloudHighlight.material.opacity = .22 + Math.sin(time * .0007 + 1) * .06
       if (elapsed >= NODE_REVEAL_MS) setStage('node-fall')
