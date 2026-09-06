@@ -189,7 +189,7 @@
 .plan-dialog > .cyber-panel { transform: none; }
 .plan-dialog .divider-v::before { transform: none; }
 .plan-dialog-close { position: absolute; top: 14px; right: var(--plan-dialog-safe, 12px); z-index: 3; transform: skewX(15deg); transform-origin: center; }
-.plan-dialog .future-list .plan-form { transform: none; }
+.plan-dialog .future-list .plan-form { transform: skewX(var(--future-skew)); transform-origin: center; }
 .plan-dialog .future-detail .progress-form { transform: skewX(var(--future-skew)); }
 .day-tasks { display: grid; }
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
@@ -211,11 +211,11 @@
 
 /* ---------- 未来页：全 UI 等宽、零圆角、发光代替阴影 ---------- */
 .theme-future .card, .theme-future .btn, .theme-future .primary, .theme-future input, .theme-future textarea, .theme-future select, .theme-future .text-button, .theme-future .icon-button { border-radius: 0; }
-.theme-future .future-page .btn, .theme-future .future-page .primary, .theme-future .future-page textarea, .theme-future .future-page select, .theme-future .future-page input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), .theme-future .future-page .text-button, .theme-future .future-page .icon-button { clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+.theme-future .future-page .btn, .theme-future .future-page .primary, .theme-future .future-page textarea, .theme-future .future-page select, .theme-future .future-page input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), .theme-future .future-page .text-button, .theme-future .future-page .icon-button { clip-path: none; }
 .theme-future .future-page input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]), .theme-future .future-page select { padding-left: 16px; padding-right: 16px; }
-.theme-future .future-page textarea { --future-textarea-slant: clamp(24px, 5vh, 42px); padding-left: calc(12px + var(--future-textarea-slant)); padding-right: calc(12px + var(--future-textarea-slant)); clip-path: polygon(var(--future-textarea-slant) 0, 100% 0, calc(100% - var(--future-textarea-slant)) 100%, 0 100%); }
-.theme-future .future-page .progress, .theme-future .future-page .progress > i { clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
-.future-page > .divider-h::before { border-radius: 0; clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+.theme-future .future-page textarea { padding-left: 12px; padding-right: 12px; clip-path: none; }
+.theme-future .future-page .progress, .theme-future .future-page .progress > i { clip-path: none; }
+.future-page > .divider-h::before { border-radius: 0; clip-path: none; }
 .future-page .task-add { transform: skewX(var(--future-skew)); transform-origin: center; }
 .future-page .task-add > * { transform: skewX(15deg); }
 
@@ -223,7 +223,7 @@
 .future-list, .future-detail, .future-bottom { scrollbar-width: thin; scrollbar-color: var(--accent) transparent; scrollbar-gutter: stable; }
 .future-list::-webkit-scrollbar, .future-detail::-webkit-scrollbar, .future-bottom::-webkit-scrollbar { display: block; width: 9px; height: 9px; }
 .future-list::-webkit-scrollbar-track, .future-detail::-webkit-scrollbar-track, .future-bottom::-webkit-scrollbar-track { background: linear-gradient(105deg, transparent 36%, var(--divider) 37% 63%, transparent 64%); }
-.future-list::-webkit-scrollbar-thumb, .future-detail::-webkit-scrollbar-thumb, .future-bottom::-webkit-scrollbar-thumb { border-radius: 0; background: var(--accent-soft); border: 1px solid var(--accent); clip-path: polygon(100% 0, 100% 84%, 0 100%, 0 16%); transform: skewX(var(--future-skew)); }
+.future-list::-webkit-scrollbar-thumb, .future-detail::-webkit-scrollbar-thumb, .future-bottom::-webkit-scrollbar-thumb { border-radius: 0; background: var(--accent-soft); border: 1px solid var(--accent); clip-path: none; transform: skewX(var(--future-skew)); }
 .future-list::-webkit-scrollbar-thumb:hover, .future-detail::-webkit-scrollbar-thumb:hover, .future-bottom::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 .theme-future .primary { background: var(--accent); color: var(--bg); letter-spacing: .12em; text-transform: uppercase; font-size: 12px; }
 .theme-future .primary:hover { box-shadow: 0 0 18px var(--accent-glow); }
