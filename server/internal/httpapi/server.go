@@ -109,6 +109,9 @@ func (s *Server) Router() *gin.Engine {
 	writer.PUT("/diary", s.saveDiary)
 	writer.PUT("/diary/access", s.setDiaryAccess)
 	writer.POST("/tasks", s.addTask)
+	writer.GET("/tasks/:id", s.getTask)
+	writer.PUT("/tasks/:id/future-detail", s.updateFutureTask)
+	writer.DELETE("/tasks/:id/future-detail", s.deleteFutureTask)
 	writer.POST("/tasks/:id/done", s.setTaskDone)
 	writer.PUT("/tasks/:id/access", s.setTaskAccess)
 	adminGroup := protected.Group("/admin")
@@ -1078,6 +1081,50 @@ func (s *Server) addTask(c *gin.Context) {
 		return
 	}
 	c.JSON(201, x)
+}
+func (s *Server) getTask(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	date := strings.TrimSpace(c.Query("date"))
+	x, e := s.now.Task(c.Request.Context(), a.LifeID, c.Param("id"), date)
+	if e != nil {
+		if strings.Contains(e.Error(), "日期") {
+			fail(c, 400, "validation_failed", e.Error())
+			return
+		}
+		fail(c, 404, "not_found", e.Error())
+		return
+	}
+	c.JSON(200, x)
+}
+func (s *Server) updateFutureTask(c *gin.Context) {
+	var r struct {
+		Date        string `json:"date"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Priority    string `json:"priority"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.now.UpdateTaskDetail(c.Request.Context(), a.LifeID, c.Param("id"), strings.TrimSpace(r.Date), strings.TrimSpace(r.Title), r.Description, r.Priority)
+	if e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, x)
+}
+func (s *Server) deleteFutureTask(c *gin.Context) {
+	var r struct { Date string `json:"date"` }
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	if e := s.now.DeleteTaskForDate(c.Request.Context(), a.LifeID, c.Param("id"), strings.TrimSpace(r.Date)); e != nil {
+		fail(c, 404, "not_found", e.Error())
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 func (s *Server) setTaskAccess(c *gin.Context) {
 	var r struct {

@@ -71,6 +71,9 @@ export const api = {
   saveDiary: (content: string, secret = false) => request<Diary>('/api/v1/now/diary', { method: 'PUT', body: JSON.stringify({ content, secret }) }),
   /** date 为空则记到今天；否则记到指定日期（YYYY-MM-DD）。 */
   addTask: (title: string, description: string, priority: string, date = '') => request<Task>('/api/v1/now/tasks', { method: 'POST', body: JSON.stringify({ title, description, priority, date }) }),
+  task: (id: string, date: string) => request<Task>(`/api/v1/now/tasks/${encode(id)}?date=${encode(date)}`),
+  updateFutureTask: (id: string, date: string, payload: { title: string; description: string; priority: Task['priority'] }) => request<Task>(`/api/v1/now/tasks/${encode(id)}/future-detail`, { method: 'PUT', body: JSON.stringify({ date, title: payload.title, description: payload.description, priority: payload.priority }) }),
+  deleteFutureTask: (id: string, date: string) => request<void>(`/api/v1/now/tasks/${encode(id)}/future-detail`, { method: 'DELETE', body: JSON.stringify({ date }) }),
   /** 任务按月分库，传 date 以便服务端定位到对应月份。 */
   setTaskDone: (id: string, done: boolean, date = '') => request<Task>(`/api/v1/now/tasks/${encode(id)}/done`, { method: 'POST', body: JSON.stringify({ done, date }) }),
   readerKeysForWriter: () => request<{ items: ReaderKey[] }>('/api/v1/now/reader-keys'),

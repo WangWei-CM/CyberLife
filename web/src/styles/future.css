@@ -196,6 +196,10 @@
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .day-tasks li:last-child { box-shadow: none; }
 .day-tasks .task-row { padding: 8px 0; }
+.future-task-row { min-width: 0; }
+.future-task-row.editable { cursor: pointer; }
+.future-task-row.editable:hover .future-task-open { color: var(--accent); transform: translateX(3px) skewX(15deg); }
+.future-task-open { flex: 0 0 auto; color: var(--text-faint); transform: skewX(15deg); transition: color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
 .day-plan-list { display: grid; gap: 6px; transform: none; transform-origin: left top; }
 .day-plan-list li { min-width: 0; transition: transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out); }
 .day-plan-list li.plan-drop-target { transform: translateX(8px); filter: drop-shadow(0 0 7px var(--accent-glow)); }
@@ -220,6 +224,43 @@
 .future-page .task-add { transform: skewX(var(--future-skew)); transform-origin: center; }
 .future-page .task-add > * { transform: skewX(15deg); }
 
+/* ---------- 未来待办抽屉：外框与可滚动内容共用 75° 斜率 ---------- */
+.future-task-drawer-layer { position: fixed; inset: 0; z-index: 90; display: flex; justify-content: flex-end; background: var(--scrim); }
+.future-task-drawer { position: relative; isolation: isolate; width: min(48vw, 760px); min-width: min(420px, 100vw); height: 100%; overflow: auto; color: var(--text); background: var(--surface); transform: skewX(var(--future-skew)); transform-origin: center; scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
+.future-task-drawer::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background:
+  linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 34%, transparent) 22%, transparent 60%) left / 1px 100% no-repeat,
+  linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--accent) 34%, transparent) 76%, var(--accent)) right / 1px 100% no-repeat,
+  linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 34%, transparent) 22%, transparent 60%) top / 100% 1px no-repeat,
+  linear-gradient(90deg, transparent 40%, color-mix(in srgb, var(--accent) 34%, transparent) 76%, var(--accent)) bottom / 100% 1px no-repeat; }
+.future-task-drawer::-webkit-scrollbar { width: 9px; }
+.future-task-drawer::-webkit-scrollbar-track { background: linear-gradient(105deg, transparent 36%, var(--divider) 37% 63%, transparent 64%); }
+.future-task-drawer::-webkit-scrollbar-thumb { background: var(--accent-soft); border: 1px solid var(--accent); }
+.future-task-drawer-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 34px 16px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); transform: skewX(15deg); }
+.future-task-drawer-head h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: .08em; }
+.future-task-drawer-actions { display: flex; gap: 4px; }
+.future-task-drawer-content { display: grid; gap: 18px; padding: 24px 34px 32px; transform: skewX(15deg); }
+.future-task-error { margin: 0; }
+.future-task-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.future-task-preview, .future-task-editor, .future-task-settings, .future-task-drawer-footer { position: relative; transform: skewX(var(--future-skew)); transform-origin: center; }
+.future-task-preview > *, .future-task-editor > *, .future-task-settings > *, .future-task-drawer-footer > * { transform: skewX(15deg); transform-origin: center; }
+.future-task-preview { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
+.future-task-preview h1 { margin: 0; font-size: clamp(24px, 3vw, 42px); line-height: 1.15; letter-spacing: .05em; }
+.future-task-editor { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
+.future-task-editor .diary-editor { min-width: 0; }
+.future-task-editor .diary-editor .md-editor { min-height: 300px; }
+.future-task-editor .primary { justify-self: end; }
+.future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
+.future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.future-task-settings .field { display: grid; gap: 5px; }
+.future-task-settings select { width: 100%; }
+.future-milestone-form { display: grid; gap: 8px; padding-top: 10px; }
+.future-milestone-form textarea { resize: vertical; }
+.future-task-drawer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--divider); }
+.future-drawer-enter-active, .future-drawer-leave-active { transition: opacity var(--dur-mid) var(--ease-out); }
+.future-drawer-enter-active .future-task-drawer, .future-drawer-leave-active .future-task-drawer { transition: transform var(--dur-mid) var(--ease-out); }
+.future-drawer-enter-from, .future-drawer-leave-to { opacity: 0; }
+.future-drawer-enter-from .future-task-drawer, .future-drawer-leave-to .future-task-drawer { transform: translateX(100%) skewX(var(--future-skew)); }
+
 /* 编辑区保持页面 75° 轮廓，内部滚动条以同角度显示，外层页面不滚动。 */
 .future-list, .future-detail, .future-bottom { scrollbar-width: thin; scrollbar-color: var(--accent) transparent; scrollbar-gutter: stable; }
 .future-list::-webkit-scrollbar, .future-detail::-webkit-scrollbar, .future-bottom::-webkit-scrollbar { display: block; width: 9px; height: 9px; }
@@ -243,6 +284,9 @@
   .zoom-actions { margin-left: 0; }
   .detail-head { flex-wrap: wrap; }
   .cyber-head { flex-wrap: wrap; }
+  .future-task-drawer { width: 100%; min-width: 0; }
+  .future-task-drawer-head, .future-task-drawer-content { padding-left: 22px; padding-right: 22px; }
+  .future-task-drawer-footer { align-items: flex-start; flex-direction: column; }
 }
 
 @media (min-width: 901px) {

@@ -116,3 +116,36 @@ func TestTasksOnOtherDates(t *testing.T) {
 		t.Fatal("task should not be found in the current month")
 	}
 }
+
+func TestTaskReadsFutureTaskDetailByDate(t *testing.T) {
+	store, life := newLife(t)
+	ctx := context.Background()
+	service := New(store)
+	created, err := service.AddTask(ctx, life, "远期详情", "完整 **描述**", "high", "2030-03-15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := service.Task(ctx, life, created.ID, "2030-03-15")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != created.Title || got.Description != "完整 **描述**" || got.Priority != "high" {
+		t.Fatalf("unexpected task detail: %+v", got)
+	}
+	if _, err := service.Task(ctx, life, created.ID, ""); err == nil {
+		t.Fatal("expected a required-date error")
+	}
+	if _, err := service.Task(ctx, life, "missing", "2030-03-15"); err == nil {
+		t.Fatal("expected a missing-task error")
+	}
+	updated, err := service.UpdateTaskDetail(ctx, life, created.ID, "2030-03-15", "已更新", "更新后的详情", "low")
+	if err != nil || updated.Title != "已更新" || updated.Priority != "low" {
+		t.Fatalf("unexpected update: task=%+v err=%v", updated, err)
+	}
+	if err := service.DeleteTaskForDate(ctx, life, created.ID, "2030-03-15"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Task(ctx, life, created.ID, "2030-03-15"); err == nil {
+		t.Fatal("expected deleted task to be missing")
+	}
+}

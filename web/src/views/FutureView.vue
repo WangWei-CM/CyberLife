@@ -3,10 +3,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import ZoomCalendar from '../components/ZoomCalendar.vue'
 import ProgressBar from '../components/ProgressBar.vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
+import DiaryEditor from '../components/DiaryEditor.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
-import { api, type FutureTask, type Plan } from '../api/client'
-import { isWriter } from '../stores/auth'
+import { api, type FutureTask, type Plan, type Task } from '../api/client'
+import { authState, isWriter } from '../stores/auth'
 import { ui } from '../stores/ui'
 import { useCountUp } from '../lib/motion'
 import { addDaysISO, diffDays, monthDayLabel, relativeDayLabel, todayISO } from '../lib/dates'
@@ -34,6 +35,16 @@ const uploading = ref('')
 const draggingPlanId = ref('')
 const dropPlanId = ref('')
 const planOrderBusy = ref(false)
+const taskDrawerOpen = ref(false)
+const taskLoading = ref(false)
+const selectedTask = ref<Task | null>(null)
+const taskEditing = ref(false)
+const taskBusy = ref(false)
+const taskError = ref('')
+const taskDraft = ref({ title: '', description: '', priority: 'normal' as Task['priority'] })
+const taskAccessDraft = ref({ presetId: '', secret: false, commentable: false })
+const milestoneDraft = ref({ description: '', detail: '' })
+const presets = ref<{ id: string; name: string }[]>([])
 
 const comparePlans = (a: Plan, b: Plan) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.endDate.localeCompare(b.endDate)
 const sortedPlans = computed(() => [...plans.value].sort(comparePlans))
@@ -46,6 +57,8 @@ const planDisplay = useCountUp(() => selectedPlan.value?.progress ?? 0)
 const remainingDays = computed(() => selectedPlan.value ? diffDays(today, selectedPlan.value.endDate) : 0)
 const isOngoing = (plan: Plan) => plan.startDate <= today && today <= plan.endDate && plan.progress < 100
 const fileSize = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
+const theme = computed(() => (document.querySelector('.app-shell')?.classList.contains('light') ? 'light' : 'dark') as 'light' | 'dark')
+const taskVaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${selectedTask.value?.taskDate ?? selectedDate.value}:future-task:${selectedTask.value?.id ?? ''}`)
 
 async function loadPlans() {
   try {
@@ -53,6 +66,10 @@ async function loadPlans() {
     if (ui.pendingPlanId) { const pending = plans.value.find(plan => plan.id === ui.pendingPlanId); ui.pendingPlanId = ''; if (pending) { choose(pending); return } }
     if (!selectedPlanId.value && sortedPlans.value.length) choose(sortedPlans.value.find(isOngoing) ?? sortedPlans.value[0])
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' }
+}
+async function loadTaskPresets() {
+  if (!isWriter.value) return
+  try { presets.value = (await api.presets()).items } catch { presets.value = [] }
 }
 /** 任务按需分块拉取（单次 ≤ 366 天），只覆盖今天前后两年，更远处只显示规划横条。 */
 async function ensureTasks(from: string, to: string) {
@@ -164,13 +181,69 @@ async function removeFile(fileID: string) {
 async function addTask() {
   const title = newTask.value.trim()
   if (!title) return
-  try { const task = await api.addTask(title, '', 'normal', selectedDate.value); newTask.value = ''; tasks.value = new Map(tasks.value).set(task.id, { id: task.id, date: task.taskDate, title: task.title, priority: task.priority, done: task.done }) } catch (cause) { error.value = cause instanceof Error ? cause.message : '添加失败' }
+  try { const task = await api.addTask(title, '', 'normal', selectedDate.value); newTask.value = ''; syncTask(task) } catch (cause) { error.value = cause instanceof Error ? cause.message : '添加失败' }
+}
+function asFutureTask(task: Task): FutureTask { return { id: task.id, date: task.taskDate, title: task.title, priority: task.priority, done: task.done, presetId: task.presetId, secret: task.secret } }
+function syncTask(task: Task) {
+  tasks.value = new Map(tasks.value).set(task.id, asFutureTask(task))
+  if (selectedTask.value?.id === task.id) selectedTask.value = task
 }
 async function toggleTask(task: FutureTask) {
   if (!isWriter.value) return
   const next = !task.done
   tasks.value = new Map(tasks.value).set(task.id, { ...task, done: next })
-  try { await api.setTaskDone(task.id, next, task.date) } catch (cause) { tasks.value = new Map(tasks.value).set(task.id, { ...task, done: !next }); error.value = cause instanceof Error ? cause.message : '更新失败' }
+  try { syncTask(await api.setTaskDone(task.id, next, task.date)) } catch (cause) { tasks.value = new Map(tasks.value).set(task.id, { ...task, done: !next }); error.value = cause instanceof Error ? cause.message : '更新失败' }
+}
+function taskPriorityLabel(priority: Task['priority']) { return priority === 'high' ? '高优先级' : priority === 'low' ? '低优先级' : '普通优先级' }
+function closeTaskDrawer() { taskDrawerOpen.value = false; taskLoading.value = false; selectedTask.value = null; taskEditing.value = false; taskError.value = '' }
+async function openTaskDrawer(task: FutureTask) {
+  if (!isWriter.value) return
+  taskDrawerOpen.value = true
+  taskLoading.value = true
+  taskError.value = ''
+  selectedTask.value = null
+  taskEditing.value = false
+  try {
+    const detail = await api.task(task.id, task.date)
+    selectedTask.value = detail
+    taskDraft.value = { title: detail.title, description: detail.description, priority: detail.priority }
+    taskAccessDraft.value = { presetId: detail.presetId ?? '', secret: !!detail.secret, commentable: !!detail.commentable }
+  } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '读取任务详情失败' } finally { taskLoading.value = false }
+}
+async function saveTask() {
+  const task = selectedTask.value
+  if (!task || taskBusy.value || !taskDraft.value.title.trim()) return
+  taskBusy.value = true
+  taskError.value = ''
+  try { syncTask(await api.updateFutureTask(task.id, task.taskDate, taskDraft.value)); taskEditing.value = false } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '保存失败' } finally { taskBusy.value = false }
+}
+async function saveTaskAccess() {
+  const task = selectedTask.value
+  if (!task || taskBusy.value) return
+  taskBusy.value = true
+  taskError.value = ''
+  try { syncTask(await api.setTaskAccess(task.id, taskAccessDraft.value.presetId, taskAccessDraft.value.secret, taskAccessDraft.value.commentable)) } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '权限保存失败' } finally { taskBusy.value = false }
+}
+async function addTaskMilestone() {
+  const task = selectedTask.value
+  if (!task || taskBusy.value || !milestoneDraft.value.description.trim()) return
+  taskBusy.value = true
+  taskError.value = ''
+  try { await api.addMilestone({ target_type: 'task', target_id: task.id, description: milestoneDraft.value.description.trim(), detail: milestoneDraft.value.detail.trim(), preset_id: taskAccessDraft.value.presetId, secret: taskAccessDraft.value.secret }); milestoneDraft.value = { description: '', detail: '' } } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '里程碑保存失败' } finally { taskBusy.value = false }
+}
+async function removeTask() {
+  const task = selectedTask.value
+  if (!task || taskBusy.value) return
+  taskBusy.value = true
+  taskError.value = ''
+  try { await api.deleteFutureTask(task.id, task.taskDate); const next = new Map(tasks.value); next.delete(task.id); tasks.value = next; closeTaskDrawer() } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '删除失败' } finally { taskBusy.value = false }
+}
+async function toggleTaskFromDrawer() {
+  const task = selectedTask.value
+  if (!task || taskBusy.value) return
+  taskBusy.value = true
+  taskError.value = ''
+  try { syncTask(await api.setTaskDone(task.id, !task.done, task.taskDate)) } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '更新失败' } finally { taskBusy.value = false }
 }
 function startResize(kind: 'col' | 'row', event: PointerEvent) {
   dragging.value = kind
@@ -197,7 +270,7 @@ function startResize(kind: 'col' | 'row', event: PointerEvent) {
 }
 watch(selectedPlan, plan => { if (plan) progress.value = plan.progress })
 watch(() => ui.pendingPlanId, id => { if (id && plans.value.length) { choosePlanById(id); ui.pendingPlanId = '' } })
-onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(today, 60)) })
+onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, -7), addDaysISO(today, 60)) })
 </script>
 
 <template>
@@ -293,7 +366,14 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
                 <div class="day-col">
                   <form v-if="isWriter" class="task-add" @submit.prevent="addTask"><input v-model="newTask" :placeholder="selectedDate === today ? '为今天添加待办，回车保存' : `为 ${monthDayLabel(selectedDate)} 添加待办，回车保存`" maxlength="120" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
                   <ul v-if="dayTasks.length" class="day-tasks">
-                    <li v-for="task in dayTasks" :key="task.id" :class="{ done: task.done }"><label class="task-row"><input type="checkbox" :checked="task.done" :disabled="!isWriter" @change="toggleTask(task)" /><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><i v-if="task.priority === 'high'" class="task-priority high" title="高优先级" /></label></li>
+                    <li v-for="task in dayTasks" :key="task.id" :class="{ done: task.done }">
+                      <div class="task-row future-task-row" :class="{ editable: isWriter }" :role="isWriter ? 'button' : undefined" :tabindex="isWriter ? 0 : undefined" @click="openTaskDrawer(task)" @keydown.enter="openTaskDrawer(task)">
+                        <input type="checkbox" :checked="task.done" :disabled="!isWriter" :aria-label="`${task.title}完成状态`" @click.stop @change="toggleTask(task)" />
+                        <span class="task-title" :class="{ done: task.done }">{{ task.title }}</span>
+                        <i v-if="task.priority === 'high'" class="task-priority high" title="高优先级" />
+                        <AppIcon v-if="isWriter" name="chevron-right" :size="14" class="future-task-open" />
+                      </div>
+                    </li>
                   </ul>
                   <EmptyState v-else icon="check" :text="selectedDate === today ? '今天还没有待办' : '这一天还没有待办'" compact />
                 </div>
@@ -310,5 +390,46 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
         </section>
       </Transition>
     </section>
+    <Transition name="future-drawer">
+      <div v-if="taskDrawerOpen" class="future-task-drawer-layer" @click.self="closeTaskDrawer">
+        <aside class="future-task-drawer" role="dialog" aria-modal="true" aria-label="未来待办详情">
+          <header class="future-task-drawer-head">
+            <div><small class="faint mono">{{ selectedTask?.taskDate ?? selectedDate }}</small><h2>待办详情</h2></div>
+            <div class="future-task-drawer-actions"><button v-if="selectedTask" class="icon-button" :aria-label="taskEditing ? '退出编辑' : '编辑待办'" @click="taskEditing = !taskEditing"><AppIcon :name="taskEditing ? 'close' : 'edit'" :size="16" /></button><button class="icon-button" aria-label="关闭待办详情" @click="closeTaskDrawer"><AppIcon name="close" :size="16" /></button></div>
+          </header>
+          <div class="future-task-drawer-content">
+            <EmptyState v-if="taskLoading" icon="target" text="正在读取待办详情" compact />
+            <template v-else-if="selectedTask">
+              <p v-if="taskError" class="error future-task-error" role="alert">{{ taskError }}</p>
+              <div class="future-task-status">
+                <span class="task-priority-label" :class="`priority-${selectedTask.priority}`">{{ taskPriorityLabel(selectedTask.priority) }}</span>
+                <button class="text-button" :disabled="taskBusy" @click="toggleTaskFromDrawer"><AppIcon :name="selectedTask.done ? 'repeat' : 'check'" :size="14" />{{ selectedTask.done ? '标记未完成' : '标记完成' }}</button>
+              </div>
+              <form v-if="taskEditing" class="future-task-editor" @submit.prevent="saveTask">
+                <input v-model="taskDraft.title" maxlength="120" aria-label="任务标题" />
+                <select v-model="taskDraft.priority" aria-label="任务优先级"><option value="high">高优先级</option><option value="normal">普通优先级</option><option value="low">低优先级</option></select>
+                <DiaryEditor :model-value="taskDraft.description" editor-id="future-task-detail-editor" :theme="theme" :vault-key="taskVaultKey" placeholder="任务详细描述（支持 Markdown）" @update:model-value="taskDraft.description = $event" />
+                <button class="primary" type="submit" :disabled="taskBusy || !taskDraft.title.trim()">保存待办</button>
+              </form>
+              <section v-else class="future-task-preview">
+                <h1>{{ selectedTask.title }}</h1>
+                <MarkdownPreview v-if="selectedTask.description" :model-value="selectedTask.description" :editor-id="`future-task-${selectedTask.id}`" :theme="theme" theme-class="theme-future" />
+                <EmptyState v-else icon="book" text="没有详细描述" compact />
+              </section>
+              <section class="future-task-settings">
+                <header><b>权限与互动</b><small class="faint">附件默认继承任务权限</small></header>
+                <label class="field"><span>权限预设</span><select v-model="taskAccessDraft.presetId"><option value="">锚点范围内公开</option><option v-for="preset in presets" :key="preset.id" :value="preset.id">{{ preset.name }}</option></select></label>
+                <label class="check-field"><input v-model="taskAccessDraft.secret" type="checkbox" />绝密（仅书写者可见）</label>
+                <label class="check-field"><input v-model="taskAccessDraft.commentable" type="checkbox" />允许评论</label>
+                <button class="text-button" :disabled="taskBusy" @click="saveTaskAccess"><AppIcon name="shield" :size="14" />保存权限设置</button>
+                <div class="future-milestone-form"><b>标记里程碑</b><input v-model="milestoneDraft.description" placeholder="里程碑描述" maxlength="120" /><textarea v-model="milestoneDraft.detail" placeholder="详细信息（可选）" maxlength="500" rows="2" /><button class="text-button" :disabled="taskBusy || !milestoneDraft.description.trim()" @click="addTaskMilestone"><AppIcon name="medal" :size="14" />添加里程碑</button></div>
+              </section>
+              <footer class="future-task-drawer-footer"><button class="text-button danger" :disabled="taskBusy" @click="removeTask"><AppIcon name="trash" :size="14" />删除待办</button><span class="faint">日期固定为 {{ selectedTask.taskDate }}</span></footer>
+            </template>
+            <EmptyState v-else icon="target" :text="taskError || '未找到待办'" compact />
+          </div>
+        </aside>
+      </div>
+    </Transition>
   </main>
 </template>

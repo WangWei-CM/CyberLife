@@ -452,6 +452,77 @@ func (s *Service) AddTask(ctx context.Context, life, title, description, priorit
 	return x, e
 }
 
+// Task reads one task from the month selected by its required task date.
+// It is used by the future-page editor so it can load a task's full detail without
+// exposing descriptions through the lightweight calendar feed.
+func (s *Service) Task(ctx context.Context, life, id, taskDate string) (Task, error) {
+	if strings.TrimSpace(taskDate) == "" {
+		return Task{}, fmt.Errorf("任务日期不能为空")
+	}
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return Task{}, e
+	}
+	db, e := s.db(ctx, life, at)
+	if e != nil {
+		return Task{}, e
+	}
+	defer db.Close()
+	x, e := readTask(ctx, db, id)
+	if e == sql.ErrNoRows {
+		return Task{}, fmt.Errorf("任务不存在")
+	}
+	return x, e
+}
+
+// UpdateTaskDetail updates the editable fields of a task stored on any date.
+func (s *Service) UpdateTaskDetail(ctx context.Context, life, id, taskDate, title, description, priority string) (Task, error) {
+	if strings.TrimSpace(title) == "" {
+		return Task{}, fmt.Errorf("任务标题不能为空")
+	}
+	if priority != "low" && priority != "normal" && priority != "high" {
+		priority = "normal"
+	}
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return Task{}, e
+	}
+	db, e := s.db(ctx, life, at)
+	if e != nil {
+		return Task{}, e
+	}
+	defer db.Close()
+	result, e := db.ExecContext(ctx, "UPDATE tasks SET title=?,description=?,priority=?,updated_at=? WHERE id=? AND life_id=?", strings.TrimSpace(title), description, priority, time.Now().UTC().Format(time.RFC3339Nano), id, life)
+	if e != nil {
+		return Task{}, e
+	}
+	if n, _ := result.RowsAffected(); n != 1 {
+		return Task{}, fmt.Errorf("任务不存在")
+	}
+	return readTask(ctx, db, id)
+}
+
+// DeleteTaskForDate deletes a task from the month selected by its date.
+func (s *Service) DeleteTaskForDate(ctx context.Context, life, id, taskDate string) error {
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return e
+	}
+	db, e := s.db(ctx, life, at)
+	if e != nil {
+		return e
+	}
+	defer db.Close()
+	result, e := db.ExecContext(ctx, "DELETE FROM tasks WHERE id=? AND life_id=?", id, life)
+	if e != nil {
+		return e
+	}
+	if n, _ := result.RowsAffected(); n != 1 {
+		return fmt.Errorf("任务不存在")
+	}
+	return nil
+}
+
 // SetTaskDone toggles completion. Tasks live in the month database of their date, so callers pass the
 // task date to locate it; an empty date falls back to the current month.
 func (s *Service) SetTaskDone(ctx context.Context, life, id string, done bool, taskDate string) (Task, error) {
