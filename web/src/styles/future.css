@@ -73,7 +73,8 @@
 .plan-card.ongoing .plan-dates em { color: var(--accent); }
 .plan-card .progress-wrap { gap: 0; }
 
-.future-detail { overflow: auto; }
+.future-detail { overflow-x: hidden; overflow-y: auto; }
+.plan-dialog .future-detail > .detail-body { transform: skewX(15deg); transform-origin: left top; }
 .detail-body { display: grid; gap: 18px; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .detail-title-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
