@@ -78,6 +78,9 @@ func (s *Server) Router() *gin.Engine {
 	writer.Use(s.requireWriter())
 	writer.GET("", s.nowToday)
 	writer.POST("/plans", s.createPlan)
+	// Keep reordering on a distinct method/path shape so it can never be interpreted
+	// as an update for a plan whose ID happens to be the route segment.
+	writer.POST("/plans/reorder", s.reorderPlans)
 	writer.PUT("/plans/order", s.reorderPlans)
 	writer.POST("/plans/:id/progress", s.setPlanProgress)
 	writer.PUT("/plans/:id", s.updatePlan)
