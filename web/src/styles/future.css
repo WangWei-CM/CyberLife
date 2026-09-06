@@ -57,12 +57,18 @@
 .form-control > :is(input, textarea, select) { width: 100%; }
 .plan-form .primary { justify-self: end; }
 .plan-list { display: grid; gap: 8px; position: relative; }
+.plan-dialog .future-list .plan-list { transform: none; transform-origin: left top; }
+.plan-dialog .future-list .plan-card { transform: none; }
+.plan-list li { min-width: 0; transition: transform var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out); }
+.plan-list li.plan-drop-target { transform: translateX(8px); filter: drop-shadow(0 0 7px var(--accent-glow)); }
 .plan-card {
   display: block; width: calc(100% - 12px); margin: 0 6px; text-align: left;
   background: var(--surface-2); color: var(--text);
   clip-path: none; transform: skewX(var(--future-skew)); transform-origin: center;
   transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out);
 }
+.plan-card[draggable="true"] { cursor: grab; }
+.plan-card[draggable="true"]:active, .plan-card.dragging { cursor: grabbing; opacity: .52; }
 .plan-card:hover, .plan-card:focus-visible { box-shadow: 0 0 12px var(--accent-soft), 0 0 28px var(--accent-soft); background: var(--surface-3); }
 .plan-card.active { box-shadow: inset 3px 0 0 var(--accent), 0 0 14px var(--accent-soft), 0 0 32px var(--accent-soft); background: var(--accent-soft); }
 .plan-card.done { opacity: .6; }

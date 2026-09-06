@@ -46,6 +46,7 @@ type Plan struct {
 	CoverURL     string     `json:"coverUrl"`
 	IconURL      string     `json:"iconUrl"`
 	Files        []PlanFile `json:"files"`
+	SortOrder    int        `json:"sortOrder"`
 	coverPath    string
 	iconPath     string
 }
@@ -61,12 +62,12 @@ type Task struct {
 
 type planScanner interface{ Scan(dest ...any) error }
 
-const planColumns = "id,name,start_date,end_date,intro_md,COALESCE(secret,0),COALESCE(visibility_preset_id,''),COALESCE(cover_path,''),COALESCE(icon_path,'')"
+const planColumns = "id,name,start_date,end_date,intro_md,COALESCE(secret,0),COALESCE(visibility_preset_id,''),COALESCE(cover_path,''),COALESCE(icon_path,''),COALESCE(sort_order,0)"
 
 func scanPlan(row planScanner) (Plan, error) {
 	var x Plan
 	var secret int
-	e := row.Scan(&x.ID, &x.Name, &x.StartDate, &x.EndDate, &x.Intro, &secret, &x.PresetID, &x.coverPath, &x.iconPath)
+	e := row.Scan(&x.ID, &x.Name, &x.StartDate, &x.EndDate, &x.Intro, &secret, &x.PresetID, &x.coverPath, &x.iconPath, &x.SortOrder)
 	if e != nil {
 		return Plan{}, e
 	}
@@ -145,7 +146,12 @@ func (s *Service) ListPlans(ctx context.Context, life string) ([]Plan, error) {
 		db.Close()
 		out = append(out, batch...)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].EndDate < out[j].EndDate })
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].SortOrder != out[j].SortOrder {
+			return out[i].SortOrder < out[j].SortOrder
+		}
+		return out[i].EndDate < out[j].EndDate
+	})
 	return out, nil
 }
 
@@ -199,16 +205,64 @@ func (s *Service) CreatePlan(ctx context.Context, life, name, start, end, intro 
 	if e := validatePlan(name, start, end); e != nil {
 		return Plan{}, e
 	}
+	existing, e := s.ListPlans(ctx, life)
+	if e != nil {
+		return Plan{}, e
+	}
+	nextOrder := 0
+	for _, plan := range existing {
+		if plan.SortOrder >= nextOrder {
+			nextOrder = plan.SortOrder + 1
+		}
+	}
 	db, e := s.store.OpenLifeMonth(ctx, life, storage.MonthKey(time.Now()))
 	if e != nil {
 		return Plan{}, e
 	}
 	defer db.Close()
-	x := Plan{ID: uuid.NewString(), Name: name, StartDate: start, EndDate: end, Intro: intro, Files: []PlanFile{}}
+	x := Plan{ID: uuid.NewString(), Name: name, StartDate: start, EndDate: end, Intro: intro, SortOrder: nextOrder, Files: []PlanFile{}}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, e = db.ExecContext(ctx, "INSERT INTO plans(id,life_id,name,start_date,end_date,intro_md,secret,commentable,created_at,updated_at) VALUES(?,?,?,?,?,?,0,0,?,?)", x.ID, life, x.Name, x.StartDate, x.EndDate, x.Intro, now, now)
+	_, e = db.ExecContext(ctx, "INSERT INTO plans(id,life_id,name,start_date,end_date,intro_md,secret,commentable,sort_order,created_at,updated_at) VALUES(?,?,?,?,?,?,0,0,?,?,?)", x.ID, life, x.Name, x.StartDate, x.EndDate, x.Intro, x.SortOrder, now, now)
 	x.TimeProgress = timeProgress(start, end)
 	return x, e
+}
+
+// ReorderPlans persists the exact writer-defined ordering across plans stored in different month databases.
+func (s *Service) ReorderPlans(ctx context.Context, life string, ids []string) error {
+	plans, e := s.ListPlans(ctx, life)
+	if e != nil {
+		return e
+	}
+	if len(ids) != len(plans) {
+		return fmt.Errorf("排序列表不完整")
+	}
+	known := make(map[string]struct{}, len(plans))
+	for _, plan := range plans {
+		known[plan.ID] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := known[id]; !ok {
+			return fmt.Errorf("规划不存在")
+		}
+		if _, duplicate := seen[id]; duplicate {
+			return fmt.Errorf("排序列表包含重复规划")
+		}
+		seen[id] = struct{}{}
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for order, id := range ids {
+		db, _, e := s.findPlan(ctx, life, id)
+		if e != nil {
+			return e
+		}
+		_, e = db.ExecContext(ctx, "UPDATE plans SET sort_order=?,updated_at=? WHERE id=?", order, now, id)
+		db.Close()
+		if e != nil {
+			return e
+		}
+	}
+	return nil
 }
 
 // UpdatePlan edits name, dates and the Markdown intro of an existing plan.

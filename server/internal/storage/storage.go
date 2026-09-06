@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS plan_files (id TEXT PRIMARY KEY, plan_id TEXT NOT NUL
 		{"tasks", "visibility_preset_id", "TEXT"}, {"tasks", "commentable", "INTEGER NOT NULL DEFAULT 0"}, {"tasks", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"mood_records", "secret", "INTEGER NOT NULL DEFAULT 0"}, {"body_records", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"content_attachments", "visibility_preset_id", "TEXT"}, {"content_attachments", "secret", "INTEGER NOT NULL DEFAULT 0"},
-		{"inbox_messages", "ref_date", "TEXT"}, {"plans", "cover_path", "TEXT"}, {"plans", "icon_path", "TEXT"},
+		{"inbox_messages", "ref_date", "TEXT"}, {"plans", "cover_path", "TEXT"}, {"plans", "icon_path", "TEXT"}, {"plans", "sort_order", "INTEGER NOT NULL DEFAULT 0"},
 	} {
 		if err := ensureColumn(ctx, db, change.table, change.column, change.definition); err != nil {
 			return err

@@ -31,8 +31,11 @@ const topHeight = ref(Number(localStorage.getItem('future-top-height-v2') || 340
 const dragging = ref<'col' | 'row' | null>(null)
 const busy = ref(false)
 const uploading = ref('')
+const draggingPlanId = ref('')
+const dropPlanId = ref('')
+const planOrderBusy = ref(false)
 
-const sortedPlans = computed(() => [...plans.value].sort((a, b) => a.endDate.localeCompare(b.endDate)))
+const sortedPlans = computed(() => [...plans.value].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.endDate.localeCompare(b.endDate)))
 const selectedPlan = computed(() => plans.value.find(plan => plan.id === selectedPlanId.value) ?? null)
 const taskList = computed(() => [...tasks.value.values()])
 const dayTasks = computed(() => taskList.value.filter(task => task.date === selectedDate.value).sort((a, b) => Number(a.done) - Number(b.done)))
@@ -83,6 +86,38 @@ function choosePlanById(id: string) { const plan = plans.value.find(item => item
 function openPlanDialog() { if (!selectedPlan.value && sortedPlans.value.length) choose(sortedPlans.value.find(isOngoing) ?? sortedPlans.value[0]); planDialogOpen.value = true }
 function closePlanDialog() { planDialogOpen.value = false; editMode.value = false }
 function replacePlan(next: Plan) { plans.value = plans.value.map(plan => plan.id === next.id ? { ...plan, ...next } : plan) }
+function startPlanDrag(plan: Plan, event: DragEvent) {
+  if (!isWriter.value || planOrderBusy.value) return
+  draggingPlanId.value = plan.id
+  dropPlanId.value = ''
+  event.dataTransfer?.setData('text/plain', plan.id)
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+function hoverPlanDrop(plan: Plan, event: DragEvent) {
+  if (!draggingPlanId.value || draggingPlanId.value === plan.id) return
+  event.preventDefault()
+  dropPlanId.value = plan.id
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+}
+async function dropPlan(plan: Plan, event: DragEvent) {
+  event.preventDefault()
+  const sourceID = draggingPlanId.value || event.dataTransfer?.getData('text/plain') || ''
+  draggingPlanId.value = ''
+  dropPlanId.value = ''
+  if (!sourceID || sourceID === plan.id || planOrderBusy.value) return
+  const next = [...sortedPlans.value]
+  const sourceIndex = next.findIndex(item => item.id === sourceID)
+  const targetIndex = next.findIndex(item => item.id === plan.id)
+  if (sourceIndex < 0 || targetIndex < 0) return
+  const [moved] = next.splice(sourceIndex, 1)
+  next.splice(targetIndex, 0, moved)
+  const previous = plans.value
+  const order = new Map(next.map((item, index) => [item.id, index]))
+  plans.value = plans.value.map(item => ({ ...item, sortOrder: order.get(item.id) ?? item.sortOrder }))
+  planOrderBusy.value = true
+  try { await api.reorderPlans(next.map(item => item.id)) } catch (cause) { plans.value = previous; error.value = cause instanceof Error ? cause.message : '排序保存失败' } finally { planOrderBusy.value = false }
+}
+function endPlanDrag() { draggingPlanId.value = ''; dropPlanId.value = '' }
 async function createPlan() {
   if (!form.value.name.trim() || busy.value) return
   busy.value = true
@@ -181,8 +216,8 @@ onMounted(() => { loadPlans(); ensureTasks(addDaysISO(today, -7), addDaysISO(tod
           </form>
         </Transition>
         <TransitionGroup v-if="sortedPlans.length" name="list" tag="ul" class="plan-list">
-          <li v-for="plan in sortedPlans" :key="plan.id">
-            <button v-glow class="plan-card" :class="{ active: plan.id === selectedPlanId, ongoing: isOngoing(plan), done: plan.progress >= 100 }" @click="choose(plan)">
+          <li v-for="plan in sortedPlans" :key="plan.id" :class="{ 'plan-drop-target': dropPlanId === plan.id && draggingPlanId !== plan.id }" @dragover="hoverPlanDrop(plan, $event)" @drop="dropPlan(plan, $event)">
+            <button v-glow class="plan-card" :class="{ active: plan.id === selectedPlanId, ongoing: isOngoing(plan), done: plan.progress >= 100, dragging: draggingPlanId === plan.id }" :draggable="isWriter && !planOrderBusy" @dragstart="startPlanDrag(plan, $event)" @dragend="endPlanDrag" @click="choose(plan)">
               <span class="plan-card-inner">
                 <span class="plan-name-row"><img v-if="plan.iconUrl" class="plan-icon small" :src="plan.iconUrl" alt="" /><b class="plan-name">{{ plan.name }}</b></span>
                 <small class="plan-dates mono">{{ monthDayLabel(plan.startDate) }} → {{ monthDayLabel(plan.endDate) }}<em>{{ relativeDayLabel(plan.endDate) }}</em></small>

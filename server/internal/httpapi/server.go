@@ -78,6 +78,7 @@ func (s *Server) Router() *gin.Engine {
 	writer.Use(s.requireWriter())
 	writer.GET("", s.nowToday)
 	writer.POST("/plans", s.createPlan)
+	writer.PUT("/plans/order", s.reorderPlans)
 	writer.POST("/plans/:id/progress", s.setPlanProgress)
 	writer.PUT("/plans/:id", s.updatePlan)
 	writer.POST("/plans/:id/cover", s.uploadPlanImage("cover"))
@@ -400,6 +401,20 @@ func (s *Server) updatePlan(c *gin.Context) {
 		return
 	}
 	c.JSON(200, x)
+}
+func (s *Server) reorderPlans(c *gin.Context) {
+	var r struct {
+		IDs []string `json:"ids"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	if e := s.future.ReorderPlans(c.Request.Context(), a.LifeID, r.IDs); e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.Status(204)
 }
 func (s *Server) setPlanProgress(c *gin.Context) {
 	var r struct {
