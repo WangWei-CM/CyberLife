@@ -74,7 +74,6 @@
 .plan-card .progress-wrap { gap: 0; }
 
 .future-detail { overflow-x: hidden; overflow-y: auto; }
-.plan-dialog .future-detail > .detail-body { transform: skewX(15deg); transform-origin: left top; }
 .detail-body { display: grid; gap: 18px; }
 .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .detail-title-row { display: flex; align-items: center; gap: 14px; min-width: 0; }
@@ -96,8 +95,11 @@
 .detail-title { font-size: 20px; font-weight: 700; letter-spacing: .08em; color: var(--text); }
 .detail-dates { margin-top: 6px; font-size: 12px; color: var(--text-dim); letter-spacing: .06em; }
 .detail-dates span { margin-left: 12px; color: var(--accent); }
+.plan-dialog .future-detail { --future-detail-rail: clamp(36px, 5vw, 80px); }
+.plan-dialog .future-detail .detail-head, .plan-dialog .future-detail .dual-progress { width: calc(100% - var(--future-detail-rail)); min-width: 0; margin-left: var(--future-detail-rail); }
 .dual-progress { display: grid; gap: 10px; }
-.dual-row { display: grid; grid-template-columns: 96px 1fr 48px; align-items: center; gap: 12px; }
+.dual-row { display: grid; grid-template-columns: minmax(76px, 96px) minmax(0, 1fr) 40px; align-items: center; gap: 8px; }
+.dual-row > :nth-child(2) { min-width: 0; }
 .dual-row b { text-align: right; font-size: 13px; color: var(--text); }
 .progress-form { gap: 8px; padding: 12px; }
 .detail-intro .md-editor { border: 0 !important; background: transparent !important; min-height: 0; }
