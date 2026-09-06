@@ -630,7 +630,10 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const render = (time: number) => {
     if (destroyed) return
     const elapsed = time - stageStarted
+    const revealLinear = clamp(elapsed / NODE_REVEAL_MS)
     const revealProgress = easeOutCubic(elapsed / NODE_REVEAL_MS)
+    const chipRevealProgress = easeOutCubic((revealLinear - .18) / .62)
+    const contentRevealProgress = easeInOutCubic((revealLinear - .52) / .48)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
     const pageProgress = easeOutCubic(elapsed / PAGE_ENTER_MS)
 
@@ -648,8 +651,9 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       material.opacity = (.16 + index * .035) + Math.sin(time * (.00034 + index * .00004) + index) * .025
     })
     if (stage === 'node-reveal') {
-      renderer.setClearColor(0x02060b, 1 - clamp(revealProgress / .18))
-      node.visible = true
+      renderer.setClearColor(0x02060b, 1 - contentRevealProgress * .42)
+      node.visible = chipRevealProgress > 0
+      transitionRoot?.style.setProperty('--node-copy-opacity', String(chipRevealProgress))
       cloudField.visible = true
       cloudFieldLayers.forEach((layer, index) => {
         layer.position.copy(cloudFieldOrigins[index])
@@ -661,21 +665,22 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
       atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
-      cloudFieldMaterials.forEach((material, index) => { material.opacity = (.16 + index * .035) * clamp((revealProgress - .18) / .3) })
-      node.position.set(0, .2 + (1 - revealProgress) * .8, .3)
-      node.scale.setScalar(.38 + revealProgress * .62)
-      sweep.position.x = -.75 + revealProgress * 1.5
-      sweepMaterial.opacity = .48 * Math.sin(revealProgress * Math.PI)
-      nodeGlow.intensity = 16 * Math.sin(revealProgress * Math.PI)
-      node.rotation.set(-.32 + revealProgress * .16, .65 + time * .00016, .12 + time * .00008)
+      cloudFieldMaterials.forEach((material, index) => { material.opacity = (.16 + index * .035) * clamp(revealLinear / .22) })
+      node.position.set(0, .2 + (1 - chipRevealProgress) * .8, .3)
+      node.scale.setScalar(.28 + chipRevealProgress * .72)
+      sweep.position.x = -.75 + chipRevealProgress * 1.5
+      sweepMaterial.opacity = .48 * Math.sin(chipRevealProgress * Math.PI)
+      nodeGlow.intensity = 16 * Math.sin(chipRevealProgress * Math.PI)
+      node.rotation.set(-.32 + chipRevealProgress * .16, .65 + time * .00016, .12 + time * .00008)
       camera.position.z = 10 - revealProgress * 1.25
       camera.lookAt(0, -.55 + revealProgress * .35, 0)
       clouds.material.opacity = .78 + Math.sin(time * .0005) * .1
       cloudHighlight.material.opacity = .22 + Math.sin(time * .0007 + 1) * .06
       if (elapsed >= NODE_REVEAL_MS) setStage('node-fall')
     } else if (stage === 'node-fall') {
-      renderer.setClearColor(0x02060b, Math.pow(1 - fallProgress, 1.15))
+      renderer.setClearColor(0x02060b, .58 * Math.pow(1 - fallProgress, 1.15))
       node.visible = true
+      transitionRoot?.style.setProperty('--node-copy-opacity', '1')
       cloudField.visible = true
       earthGroup.visible = false
       node.position.set(0, .2, .3)
@@ -702,6 +707,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     } else if (stage === 'page-enter') {
       renderer.setClearColor(0x02060b, 0)
       node.visible = true
+      transitionRoot?.style.setProperty('--node-copy-opacity', '0')
       cloudField.visible = false
       earthGroup.visible = false
       node.position.set(0, .2, .3)
@@ -713,6 +719,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     } else if (stage === 'orbital-login' || stage === 'authenticating') {
       renderer.setClearColor(0x02060b, 1)
       node.visible = false
+      transitionRoot?.style.setProperty('--node-copy-opacity', '0')
       sweepMaterial.opacity = 0
       nodeGlow.intensity = 0
       earthGroup.visible = true
@@ -766,6 +773,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       transitionRoot?.style.removeProperty('--node-copy-rotate-x')
       transitionRoot?.style.removeProperty('--node-copy-rotate-y')
       transitionRoot?.style.removeProperty('--node-copy-rotate-z')
+      transitionRoot?.style.removeProperty('--node-copy-opacity')
       disposeObject(scene)
       renderer.renderLists.dispose()
       renderer.dispose()

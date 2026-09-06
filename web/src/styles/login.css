@@ -28,7 +28,8 @@
     perspective(900px) rotateX(var(--node-copy-rotate-x, 2deg)) rotateY(var(--node-copy-rotate-y, -3deg)) rotateZ(var(--node-copy-rotate-z, -.5deg)) scale(var(--node-copy-scale, 1));
   transition: opacity .28s var(--ease-out);
 }
-.login-transition.node-reveal .login-welcome, .login-transition.node-fall .login-welcome { opacity: 1; }
+.login-transition.node-reveal .login-welcome { opacity: var(--node-copy-opacity, 0); }
+.login-transition.node-fall .login-welcome { opacity: 1; }
 .login-welcome .login-node-caption, .login-welcome .login-greeting, .login-welcome .login-quote { margin: 0; }
 .login-stage-label, .login-node-caption { font-family: var(--font-mono); letter-spacing: .18em; }
 .login-brand-image {
