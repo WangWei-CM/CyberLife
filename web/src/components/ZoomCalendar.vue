@@ -171,28 +171,30 @@ defineExpose({ zoomBy, goToday, rangeLabel })
     </div>
     <div ref="root" class="zoom-calendar" :class="[`level-${level}`, { zooming, dragging }]" tabindex="0" role="application" aria-label="待办日历，滚轮缩放，拖动平移，点击选中日期" @wheel="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp">
       <TransitionGroup name="tick" tag="div" class="cal-columns">
-        <div v-for="column in columns" :key="column.key" class="cal-col" :class="[`col-${column.level}`, { past: column.past, today: column.today, weekend: column.weekend }]" :style="{ transform: `translateX(${column.left}px)`, width: `${column.width}px` }">
-          <Transition name="tick"><header v-if="column.label" class="cal-label"><b>{{ column.label }}</b><small v-if="column.sub">{{ column.sub }}</small></header></Transition>
-          <div class="cal-events">
-            <template v-if="column.level === 'day'">
-              <span v-for="task in tasksFor(column).slice(0, 6)" :key="task.id" class="cal-event" :class="{ done: task.done, overdue: !task.done && column.past, high: task.priority === 'high' }" :title="task.title">{{ task.title }}</span>
-              <small v-if="tasksFor(column).length > 6" class="cal-more mono">+{{ tasksFor(column).length - 6 }}</small>
-            </template>
-            <template v-else>
-              <span v-if="tasksFor(column).length" class="cal-count mono" :class="{ wide: column.width > 40 }"><i v-for="task in tasksFor(column).slice(0, 12)" :key="task.id" :class="{ done: task.done, overdue: !task.done && dayIndex(task.date) < todayIndex }" /><b v-if="column.width > 40">{{ tasksFor(column).length }}</b></span>
-            </template>
+        <div v-for="column in columns" :key="column.key" class="cal-col" :class="[`col-${column.level}`, { past: column.past, today: column.today, weekend: column.weekend }]" :style="{ transform: `translateX(${column.left}px) skewX(-15deg)`, width: `${column.width}px` }">
+          <div class="cal-col-content">
+            <Transition name="tick"><header v-if="column.label" class="cal-label"><b>{{ column.label }}</b><small v-if="column.sub">{{ column.sub }}</small></header></Transition>
+            <div class="cal-events">
+              <template v-if="column.level === 'day'">
+                <span v-for="task in tasksFor(column).slice(0, 6)" :key="task.id" class="cal-event" :class="{ done: task.done, overdue: !task.done && column.past, high: task.priority === 'high' }" :title="task.title">{{ task.title }}</span>
+                <small v-if="tasksFor(column).length > 6" class="cal-more mono">+{{ tasksFor(column).length - 6 }}</small>
+              </template>
+              <template v-else>
+                <span v-if="tasksFor(column).length" class="cal-count mono" :class="{ wide: column.width > 40 }"><i v-for="task in tasksFor(column).slice(0, 12)" :key="task.id" :class="{ done: task.done, overdue: !task.done && dayIndex(task.date) < todayIndex }" /><b v-if="column.width > 40">{{ tasksFor(column).length }}</b></span>
+              </template>
+            </div>
           </div>
         </div>
       </TransitionGroup>
       <div class="cal-plans">
         <TransitionGroup name="tick">
-          <button v-for="item in planBars" :key="item.plan.id" class="cal-plan" :class="{ active: item.plan.id === selectedPlan, done: item.plan.progress >= 100 }" :data-plan="item.plan.id" :style="{ transform: `translateX(${item.left}px)`, width: `${item.width}px`, top: `${item.lane * 22}px` }" :title="item.plan.name" type="button">
+          <button v-for="item in planBars" :key="item.plan.id" class="cal-plan" :class="{ active: item.plan.id === selectedPlan, done: item.plan.progress >= 100 }" :data-plan="item.plan.id" :style="{ transform: `translateX(${item.left}px) skewX(-15deg)`, width: `${item.width}px`, top: `${item.lane * 22}px` }" :title="item.plan.name" type="button">
             <i :style="{ width: `${item.plan.progress}%` }" /><span v-if="item.width > 60">{{ item.plan.name }}</span>
           </button>
         </TransitionGroup>
       </div>
-      <i class="cal-selected" :style="{ transform: `translateX(${selectedX.left}px)`, width: `${selectedX.width}px` }" aria-hidden="true" />
-      <i class="cal-today" :style="{ transform: `translateX(${todayX}px)` }" aria-hidden="true" />
+      <i class="cal-selected" :style="{ transform: `translateX(${selectedX.left}px) skewX(-15deg)`, width: `${selectedX.width}px` }" aria-hidden="true" />
+      <i class="cal-today" :style="{ transform: `translateX(${todayX}px) skewX(-15deg)` }" aria-hidden="true" />
     </div>
   </div>
 </template>

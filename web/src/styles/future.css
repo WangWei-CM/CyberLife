@@ -113,7 +113,8 @@
 .zoom-calendar:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-soft); }
 .zoom-calendar.dragging { cursor: grabbing; }
 .cal-columns { position: absolute; inset: 0; }
-.cal-col { position: absolute; top: 0; bottom: 0; left: 0; display: grid; grid-template-rows: auto 1fr; box-shadow: inset 1px 0 0 var(--divider); will-change: transform; transition: background var(--dur-mid) var(--ease-out); clip-path: polygon(7% 0, 100% 0, 93% 100%, 0 100%); }
+.cal-col { position: absolute; top: 0; bottom: 0; left: 0; display: block; box-shadow: inset 1px 0 0 var(--divider); will-change: transform; transform-origin: center; transition: background var(--dur-mid) var(--ease-out); clip-path: none; }
+.cal-col-content { display: grid; grid-template-rows: auto 1fr; height: 100%; transform: skewX(15deg); transform-origin: center; }
 .cal-col.weekend { background: rgba(255, 255, 255, .015); }
 .cal-col.past { opacity: .55; }
 .cal-col.today { background: var(--accent-soft); box-shadow: inset 1px 0 0 var(--accent), inset -1px 0 0 var(--accent); }
@@ -138,12 +139,12 @@
 .cal-count i.overdue { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
 .cal-count b { font-size: 10px; color: var(--text-dim); margin-left: 2px; }
 .cal-plans { position: absolute; left: 0; right: 0; top: 34px; height: 66px; pointer-events: none; }
-.cal-plan { position: absolute; left: 0; height: 18px; padding: 0; overflow: hidden; background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text); font-size: 10px; letter-spacing: .06em; text-align: left; white-space: nowrap; pointer-events: auto; will-change: transform; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out); }
+.cal-plan { position: absolute; left: 0; height: 18px; padding: 0; overflow: hidden; background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text); font-size: 10px; letter-spacing: .06em; text-align: left; white-space: nowrap; pointer-events: auto; will-change: transform; clip-path: none; transform-origin: center; transition: box-shadow var(--dur-mid) var(--ease-out), background var(--dur-mid) var(--ease-out); }
 .cal-plan i { position: absolute; inset: 0; width: 0; background: color-mix(in srgb, var(--accent) 28%, transparent); transition: width var(--dur-slow) var(--ease-out); }
-.cal-plan span { position: relative; display: block; padding: 0 8px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; }
+.cal-plan span { position: relative; display: block; padding: 0 8px; line-height: 18px; overflow: hidden; text-overflow: ellipsis; transform: skewX(15deg); transform-origin: center; }
 .cal-plan:hover, .cal-plan.active { box-shadow: inset 0 0 0 1px var(--accent), 0 0 12px var(--accent-soft); background: var(--accent-soft); }
 .cal-plan.done { opacity: .45; }
-.cal-selected { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent-2-soft); box-shadow: inset 0 -2px 0 var(--accent-2); pointer-events: none; clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%); transition: transform var(--dur-mid) var(--ease-out), width var(--dur-mid) var(--ease-out); }
+.cal-selected { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent-2-soft); box-shadow: inset 0 -2px 0 var(--accent-2); pointer-events: none; clip-path: none; transform-origin: center; transition: transform var(--dur-mid) var(--ease-out), width var(--dur-mid) var(--ease-out); }
 .zoom-calendar.zooming .cal-selected, .zoom-calendar.dragging .cal-selected { transition: none; }
 .cal-today { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent-glow); pointer-events: none; }
 
