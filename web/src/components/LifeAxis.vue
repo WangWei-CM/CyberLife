@@ -183,18 +183,20 @@ defineExpose({ rangeLabel })
 <template>
   <aside ref="root" class="life-axis" :class="[`level-${level}`, { zooming, dragging, mirror }]" tabindex="0" role="slider" aria-label="人生时间轴，滚轮缩放，拖动平移，点击选中某一天" :aria-valuetext="selected" @wheel="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp" @keydown="onKey">
     <button class="axis-dock icon-button" type="button" :title="mirror ? '把时间轴放到左侧' : '把时间轴放到右侧'" :aria-label="mirror ? '把时间轴放到左侧' : '把时间轴放到右侧'" @pointerdown.stop @click.stop="emit('toggle-dock')"><AppIcon name="layout" :size="14" /></button>
-    <div class="axis-track" aria-hidden="true" />
-    <i class="axis-selected" :style="selectedStyle" aria-hidden="true" />
-    <TransitionGroup name="tick" tag="div" class="axis-ticks" aria-hidden="true">
-      <div v-for="tick in ticks" :key="tick.key" class="tick" :class="[`tick-${tick.level}`, { strong: tick.strong, selected: tick.level === 'day' && tick.index === selectedIndex }]" :style="{ transform: `translateY(${tick.top}px)`, height: `${tick.height}px` }">
-        <Transition name="tick"><time v-if="tick.label" class="tick-label">{{ tick.label }}</time></Transition>
-        <span class="tick-mark" />
-      </div>
-    </TransitionGroup>
-    <TransitionGroup name="medal" tag="div" class="axis-medals" aria-hidden="true">
-      <span v-for="medal in medals" :key="medal.key" class="axis-medal" :class="{ selected: medal.date === selected }" :style="{ top: `${medal.y}px` }" :title="medal.date"><AppIcon name="star" :size="10" :stroke-width="2.2" /></span>
-    </TransitionGroup>
-    <span class="axis-today" :style="todayStyle" aria-hidden="true"><Transition name="tick"><em v-if="pxPerDay >= 22">今</em></Transition></span>
+    <div class="axis-rail" aria-hidden="true">
+      <div class="axis-track" />
+      <i class="axis-selected" :style="selectedStyle" />
+      <TransitionGroup name="tick" tag="div" class="axis-ticks">
+        <div v-for="tick in ticks" :key="tick.key" class="tick" :class="[`tick-${tick.level}`, { strong: tick.strong, selected: tick.level === 'day' && tick.index === selectedIndex }]" :style="{ transform: `translateY(${tick.top}px)`, height: `${tick.height}px` }">
+          <Transition name="tick"><time v-if="tick.label" class="tick-label">{{ tick.label }}</time></Transition>
+          <span class="tick-mark" />
+        </div>
+      </TransitionGroup>
+      <TransitionGroup name="medal" tag="div" class="axis-medals">
+        <span v-for="medal in medals" :key="medal.key" class="axis-medal" :class="{ selected: medal.date === selected }" :style="{ top: `${medal.y}px` }" :title="medal.date"><AppIcon name="star" :size="10" :stroke-width="2.2" /></span>
+      </TransitionGroup>
+      <span class="axis-today" :style="todayStyle"><Transition name="tick"><em v-if="pxPerDay >= 22">今</em></Transition></span>
+    </div>
     <footer class="axis-range mono" aria-hidden="true">{{ rangeLabel.from }} – {{ rangeLabel.to }}<small>{{ rangeLabel.days }} 天</small></footer>
   </aside>
 </template>

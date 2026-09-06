@@ -73,28 +73,30 @@
   position: relative; height: calc(100vh - var(--topbar-h) - var(--page-pad) * 2); min-height: 320px;
   overflow: hidden; cursor: grab; user-select: none; touch-action: none; outline: 0;
   border-radius: var(--radius);
+  --axis-skew: -15deg; --axis-unskew: 15deg;
   background: linear-gradient(90deg, transparent, rgba(212, 175, 55, .03));
   transition: background var(--dur-mid) var(--ease-out);
 }
 .life-axis:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 .life-axis.dragging { cursor: grabbing; }
+.axis-rail { position: absolute; inset: 0; pointer-events: none; transform: skewX(var(--axis-skew)); transform-origin: center; }
 .axis-track { position: absolute; top: 0; bottom: 0; right: 28px; width: 2px; background: linear-gradient(180deg, transparent, var(--gold) 12%, var(--gold) 88%, transparent); box-shadow: 0 0 10px rgba(212, 175, 55, .45); pointer-events: none; }
 .axis-ticks, .axis-medals { position: absolute; inset: 0; pointer-events: none; }
 .tick { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: flex-end; justify-content: flex-end; will-change: transform; }
 .tick-mark { position: absolute; right: 22px; bottom: 0; width: 14px; height: 1px; background: rgba(212, 175, 55, .28); }
 .tick-day .tick-mark { width: 10px; }
 .tick.strong .tick-mark, .tick-month .tick-mark, .tick-year .tick-mark { width: 20px; background: rgba(212, 175, 55, .6); }
-.tick-label { position: absolute; right: 44px; bottom: 0; transform: translateY(50%); font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); white-space: nowrap; line-height: 1; transition: color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
+.tick-label { position: absolute; right: 44px; bottom: 0; transform: skewX(var(--axis-unskew)) translateY(50%); transform-origin: center; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); white-space: nowrap; line-height: 1; transition: color var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
 .tick.strong .tick-label { color: var(--text-dim); font-weight: 600; }
 .tick.selected .tick-label { color: var(--gold-hi); }
-.tick-month .tick-label { font-family: var(--font-serif); font-size: 13px; color: var(--text-dim); transform: translateY(0); bottom: auto; top: 4px; }
+.tick-month .tick-label { font-family: var(--font-serif); font-size: 13px; color: var(--text-dim); transform: skewX(var(--axis-unskew)); bottom: auto; top: 4px; }
 .tick-month.strong .tick-label { color: var(--gold); }
-.tick-year .tick-label { font-family: var(--font-serif); font-size: 20px; font-weight: 700; letter-spacing: .12em; color: var(--gold); text-shadow: 1px 1px 0 rgba(0, 0, 0, .35), -.5px -.5px 0 var(--gold-hi); transform: none; bottom: auto; top: 6px; }
+.tick-year .tick-label { font-family: var(--font-serif); font-size: 20px; font-weight: 700; letter-spacing: .12em; color: var(--gold); text-shadow: 1px 1px 0 rgba(0, 0, 0, .35), -.5px -.5px 0 var(--gold-hi); transform: skewX(var(--axis-unskew)); bottom: auto; top: 6px; }
 .tick-month, .tick-year { box-shadow: inset 0 -1px 0 rgba(212, 175, 55, .16); }
 .axis-selected { position: absolute; left: 0; right: 0; top: 0; background: linear-gradient(90deg, transparent, var(--accent-soft) 60%, rgba(212, 175, 55, .28)); box-shadow: inset -2px 0 0 var(--gold); pointer-events: none; transition: transform var(--dur-mid) var(--ease-out), height var(--dur-mid) var(--ease-out); }
 .life-axis.zooming .axis-selected, .life-axis.dragging .axis-selected { transition: none; }
 .axis-today { position: absolute; top: 0; right: 16px; width: 26px; height: 2px; background: var(--gold-hi); box-shadow: 0 0 10px var(--gold); pointer-events: none; }
-.axis-today em { position: absolute; right: 30px; top: -8px; font-style: normal; font-family: var(--font-serif); font-size: 11px; color: var(--gold-hi); letter-spacing: .1em; }
+.axis-today em { position: absolute; right: 30px; top: -8px; font-style: normal; font-family: var(--font-serif); font-size: 11px; color: var(--gold-hi); letter-spacing: .1em; transform: skewX(var(--axis-unskew)); transform-origin: center; }
 .axis-medal {
   position: absolute; right: 20px; width: 18px; height: 18px; margin-top: -9px; display: grid; place-items: center; border-radius: 50%;
   background: radial-gradient(circle at 35% 35%, var(--gold-hi), var(--gold) 55%, var(--copper)); color: #2a1f0e;
@@ -104,6 +106,7 @@
 }
 .axis-medal::after { content: ""; position: absolute; inset: 0; border-radius: inherit; opacity: .18; background: repeating-linear-gradient(45deg, transparent, transparent 1.5px, rgba(0, 0, 0, .5) 1.5px, rgba(0, 0, 0, .5) 2.5px); }
 .axis-medal.selected { transform: translateY(-50%) scale(1.25); box-shadow: 0 0 18px var(--gold), inset 0 0 3px rgba(0, 0, 0, .35); }
+.axis-medal .app-icon { transform: skewX(var(--axis-unskew)); transform-origin: center; }
 .axis-range { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: baseline; padding: 6px 30px 4px 0; font-size: 10px; color: var(--text-faint); background: linear-gradient(180deg, transparent, var(--bg) 60%); pointer-events: none; }
 .axis-range small { color: var(--text-faint); }
 .axis-dock { position: absolute; top: 6px; left: 6px; z-index: 3; width: 26px; height: 26px; color: var(--text-faint); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), filter var(--dur-fast) var(--ease-out); }
@@ -111,7 +114,7 @@
 .axis-dock:hover { color: var(--gold); filter: drop-shadow(0 0 6px var(--accent-glow)); }
 
 /* ---------- 停靠右侧时镜像：轨道与标签换到左边 ---------- */
-.life-axis.mirror { background: linear-gradient(90deg, rgba(212, 175, 55, .03), transparent); }
+.life-axis.mirror { --axis-skew: 15deg; --axis-unskew: -15deg; background: linear-gradient(90deg, rgba(212, 175, 55, .03), transparent); }
 .life-axis.mirror .axis-track { right: auto; left: 28px; }
 .life-axis.mirror .tick { justify-content: flex-start; }
 .life-axis.mirror .tick-mark { right: auto; left: 22px; }
