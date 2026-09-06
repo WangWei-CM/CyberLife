@@ -8,8 +8,8 @@ import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 import type { Appearance } from '../App.vue'
 
-const props = defineProps<{ appearance: Appearance; navPosition: 'top' | 'left' | 'right' | 'bottom' }>()
-const emit = defineEmits<{ (event: 'update:appearance', value: Appearance): void; (event: 'update:navPosition', value: 'top' | 'left' | 'right' | 'bottom'): void; (event: 'logout'): void }>()
+const props = defineProps<{ appearance: Appearance; navPosition: 'top' | 'left' | 'right' | 'bottom'; pageInset: number }>()
+const emit = defineEmits<{ (event: 'update:appearance', value: Appearance): void; (event: 'update:navPosition', value: 'top' | 'left' | 'right' | 'bottom'): void; (event: 'update:pageInset', value: number): void; (event: 'logout'): void }>()
 
 type Tab = 'music' | 'presets' | 'theme' | 'keys'
 const tabs = computed(() => isWriter.value
@@ -144,6 +144,10 @@ onMounted(() => { loadPlaylists(); if (isWriter.value) loadPresets() })
         <article class="card">
           <h2 class="card-title">顶栏位置<small>也可以直接拖动顶栏左侧手柄</small></h2>
           <SegmentedControl :model-value="props.navPosition" :options="navOptions" aria-label="顶栏位置" @update:model-value="emit('update:navPosition', $event as 'top' | 'left' | 'right' | 'bottom')" />
+        </article>
+        <article class="card">
+          <h2 class="card-title">三屏左右边距<small>相对于屏幕宽度；默认 5%</small></h2>
+          <label class="layout-inset"><input :value="props.pageInset" type="range" min="0" max="20" step="1" aria-label="三屏左右边距" @input="emit('update:pageInset', Number(($event.target as HTMLInputElement).value))" /><b class="mono">{{ props.pageInset }}%</b></label>
         </article>
         <article v-if="isWriter" class="card">
           <h2 class="card-title">规划横幅轮播间隔</h2>

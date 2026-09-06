@@ -24,7 +24,9 @@ export type Appearance = 'dark' | 'light' | 'auto'
 const screens: { key: Screen; label: string }[] = [{ key: 'past', label: '过去' }, { key: 'now', label: '现在' }, { key: 'future', label: '未来' }]
 const screen = ref<Screen>('now')
 const navPosition = ref<NavPosition>((localStorage.getItem('cyberlife-nav-position') as NavPosition) || 'top')
-const appearance = ref<Appearance>((localStorage.getItem('cyberlife-theme') as Appearance) || 'dark')
+const appearance = ref<Appearance>((localStorage.getItem('cyberlife-theme') as Appearance) || 'light')
+const storedPageInset = Number(localStorage.getItem('cyberlife-page-inset'))
+const pageInset = ref(Number.isFinite(storedPageInset) ? Math.min(20, Math.max(0, storedPageInset)) : 5)
 const secretMode = ref(localStorage.getItem('cyberlife-secret-mode') === 'true')
 const isAdminPath = window.location.pathname === '/admin'
 const shell = ref<HTMLElement>()
@@ -45,6 +47,7 @@ const pageTheme = computed(() => screen.value === 'settings' ? 'now' : screen.va
 const musicPage = computed(() => pageTheme.value)
 const secretActive = computed(() => secretMode.value && isWriter.value)
 const shellClass = computed(() => [`theme-${pageTheme.value}`, resolvedAppearance.value, `nav-${navPosition.value}`, { 'secret-mode': secretActive.value, 'shell-enter': entering.value, 'drop-target': dropTarget.value }])
+const shellStyle = computed(() => ({ '--page-inline-pad': `${pageInset.value}vw` }))
 const indicatorStyle = computed(() => ({ '--x': `${indicator.value.x}px`, '--y': `${indicator.value.y}px`, '--w': `${indicator.value.w}px`, '--h': `${indicator.value.h}px` }))
 const canGoBack = computed(() => screen.value !== 'past')
 const canGoForward = computed(() => screen.value !== 'future')
@@ -98,8 +101,8 @@ function onLoginTransitionComplete(actor: Actor) {
   signIn(actor)
 }
 
-
 watch(appearance, value => localStorage.setItem('cyberlife-theme', value))
+watch(pageInset, value => localStorage.setItem('cyberlife-page-inset', String(value)))
 watch(secretMode, value => localStorage.setItem('cyberlife-secret-mode', String(value)))
 watch(navPosition, value => { localStorage.setItem('cyberlife-nav-position', value); nextTick(updateIndicator) })
 watch(screen, () => nextTick(updateIndicator))
@@ -127,7 +130,7 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
   <div v-if="authState.loading" class="app-boot" aria-label="加载中"><i /></div>
   <AdminLoginView v-else-if="!authState.actor && isAdminPath" />
   <LoginView v-else-if="!authState.actor" @authenticated="onLoginTransitionComplete" />
-  <div v-else ref="shell" class="app-shell" :class="shellClass" @dragover.prevent @dragleave="dropTarget = false" @drop.prevent="onDrop">
+  <div v-else ref="shell" class="app-shell" :class="shellClass" :style="shellStyle" @dragover.prevent @dragleave="dropTarget = false" @drop.prevent="onDrop">
     <header class="topbar">
       <span class="topbar-grip" draggable="true" title="拖到屏幕边缘可改变位置" @dragstart="onGripDrag" @dragend="dropTarget = false"><AppIcon name="grip" :size="16" /></span>
       <div v-if="!isAdmin" class="topbar-center">
@@ -156,7 +159,7 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
       <AdminView v-if="isAdmin" />
       <PastView v-else-if="screen === 'past'" :secret="secretActive" />
       <FutureView v-else-if="screen === 'future'" />
-      <SettingsView v-else-if="screen === 'settings'" :appearance="appearance" :nav-position="navPosition" @update:appearance="setAppearance" @update:nav-position="navPosition = $event" @logout="logout" />
+      <SettingsView v-else-if="screen === 'settings'" :appearance="appearance" :nav-position="navPosition" :page-inset="pageInset" @update:appearance="setAppearance" @update:nav-position="navPosition = $event" @update:page-inset="pageInset = $event" @logout="logout" />
       <NowView v-else-if="isWriter" :secret="secretActive" @navigate-future="navigate('future')" />
       <ReaderView v-else />
     </div>

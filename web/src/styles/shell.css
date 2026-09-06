@@ -231,6 +231,16 @@
   .nav-right .topbar-tools { align-self: flex-end; margin: auto 4px 0 0; }
 }
 
+/* 桌面端三屏固定在视口内：内容溢出时由各自内容区接管滚动，不让页面产生纵向滚动条。 */
+@media (min-width: 901px) {
+  .app-shell { height: 100vh; overflow: hidden; }
+  .nav-top .screen { height: calc(100vh - var(--topbar-h)); }
+  .nav-bottom .screen, .nav-left .screen, .nav-right .screen { height: 100vh; }
+  .screen { min-height: 0; overflow: hidden; }
+  .now-page, .past-page, .future-page { height: 100%; overflow: hidden; }
+  .settings-page, .reader-page, .admin-page { height: 100%; overflow: auto; }
+}
+
 @media (max-width: 760px) {
   .topbar { padding: 0 6px; gap: 2px; }
   .topbar-grip, .actor-name, .topbar-arrow { display: none; }

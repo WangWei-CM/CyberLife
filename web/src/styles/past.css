@@ -132,3 +132,14 @@
   .chapter-year { font-size: 22px; }
   .chapter-title { font-size: 18px; }
 }
+
+@media (min-width: 901px) {
+  .past-page { display: grid; grid-template-rows: minmax(0, 1fr); }
+  .past-page .page-error { position: absolute; z-index: 3; top: var(--page-pad); left: var(--page-inline-pad); right: var(--page-inline-pad); }
+  .past-layout { height: 100%; min-height: 0; align-items: stretch; }
+  .past-content { min-height: 0; overflow: auto; scrollbar-width: none; }
+  .past-content::-webkit-scrollbar { display: none; }
+  .life-axis { height: 100%; min-height: 0; }
+  .past-card { padding: 16px 18px; }
+  .past-day .past-card { min-height: 0; }
+}

@@ -34,7 +34,7 @@ button:focus:not(:focus-visible) { outline: 0; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* ---------- 页面容器 ---------- */
-.page { max-width: var(--page-max); margin: 0 auto; padding: var(--page-pad); position: relative; }
+.page { width: 100%; max-width: var(--page-max); margin: 0; padding: var(--page-pad) var(--page-inline-pad); position: relative; }
 .page-narrow { max-width: 1100px; }
 
 /* ---------- 卡片：无边框，背景 + 阴影 表达层级 ---------- */

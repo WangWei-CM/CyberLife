@@ -18,6 +18,8 @@
 .upload-audio.busy { opacity: .6; pointer-events: none; }
 .volume-row { display: flex; align-items: center; gap: 12px; color: var(--text-dim); }
 .volume-row b { min-width: 40px; text-align: right; font-size: 12px; }
+.layout-inset { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: center; gap: 12px; }
+.layout-inset b { text-align: right; color: var(--accent); }
 .interval-row input { width: 96px; }
 .preset-list { display: grid; gap: 4px; }
 .preset-item { display: grid; gap: 2px; width: 100%; padding: 10px 12px; text-align: left; border-radius: var(--radius); background: var(--surface-2); transition: background var(--dur-mid) var(--ease-out), box-shadow var(--dur-mid) var(--ease-out), transform var(--dur-fast) var(--ease-out); }

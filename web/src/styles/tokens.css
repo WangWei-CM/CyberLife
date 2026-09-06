@@ -24,8 +24,9 @@
   --glitch-intensity: .3;
 
   --topbar-h: 56px;
-  --page-max: 1400px;
-  --page-pad: 32px;
+  --page-max: none;
+  --page-inline-pad: 5vw;
+  --page-pad: 20px;
   --gap: 16px;
   --stagger: 40ms;
 
