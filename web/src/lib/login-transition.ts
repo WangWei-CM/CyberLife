@@ -650,9 +650,6 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     cloudField.rotation.z = Math.sin(time * .00008) * .025
     cloudField.position.x = Math.sin(time * .00012) * .42
     cloudField.position.y = .15 + Math.cos(time * .00017) * .14
-    cloudFieldMaterials.forEach((material, index) => {
-      material.opacity = (.16 + index * .035) + Math.sin(time * (.00034 + index * .00004) + index) * .025
-    })
     if (stage === 'cloud-gather') {
       renderer.setClearColor(0x02060b, 1)
       node.visible = false
@@ -676,12 +673,9 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       node.visible = chipRevealProgress > 0
       transitionRoot?.style.setProperty('--node-copy-opacity', String(chipRevealProgress))
       cloudField.visible = true
-      cloudFieldLayers.forEach((layer, index) => {
-        layer.position.copy(cloudFieldOrigins[index])
-        layer.scale.setScalar(1)
-      })
+      // Keep the exact cloud state produced by cloud-gather. Reapplying its
+      // transforms or opacity here creates a visible second cloud pulse.
       earthGroup.visible = false
-      cloudFieldMaterials.forEach((material, index) => { material.opacity = .24 + index * .04 })
       node.position.set(0, .2 + (1 - chipRevealProgress) * .8, .3)
       node.scale.setScalar(.28 + chipRevealProgress * .72)
       sweep.position.x = -.75 + chipRevealProgress * 1.5
