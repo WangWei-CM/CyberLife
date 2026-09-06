@@ -226,10 +226,10 @@
   .future-top { min-height: 0; }
   .plan-dialog { --plan-dialog-safe: 24px; inset: 8px var(--future-frame-safe); height: auto !important; grid-template-columns: var(--list-width, 30%) 6px minmax(0, 1fr); gap: 0 32px; padding: 20px var(--plan-dialog-safe); }
   .plan-dialog .future-list, .plan-dialog .future-detail { min-height: 0; overflow: auto; padding-left: 14px; padding-right: 14px; }
-  .future-bottom { height: 100%; min-height: 0; margin-inline: var(--future-frame-safe); grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; }
+  .future-bottom { height: 100%; min-height: 0; margin-inline: var(--future-frame-safe); grid-template-rows: minmax(0, 1fr) minmax(0, 2fr); overflow: hidden; }
   .future-bottom > .zoom-calendar-wrap { min-height: 0; grid-template-rows: auto minmax(0, 1fr); }
   .future-bottom .zoom-calendar { height: auto; min-height: 0; }
-  .future-bottom .day-panel { min-height: 0; }
+  .future-bottom .day-panel, .future-bottom .day-frame { height: 100%; min-height: 0; max-height: none; }
   .cyber-panel { padding: 12px 14px; }
   .detail-body { gap: 12px; }
   .plan-cover { height: min(120px, 16vh); margin: -12px -14px 0; }
