@@ -72,6 +72,169 @@
 .nav-bottom .screen { padding-bottom: var(--topbar-h); }
 .app-shell.drop-target::after { content: ""; position: fixed; inset: 0; z-index: 44; pointer-events: none; box-shadow: inset 0 0 0 3px var(--accent-soft); }
 
+/* ---------- 桌面端：四方向的凸出式标题栏 ---------- */
+@media (min-width: 761px) {
+  /*
+   * 每个方向的强调轮廓都由同一块 clip-path 绘制。线段在斜面处有 2px 重叠，
+   * 缩放或落在半像素上时也不会像两个伪元素拼接那样露出断点。
+   */
+  .nav-top, .nav-bottom { --topbar-h: 140px; }
+  .nav-left, .nav-right { --side-dock-w: 140px; }
+
+  .nav-top .topbar, .nav-bottom .topbar,
+  .nav-left .topbar, .nav-right .topbar {
+    /* 轮廓悬浮于页面上方，停靠区本身不保留一整块实色底。 */
+    background: transparent; box-shadow: none; overflow: hidden;
+    backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  .nav-top .topbar::before, .nav-bottom .topbar::before,
+  .nav-left .topbar::before, .nav-right .topbar::before {
+    content: ""; position: absolute; z-index: 2; inset: 0; pointer-events: none;
+    background: var(--accent); opacity: .92;
+  }
+  .nav-top .topbar-grip, .nav-bottom .topbar-grip,
+  .nav-left .topbar-grip, .nav-right .topbar-grip {
+    width: 0; height: 0; overflow: hidden; opacity: 0;
+  }
+  .nav-top .topbar-center, .nav-bottom .topbar-center,
+  .nav-left .topbar-center, .nav-right .topbar-center {
+    visibility: hidden; pointer-events: none;
+  }
+
+  /* 顶部：标题区向下凸出，随后斜抬并接入右侧横线。 */
+  .nav-top .topbar {
+    position: sticky; height: var(--topbar-h); align-items: flex-start; padding: 0 28px 0 15px;
+  }
+  .nav-top .topbar::before {
+    clip-path: polygon(0 110px, 320px 110px, 400px 62px, 100% 62px, 100% 66px, 398px 66px, 318px 114px, 0 114px);
+  }
+  .nav-top .topbar::after {
+    content: ""; position: absolute; z-index: 0; left: 0; right: 0; bottom: 0;
+    height: 1px; background: var(--divider);
+  }
+  .nav-top .brand-lockup {
+    position: relative; z-index: 1; flex: 0 0 300px; min-width: 300px; height: var(--topbar-h); align-items: flex-start;
+  }
+  .nav-top .brand-arrow {
+    width: 30px; height: 44px; flex-basis: 30px; margin-top: 18px; border-radius: 0;
+    background: transparent; box-shadow: none;
+  }
+  .nav-top .brand-arrow .app-icon { width: 24px; height: 24px; }
+  .nav-top .brand-arrow:hover:not(:disabled), .nav-top .brand-arrow:focus-visible {
+    background: transparent; color: var(--accent-hover); filter: drop-shadow(0 0 9px var(--accent-glow)); outline: 0;
+  }
+  .nav-top .brand-mark {
+    position: relative; height: var(--topbar-h); flex: 0 0 240px; min-width: 240px;
+    align-items: flex-start; justify-content: flex-start; padding: 2px 8px 0 10px; border: 0; border-radius: 0; clip-path: none;
+    font-size: clamp(56px, 5.2vw, 82px); letter-spacing: .02em; line-height: 1.05;
+    background: transparent;
+  }
+  .nav-top .brand-mark:hover, .nav-top .brand-mark:focus-visible { background: transparent; color: var(--accent-hover); filter: drop-shadow(0 0 8px var(--accent-glow)); outline: 0; }
+  .nav-top .topbar-center {
+    position: absolute; z-index: 2; top: 28px; left: 50%; margin: 0; transform: translateX(-50%);
+  }
+  .nav-top .topbar-tools {
+    position: absolute; z-index: 2; top: 16px; right: 28px; gap: 4px; margin: 0;
+  }
+  .nav-top .topbar-tools .icon-button { width: 42px; height: 42px; }
+  .nav-top .topbar-tools .app-icon { width: 23px; height: 23px; }
+  .nav-top .actor-name { font-size: 14px; padding: 0 12px; }
+  .nav-top .topbar-tools .text-button { font-size: 16px; padding: 8px 10px; }
+  .nav-top .topbar-tools .text-button .app-icon { width: 20px; height: 20px; }
+
+  /* 底部：保持标题和工具的阅读顺序不变，仅将顶部轮廓做垂直镜像。 */
+  .nav-bottom .topbar {
+    height: var(--topbar-h); align-items: flex-end; padding: 0 28px 0 15px;
+  }
+  .nav-bottom .topbar::before {
+    clip-path: polygon(0 30px, 320px 30px, 400px 78px, 100% 78px, 100% 74px, 398px 74px, 318px 26px, 0 26px);
+  }
+  .nav-bottom .topbar::after {
+    content: ""; position: absolute; z-index: 0; left: 0; right: 0; top: 0;
+    height: 1px; background: var(--divider);
+  }
+  .nav-bottom .brand-lockup {
+    position: relative; z-index: 1; flex: 0 0 300px; min-width: 300px; height: var(--topbar-h); align-items: flex-end;
+  }
+  .nav-bottom .brand-arrow {
+    width: 30px; height: 44px; flex-basis: 30px; margin-bottom: 18px; border-radius: 0;
+    background: transparent; box-shadow: none;
+  }
+  .nav-bottom .brand-arrow .app-icon { width: 24px; height: 24px; }
+  .nav-bottom .brand-arrow:hover:not(:disabled), .nav-bottom .brand-arrow:focus-visible {
+    background: transparent; color: var(--accent-hover); filter: drop-shadow(0 0 9px var(--accent-glow)); outline: 0;
+  }
+  .nav-bottom .brand-mark {
+    position: relative; height: var(--topbar-h); flex: 0 0 240px; min-width: 240px;
+    align-items: flex-end; justify-content: flex-start; padding: 0 8px 2px 10px; border: 0; border-radius: 0; clip-path: none;
+    font-size: clamp(56px, 5.2vw, 82px); letter-spacing: .02em; line-height: 1.05;
+    background: transparent;
+  }
+  .nav-bottom .brand-mark:hover, .nav-bottom .brand-mark:focus-visible { background: transparent; color: var(--accent-hover); filter: drop-shadow(0 0 8px var(--accent-glow)); outline: 0; }
+  .nav-bottom .topbar-center {
+    position: absolute; z-index: 2; bottom: 28px; left: 50%; margin: 0; transform: translateX(-50%);
+  }
+  .nav-bottom .topbar-tools {
+    position: absolute; z-index: 2; top: auto; right: 28px; bottom: 16px; gap: 4px; margin: 0;
+  }
+  .nav-bottom .topbar-tools .icon-button { width: 42px; height: 42px; }
+  .nav-bottom .topbar-tools .app-icon { width: 23px; height: 23px; }
+  .nav-bottom .actor-name { font-size: 14px; padding: 0 12px; }
+  .nav-bottom .topbar-tools .text-button { font-size: 16px; padding: 8px 10px; }
+  .nav-bottom .topbar-tools .text-button .app-icon { width: 20px; height: 20px; }
+  .nav-bottom .screen { padding-bottom: var(--topbar-h); }
+
+  /* 左、右侧：把同一轮廓转为纵向；标题区向内容侧凸出，长边保持 64px 的视觉厚度。 */
+  .nav-left .topbar, .nav-right .topbar {
+    width: var(--side-dock-w); height: auto; padding: 15px 0 28px; align-items: flex-start;
+  }
+  .nav-left .topbar::before {
+    clip-path: polygon(110px 0, 110px 320px, 62px 400px, 62px 100%, 66px 100%, 66px 398px, 114px 318px, 114px 0);
+  }
+  .nav-right .topbar::before {
+    clip-path: polygon(30px 0, 30px 320px, 78px 400px, 78px 100%, 74px 100%, 74px 398px, 26px 318px, 26px 0);
+  }
+  .nav-left .topbar::after, .nav-right .topbar::after {
+    content: ""; position: absolute; z-index: 0; top: 0; bottom: 0;
+    width: 1px; background: var(--divider);
+  }
+  .nav-left .topbar::after { right: 0; }
+  .nav-right .topbar::after { left: 0; }
+  .nav-left .screen { margin-left: var(--side-dock-w); }
+  .nav-right .screen { margin-left: 0; margin-right: var(--side-dock-w); }
+  .nav-left .brand-lockup, .nav-right .brand-lockup {
+    position: relative; z-index: 1; width: var(--side-dock-w); min-width: 0; height: 240px; flex: 0 0 240px;
+    flex-direction: column;
+  }
+  .nav-left .brand-lockup { align-items: flex-start; }
+  .nav-right .brand-lockup { align-items: flex-end; }
+  .nav-left .brand-arrow, .nav-right .brand-arrow {
+    width: 44px; height: 30px; flex: 0 0 30px; border-radius: 0;
+    background: transparent; box-shadow: none;
+  }
+  .nav-left .brand-arrow { margin-left: 4px; }
+  .nav-right .brand-arrow { margin-right: 4px; }
+  .nav-left .brand-arrow .app-icon, .nav-right .brand-arrow .app-icon { width: 24px; height: 24px; transform: rotate(90deg); }
+  .nav-left .brand-arrow:hover:not(:disabled), .nav-left .brand-arrow:focus-visible,
+  .nav-right .brand-arrow:hover:not(:disabled), .nav-right .brand-arrow:focus-visible {
+    background: transparent; color: var(--accent-hover); filter: drop-shadow(0 0 9px var(--accent-glow)); outline: 0;
+  }
+  .nav-left .brand-mark, .nav-right .brand-mark {
+    position: relative; width: var(--side-dock-w); min-width: 0; height: 180px; flex: 0 0 180px;
+    justify-content: flex-start; padding: 6px 4px; border: 0; border-radius: 0; clip-path: none;
+    writing-mode: vertical-rl; font-size: clamp(56px, 5.2vh, 82px); letter-spacing: .02em; line-height: 1.05;
+    background: transparent;
+  }
+  /* 左右侧标题与工具贴各自的外缘，留出仅够点击与轮廓呼吸的 4px。 */
+  .nav-left .brand-mark { align-items: flex-end; }
+  .nav-right .brand-mark { align-items: flex-start; }
+  .nav-left .brand-mark:hover, .nav-left .brand-mark:focus-visible,
+  .nav-right .brand-mark:hover, .nav-right .brand-mark:focus-visible { background: transparent; color: var(--accent-hover); filter: drop-shadow(0 0 8px var(--accent-glow)); outline: 0; }
+  .nav-left .topbar-center, .nav-right .topbar-center { position: absolute; z-index: 2; margin: 0; }
+  .nav-left .topbar-tools { align-self: flex-start; margin: auto 0 0 4px; }
+  .nav-right .topbar-tools { align-self: flex-end; margin: auto 4px 0 0; }
+}
+
 @media (max-width: 760px) {
   .topbar { padding: 0 6px; gap: 2px; }
   .topbar-grip, .actor-name, .topbar-arrow { display: none; }
