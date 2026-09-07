@@ -276,7 +276,10 @@
 .future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .future-task-settings .field { display: grid; gap: 5px; }
 .future-task-settings select { width: 100%; }
-.future-milestone-form { display: grid; gap: 8px; padding-top: 10px; }
+.future-milestone-form { --future-milestone-stack-step: clamp(12px, 1.5vw, 24px); display: grid; gap: 8px; padding-top: 10px; }
+.future-milestone-form > :nth-child(2) { transform: translateX(calc(-1 * var(--future-milestone-stack-step))); }
+.future-milestone-form > :nth-child(3) { transform: translateX(calc(-2 * var(--future-milestone-stack-step))); }
+.future-milestone-form > :nth-child(4) { transform: translateX(calc(-3 * var(--future-milestone-stack-step))); }
 .future-milestone-form textarea { resize: vertical; }
 .future-task-drawer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--divider); }
 .future-drawer-enter-active, .future-drawer-leave-active { transition: opacity var(--dur-mid) var(--ease-out); }
