@@ -273,9 +273,11 @@
 .future-slant-editor .md-editor-content { position: relative; z-index: 0; background: transparent !important; }
 .future-slant-editor .md-editor-content::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: none; background: color-mix(in srgb, var(--surface) 76%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, var(--divider)); pointer-events: none; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
+.future-task-settings > * { transform: none; transform-origin: right top; }
 .future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .future-task-settings .field { display: grid; gap: 5px; }
 .future-task-settings select { width: 100%; }
+.future-task-settings .future-slant-control::before, .future-task-settings .future-slant-check::before { transform: none; }
 .future-milestone-form { display: grid; gap: 8px; padding-top: 10px; transform: none; transform-origin: right top; }
 .future-milestone-form .future-slant-control::before { transform: none; }
 .future-milestone-form textarea { resize: vertical; }
