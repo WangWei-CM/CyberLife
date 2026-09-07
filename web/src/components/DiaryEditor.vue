@@ -86,12 +86,27 @@ function syncSlantedLines() {
   const slope = Math.tan(Math.PI / 12)
   const run = Math.min(150, Math.max(86, editor.clientHeight * slope))
   const editorTop = editor.getBoundingClientRect().top
+  const lineMetrics: { top: number; bottom: number; indent: number }[] = []
   lines.forEach(line => {
     const lineTop = line.getBoundingClientRect().top - editorTop
-    const indent = `${Math.max(0, Math.round(run - lineTop * slope + 12))}px`
+    const indentValue = Math.max(0, Math.round(run - lineTop * slope + 12))
+    const indent = `${indentValue}px`
     // md-editor-v3 会重写 padding 样式。使用独立自定义属性可避免与其内联样式冲突，
     // 同时只有实际变化时才写入，避免 attributes 观察导致反馈循环。
     if (line.style.getPropertyValue('--future-line-indent') !== indent) line.style.setProperty('--future-line-indent', indent)
+    const bounds = line.getBoundingClientRect()
+    lineMetrics.push({ top: bounds.top, bottom: bounds.bottom, indent: indentValue })
+  })
+  // CodeMirror 的选区单独放在 cm-selectionLayer，默认按未缩进的 x=0 绘制。
+  // 为每个选区片段匹配其所在可见行，使跨行选择同样沿 75° 方向逐行偏移。
+  editor.querySelectorAll<HTMLElement>('.cm-selectionBackground').forEach(selection => {
+    const bounds = selection.getBoundingClientRect()
+    const y = bounds.top + Math.min(2, Math.max(0, bounds.height / 2))
+    const metric = lineMetrics.find(line => y >= line.top - 1 && y <= line.bottom + 1)
+      ?? lineMetrics.reduce<{ top: number; bottom: number; indent: number } | undefined>((nearest, line) => !nearest || Math.abs(line.top - y) < Math.abs(nearest.top - y) ? line : nearest, undefined)
+    if (!metric) return
+    const offset = `${metric.indent}px`
+    if (selection.style.getPropertyValue('--future-selection-indent') !== offset) selection.style.setProperty('--future-selection-indent', offset)
   })
 }
 function scheduleSlantedLines() {
