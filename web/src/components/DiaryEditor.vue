@@ -13,7 +13,7 @@ import EmptyState from './EmptyState.vue'
  * 2. 删除备份审计：单次删除 ≥50 字自动快照到 localStorage，可查看/恢复；不重写 CodeMirror undo
  * 3. 保留图片/链接/公式/图表等全部工具栏项
  */
-const props = withDefaults(defineProps<{ modelValue: string; theme: 'light' | 'dark'; vaultKey: string; placeholder?: string; editorId?: string; secret?: boolean }>(), { placeholder: '', editorId: 'diary-editor', secret: false })
+const props = withDefaults(defineProps<{ modelValue: string; theme: 'light' | 'dark'; vaultKey: string; placeholder?: string; editorId?: string; secret?: boolean; slantedLines?: boolean }>(), { placeholder: '', editorId: 'diary-editor', secret: false, slantedLines: false })
 const emit = defineEmits<{ (event: 'update:modelValue', value: string): void; (event: 'change', value: string): void }>()
 
 type Snapshot = { at: string; text: string }
@@ -25,6 +25,9 @@ const lightbox = ref<{ src: string; alt: string } | null>(null)
 const themeClass = ref('')
 let lastAudited = props.modelValue
 let auditTimer: number | undefined
+let slantedLineObserver: MutationObserver | undefined
+let slantedLineResizeObserver: ResizeObserver | undefined
+let slantedLineFrame: number | undefined
 
 const storageKey = computed(() => `cyberlife-diary-vault:${props.vaultKey}`)
 const toolbars: ToolbarNames[] = ['bold', 'underline', 'italic', 'strikeThrough', '-', 'title', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList', 'task', '-', 'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-', 'revoke', 'next', 0, '=', 'preview', 'previewOnly', 'catalog']
@@ -63,6 +66,40 @@ function onChange(value: string) {
   emit('change', value)
   if (auditTimer) clearTimeout(auditTimer)
   auditTimer = window.setTimeout(() => audit(value), 400)
+  scheduleSlantedLines()
+}
+function syncSlantedLines() {
+  slantedLineFrame = undefined
+  const editor = root.value?.querySelector<HTMLElement>('.md-editor')
+  const content = editor?.querySelector<HTMLElement>('.cm-content')
+  if (!editor || !content) return
+  const lines = content.querySelectorAll<HTMLElement>('.cm-line')
+  if (!props.slantedLines) {
+    lines.forEach(line => line.style.removeProperty('padding-left'))
+    return
+  }
+  const slope = Math.tan(Math.PI / 12)
+  const run = Math.min(150, Math.max(86, editor.clientHeight * slope))
+  const editorTop = editor.getBoundingClientRect().top
+  lines.forEach(line => {
+    const lineTop = line.getBoundingClientRect().top - editorTop
+    line.style.paddingLeft = `${Math.max(0, Math.round(run - lineTop * slope + 12))}px`
+  })
+}
+function scheduleSlantedLines() {
+  if (!props.slantedLines || slantedLineFrame !== undefined) return
+  slantedLineFrame = window.requestAnimationFrame(syncSlantedLines)
+}
+function setupSlantedLines() {
+  if (!props.slantedLines) return
+  const editor = root.value?.querySelector<HTMLElement>('.md-editor')
+  const content = editor?.querySelector<HTMLElement>('.cm-content')
+  if (!editor || !content) { window.requestAnimationFrame(setupSlantedLines); return }
+  slantedLineObserver = new MutationObserver(scheduleSlantedLines)
+  slantedLineObserver.observe(content, { childList: true, characterData: true, subtree: true })
+  slantedLineResizeObserver = new ResizeObserver(scheduleSlantedLines)
+  slantedLineResizeObserver.observe(editor)
+  scheduleSlantedLines()
 }
 function restore(snapshot: Snapshot) {
   const merged = props.modelValue.trimEnd() ? `${props.modelValue.trimEnd()}\n\n${snapshot.text}\n` : `${snapshot.text}\n`
@@ -92,8 +129,8 @@ function snapshotLabel(value: string) { const date = new Date(value); return `${
 
 watch(storageKey, () => { loadSnapshots(); lastAudited = props.modelValue })
 watch(() => props.modelValue, value => { if (auditTimer === undefined && value !== lastAudited && Math.abs(value.length - lastAudited.length) > 200) lastAudited = value })
-onMounted(() => { loadSnapshots(); root.value?.addEventListener('click', onPreviewClick); document.addEventListener('click', onDocumentClick) })
-onBeforeUnmount(() => { root.value?.removeEventListener('click', onPreviewClick); document.removeEventListener('click', onDocumentClick); if (auditTimer) clearTimeout(auditTimer) })
+onMounted(() => { loadSnapshots(); root.value?.addEventListener('click', onPreviewClick); document.addEventListener('click', onDocumentClick); setupSlantedLines() })
+onBeforeUnmount(() => { root.value?.removeEventListener('click', onPreviewClick); document.removeEventListener('click', onDocumentClick); if (auditTimer) clearTimeout(auditTimer); if (slantedLineFrame !== undefined) cancelAnimationFrame(slantedLineFrame); slantedLineObserver?.disconnect(); slantedLineResizeObserver?.disconnect() })
 </script>
 
 <template>
