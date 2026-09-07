@@ -25,9 +25,6 @@ const lightbox = ref<{ src: string; alt: string } | null>(null)
 const themeClass = ref('')
 let lastAudited = props.modelValue
 let auditTimer: number | undefined
-let slantedLineObserver: MutationObserver | undefined
-let slantedLineResizeObserver: ResizeObserver | undefined
-let slantedLineFrame: number | undefined
 
 const storageKey = computed(() => `cyberlife-diary-vault:${props.vaultKey}`)
 const toolbars: ToolbarNames[] = ['bold', 'underline', 'italic', 'strikeThrough', '-', 'title', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList', 'task', '-', 'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-', 'revoke', 'next', 0, '=', 'preview', 'previewOnly', 'catalog']
@@ -66,72 +63,6 @@ function onChange(value: string) {
   emit('change', value)
   if (auditTimer) clearTimeout(auditTimer)
   auditTimer = window.setTimeout(() => audit(value), 400)
-  // CodeMirror 会先替换行节点、再发出更新事件；此处同步一次可避免新行先以
-  // 默认竖直位置绘制一帧。MutationObserver 仍会在同一轮微任务中校准新节点。
-  syncSlantedLines()
-}
-function syncSlantedLines() {
-  slantedLineFrame = undefined
-  const editor = root.value?.querySelector<HTMLElement>('.md-editor')
-  const content = editor?.querySelector<HTMLElement>('.cm-content')
-  if (!editor || !content) return
-  const lines = content.querySelectorAll<HTMLElement>('.cm-line')
-  if (!props.slantedLines) {
-    lines.forEach(line => {
-      line.style.removeProperty('padding-left')
-      line.style.removeProperty('--future-line-indent')
-    })
-    return
-  }
-  const slope = Math.tan(Math.PI / 12)
-  const run = Math.min(150, Math.max(86, editor.clientHeight * slope))
-  const editorTop = editor.getBoundingClientRect().top
-  const lineMetrics: { top: number; bottom: number; indent: number }[] = []
-  lines.forEach(line => {
-    const lineTop = line.getBoundingClientRect().top - editorTop
-    const indentValue = Math.max(0, Math.round(run - lineTop * slope + 12))
-    const indent = `${indentValue}px`
-    // md-editor-v3 会重写 padding 样式。使用独立自定义属性可避免与其内联样式冲突，
-    // 同时只有实际变化时才写入，避免 attributes 观察导致反馈循环。
-    if (line.style.getPropertyValue('--future-line-indent') !== indent) line.style.setProperty('--future-line-indent', indent)
-    const bounds = line.getBoundingClientRect()
-    lineMetrics.push({ top: bounds.top, bottom: bounds.bottom, indent: indentValue })
-  })
-  // CodeMirror 的选区单独放在 cm-selectionLayer。首、尾行的片段带有文本起点，
-  // 需要补入缩进；跨行中间的片段则从其 x=0 行首基准开始，需反向抵消该基准。
-  // 这样每一行选区的左边缘才会精确落在对应文字开头。
-  editor.querySelectorAll<HTMLElement>('.cm-selectionBackground').forEach(selection => {
-    const bounds = selection.getBoundingClientRect()
-    const y = bounds.top + Math.min(2, Math.max(0, bounds.height / 2))
-    const metric = lineMetrics.find(line => y >= line.top - 1 && y <= line.bottom + 1)
-      ?? lineMetrics.reduce<{ top: number; bottom: number; indent: number } | undefined>((nearest, line) => !nearest || Math.abs(line.top - y) < Math.abs(nearest.top - y) ? line : nearest, undefined)
-    if (!metric) return
-    const offset = `${selection.offsetLeft <= 1 ? -metric.indent : metric.indent}px`
-    if (selection.style.getPropertyValue('--future-selection-indent') !== offset) selection.style.setProperty('--future-selection-indent', offset)
-  })
-}
-function scheduleSlantedLines() {
-  if (!props.slantedLines || slantedLineFrame !== undefined) return
-  slantedLineFrame = window.requestAnimationFrame(syncSlantedLines)
-}
-function setupSlantedLines() {
-  if (!props.slantedLines) return
-  const editor = root.value?.querySelector<HTMLElement>('.md-editor')
-  const content = editor?.querySelector<HTMLElement>('.cm-content')
-  const observerRoot = root.value
-  if (!editor || !content || !observerRoot) { window.requestAnimationFrame(setupSlantedLines); return }
-  // 行节点在输入、换行与自动换行时会被 CodeMirror 整体替换。不能把这个校准
-  // 延迟到 requestAnimationFrame，否则新行会在默认位置和斜向位置之间闪跳。
-  // 监听必须挂在稳定的组件根节点，不能挂在 cm-content：短行输入时 md-editor-v3
-  // 会直接替换 cm-content，原先的监听器随之失效，后续行便会回到竖直默认布局。
-  slantedLineObserver = new MutationObserver(syncSlantedLines)
-  // md-editor-v3 有时不替换行节点，而是直接重写其 style；此时也必须重新注入偏移。
-  slantedLineObserver.observe(observerRoot, { childList: true, characterData: true, attributes: true, attributeFilter: ['style'], subtree: true })
-  slantedLineResizeObserver = new ResizeObserver(scheduleSlantedLines)
-  slantedLineResizeObserver.observe(observerRoot)
-  syncSlantedLines()
-  // 首次挂载时 CodeMirror 可能在本轮之后补齐可见行；下一帧仅作为初始化兜底。
-  scheduleSlantedLines()
 }
 function restore(snapshot: Snapshot) {
   const merged = props.modelValue.trimEnd() ? `${props.modelValue.trimEnd()}\n\n${snapshot.text}\n` : `${snapshot.text}\n`
@@ -161,8 +92,8 @@ function snapshotLabel(value: string) { const date = new Date(value); return `${
 
 watch(storageKey, () => { loadSnapshots(); lastAudited = props.modelValue })
 watch(() => props.modelValue, value => { if (auditTimer === undefined && value !== lastAudited && Math.abs(value.length - lastAudited.length) > 200) lastAudited = value })
-onMounted(() => { loadSnapshots(); root.value?.addEventListener('click', onPreviewClick); document.addEventListener('click', onDocumentClick); setupSlantedLines() })
-onBeforeUnmount(() => { root.value?.removeEventListener('click', onPreviewClick); document.removeEventListener('click', onDocumentClick); if (auditTimer) clearTimeout(auditTimer); if (slantedLineFrame !== undefined) cancelAnimationFrame(slantedLineFrame); slantedLineObserver?.disconnect(); slantedLineResizeObserver?.disconnect() })
+onMounted(() => { loadSnapshots(); root.value?.addEventListener('click', onPreviewClick); document.addEventListener('click', onDocumentClick) })
+onBeforeUnmount(() => { root.value?.removeEventListener('click', onPreviewClick); document.removeEventListener('click', onDocumentClick); if (auditTimer) clearTimeout(auditTimer) })
 </script>
 
 <template>

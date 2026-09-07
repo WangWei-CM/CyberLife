@@ -283,9 +283,13 @@
 .future-slant-editor .md-editor-content::before { display: none; }
 .future-slant-editor .md-editor .cm-content, .future-slant-editor .md-editor .cm-line, .future-slant-editor .md-editor .cm-placeholder { color: #F4F7FF !important; text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 16%, transparent); }
 .future-slant-editor .md-editor .cm-line { box-sizing: border-box; }
-/* 新建虚拟行先沿同一斜向基准落位；JS 会用 --future-line-indent 精确校正其行高坐标。 */
-.future-slant-editor .diary-editor.slanted-lines .cm-line { padding-left: var(--future-line-indent, calc(var(--future-editor-run) + 12px)) !important; }
-.future-slant-editor .diary-editor.slanted-lines .cm-selectionBackground { transform: translateX(var(--future-selection-indent, 0px)) !important; }
+/* 同一变换矩阵：内容坐标整体形成 75°，每一行反向变换仅恢复字形水平。
+   CodeMirror 的命中、光标和选择层仍在同一坐标系中，避免视觉与交互错位。 */
+.future-slant-editor .diary-editor.slanted-lines .cm-content,
+.future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer { transform: skewX(var(--future-skew)); transform-origin: left top; }
+.future-slant-editor .diary-editor.slanted-lines .cm-line,
+.future-slant-editor .diary-editor.slanted-lines .cm-placeholder,
+.future-slant-editor .diary-editor.slanted-lines .cm-cursor { transform: skewX(15deg); transform-origin: left top; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
 .future-task-settings > * { transform: none; transform-origin: right top; }
 .future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
