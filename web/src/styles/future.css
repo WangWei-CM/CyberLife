@@ -261,12 +261,12 @@
 .future-slant-check::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: skewX(var(--future-skew)); background: color-mix(in srgb, var(--surface) 82%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, var(--divider)); }
 .future-slant-editor { padding: 1px; }
 .future-slant-editor .diary-editor { min-width: 0; }
-.future-slant-editor .md-editor { min-height: 300px; border: 0 !important; background: transparent !important; }
+.future-slant-editor .md-editor { height: clamp(320px, 52vh, 560px) !important; min-height: 320px; border: 0 !important; background: transparent !important; transform: skewX(var(--future-skew)); transform-origin: right top; }
 .future-slant-editor .md-editor-toolbar { position: relative; z-index: 0; min-height: 42px; padding-inline: 12px !important; background: transparent !important; border: 0 !important; overflow: visible !important; }
-.future-slant-editor .md-editor-toolbar::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: skewX(var(--future-skew)); background: color-mix(in srgb, var(--surface-3) 84%, transparent); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--accent) 52%, var(--divider)); pointer-events: none; }
+.future-slant-editor .md-editor-toolbar::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: none; background: color-mix(in srgb, var(--surface-3) 84%, transparent); box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--accent) 52%, var(--divider)); pointer-events: none; }
 .future-slant-editor .md-editor-toolbar-item { position: relative; z-index: 1; display: inline-flex !important; visibility: visible !important; opacity: 1 !important; border-radius: 0 !important; }
 .future-slant-editor .md-editor-content { position: relative; z-index: 0; background: transparent !important; }
-.future-slant-editor .md-editor-content::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: skewX(var(--future-skew)); background: color-mix(in srgb, var(--surface) 76%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, var(--divider)); pointer-events: none; }
+.future-slant-editor .md-editor-content::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: none; background: color-mix(in srgb, var(--surface) 76%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, var(--divider)); pointer-events: none; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
 .future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .future-task-settings .field { display: grid; gap: 5px; }
