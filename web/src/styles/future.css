@@ -286,7 +286,7 @@
 /* 同一变换矩阵：内容坐标整体形成 75°，每一行反向变换仅恢复字形水平。
    CodeMirror 的命中、光标和选择层仍在同一坐标系中，避免视觉与交互错位。 */
 .future-slant-editor .diary-editor.slanted-lines .cm-content,
-.future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer { transform: skewX(var(--future-skew)); transform-origin: left top; }
+.future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer { transform: translateX(calc(var(--future-editor-run) + 12px)) skewX(var(--future-skew)); transform-origin: left top; }
 .future-slant-editor .diary-editor.slanted-lines .cm-line,
 .future-slant-editor .diary-editor.slanted-lines .cm-placeholder,
 .future-slant-editor .diary-editor.slanted-lines .cm-cursor { transform: skewX(15deg); transform-origin: left top; }
