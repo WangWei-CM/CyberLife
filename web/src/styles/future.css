@@ -238,11 +238,15 @@
 .future-task-drawer-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 34px 16px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); transform: skewX(15deg); transform-origin: right top; }
 .future-task-drawer-head h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: .08em; }
 .future-task-drawer-actions { display: flex; gap: 4px; }
-.future-task-drawer-content { display: grid; gap: 18px; padding: 24px 34px 32px; transform: skewX(15deg); transform-origin: right top; }
+.future-task-drawer-content { --future-drawer-stack-step: clamp(22px, 3.2vw, 56px); display: grid; gap: 18px; padding: 24px 34px 32px; transform: skewX(15deg); transform-origin: right top; }
 .future-task-error { margin: 0; }
 .future-task-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .future-task-preview, .future-task-editor, .future-task-settings, .future-task-drawer-footer { position: relative; transform: skewX(var(--future-skew)); transform-origin: center; }
 .future-task-preview > *, .future-task-editor > *, .future-task-settings > *, .future-task-drawer-footer > * { transform: skewX(15deg); transform-origin: center; }
+.future-task-stack-panel { transform-origin: right top; }
+.future-task-stack-primary { transform: translateX(0) skewX(var(--future-skew)); }
+.future-task-stack-secondary { transform: translateX(calc(-1 * var(--future-drawer-stack-step))) skewX(var(--future-skew)); }
+.future-task-stack-tertiary { transform: translateX(calc(-2 * var(--future-drawer-stack-step))) skewX(var(--future-skew)); }
 .future-task-preview { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
 .future-task-preview h1 { margin: 0; font-size: clamp(24px, 3vw, 42px); line-height: 1.15; letter-spacing: .05em; }
 .future-task-editor { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
