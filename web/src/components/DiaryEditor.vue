@@ -96,13 +96,16 @@ function setupSlantedLines() {
   if (!props.slantedLines) return
   const editor = root.value?.querySelector<HTMLElement>('.md-editor')
   const content = editor?.querySelector<HTMLElement>('.cm-content')
-  if (!editor || !content) { window.requestAnimationFrame(setupSlantedLines); return }
+  const observerRoot = root.value
+  if (!editor || !content || !observerRoot) { window.requestAnimationFrame(setupSlantedLines); return }
   // 行节点在输入、换行与自动换行时会被 CodeMirror 整体替换。不能把这个校准
   // 延迟到 requestAnimationFrame，否则新行会在默认位置和斜向位置之间闪跳。
+  // 监听必须挂在稳定的组件根节点，不能挂在 cm-content：短行输入时 md-editor-v3
+  // 会直接替换 cm-content，原先的监听器随之失效，后续行便会回到竖直默认布局。
   slantedLineObserver = new MutationObserver(syncSlantedLines)
-  slantedLineObserver.observe(content, { childList: true, characterData: true, subtree: true })
+  slantedLineObserver.observe(observerRoot, { childList: true, characterData: true, subtree: true })
   slantedLineResizeObserver = new ResizeObserver(scheduleSlantedLines)
-  slantedLineResizeObserver.observe(editor)
+  slantedLineResizeObserver.observe(observerRoot)
   syncSlantedLines()
   // 首次挂载时 CodeMirror 可能在本轮之后补齐可见行；下一帧仅作为初始化兜底。
   scheduleSlantedLines()
