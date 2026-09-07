@@ -77,7 +77,10 @@ function syncSlantedLines() {
   if (!editor || !content) return
   const lines = content.querySelectorAll<HTMLElement>('.cm-line')
   if (!props.slantedLines) {
-    lines.forEach(line => line.style.removeProperty('padding-left'))
+    lines.forEach(line => {
+      line.style.removeProperty('padding-left')
+      line.style.removeProperty('--future-line-indent')
+    })
     return
   }
   const slope = Math.tan(Math.PI / 12)
@@ -85,7 +88,10 @@ function syncSlantedLines() {
   const editorTop = editor.getBoundingClientRect().top
   lines.forEach(line => {
     const lineTop = line.getBoundingClientRect().top - editorTop
-    line.style.paddingLeft = `${Math.max(0, Math.round(run - lineTop * slope + 12))}px`
+    const indent = `${Math.max(0, Math.round(run - lineTop * slope + 12))}px`
+    // md-editor-v3 会重写 padding 样式。使用独立自定义属性可避免与其内联样式冲突，
+    // 同时只有实际变化时才写入，避免 attributes 观察导致反馈循环。
+    if (line.style.getPropertyValue('--future-line-indent') !== indent) line.style.setProperty('--future-line-indent', indent)
   })
 }
 function scheduleSlantedLines() {
@@ -103,7 +109,8 @@ function setupSlantedLines() {
   // 监听必须挂在稳定的组件根节点，不能挂在 cm-content：短行输入时 md-editor-v3
   // 会直接替换 cm-content，原先的监听器随之失效，后续行便会回到竖直默认布局。
   slantedLineObserver = new MutationObserver(syncSlantedLines)
-  slantedLineObserver.observe(observerRoot, { childList: true, characterData: true, subtree: true })
+  // md-editor-v3 有时不替换行节点，而是直接重写其 style；此时也必须重新注入偏移。
+  slantedLineObserver.observe(observerRoot, { childList: true, characterData: true, attributes: true, attributeFilter: ['style'], subtree: true })
   slantedLineResizeObserver = new ResizeObserver(scheduleSlantedLines)
   slantedLineResizeObserver.observe(observerRoot)
   syncSlantedLines()
@@ -143,7 +150,7 @@ onBeforeUnmount(() => { root.value?.removeEventListener('click', onPreviewClick)
 </script>
 
 <template>
-  <div ref="root" class="diary-editor" :class="{ secret }">
+  <div ref="root" class="diary-editor" :class="{ secret, 'slanted-lines': slantedLines }">
     <MdEditor :model-value="modelValue" :editor-id="editorId" :theme="theme" language="zh-CN" :toolbars="toolbars" :placeholder="placeholder" :no-img-zoom-in="true" :preview="false" :auto-fold-threshold="60" @update:model-value="onChange" @on-upload-img="uploadImages">
       <template #defToolbars>
         <NormalToolbar title="删除备份" class="vault-trigger" @on-click="vaultOpen = !vaultOpen">

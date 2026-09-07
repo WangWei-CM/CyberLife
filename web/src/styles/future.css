@@ -283,6 +283,8 @@
 .future-slant-editor .md-editor-content::before { display: none; }
 .future-slant-editor .md-editor .cm-content, .future-slant-editor .md-editor .cm-line, .future-slant-editor .md-editor .cm-placeholder { color: #F4F7FF !important; text-shadow: 0 0 8px color-mix(in srgb, var(--accent) 16%, transparent); }
 .future-slant-editor .md-editor .cm-line { box-sizing: border-box; }
+/* 新建虚拟行先沿同一斜向基准落位；JS 会用 --future-line-indent 精确校正其行高坐标。 */
+.future-slant-editor .diary-editor.slanted-lines .cm-line { padding-left: var(--future-line-indent, calc(var(--future-editor-run) + 12px)) !important; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
 .future-task-settings > * { transform: none; transform-origin: right top; }
 .future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
