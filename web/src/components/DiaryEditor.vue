@@ -97,15 +97,16 @@ function syncSlantedLines() {
     const bounds = line.getBoundingClientRect()
     lineMetrics.push({ top: bounds.top, bottom: bounds.bottom, indent: indentValue })
   })
-  // CodeMirror 的选区单独放在 cm-selectionLayer，默认按未缩进的 x=0 绘制。
-  // 为每个选区片段匹配其所在可见行，使跨行选择同样沿 75° 方向逐行偏移。
+  // CodeMirror 的选区单独放在 cm-selectionLayer。首、尾行的片段带有文本起点，
+  // 需要补入缩进；跨行中间的片段则从其 x=0 行首基准开始，需反向抵消该基准。
+  // 这样每一行选区的左边缘才会精确落在对应文字开头。
   editor.querySelectorAll<HTMLElement>('.cm-selectionBackground').forEach(selection => {
     const bounds = selection.getBoundingClientRect()
     const y = bounds.top + Math.min(2, Math.max(0, bounds.height / 2))
     const metric = lineMetrics.find(line => y >= line.top - 1 && y <= line.bottom + 1)
       ?? lineMetrics.reduce<{ top: number; bottom: number; indent: number } | undefined>((nearest, line) => !nearest || Math.abs(line.top - y) < Math.abs(nearest.top - y) ? line : nearest, undefined)
     if (!metric) return
-    const offset = `${metric.indent}px`
+    const offset = `${selection.offsetLeft <= 1 ? -metric.indent : metric.indent}px`
     if (selection.style.getPropertyValue('--future-selection-indent') !== offset) selection.style.setProperty('--future-selection-indent', offset)
   })
 }
