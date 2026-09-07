@@ -193,6 +193,7 @@
 .plan-dialog .future-list .plan-form { transform: skewX(var(--future-skew)); transform-origin: center; }
 .plan-dialog .future-detail .progress-form { transform: skewX(var(--future-skew)); }
 .day-tasks { display: grid; }
+.day-col > .day-tasks { min-width: 0; transform: none; transform-origin: left top; }
 .day-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .day-tasks li:last-child { box-shadow: none; }
 .day-tasks .task-row { padding: 8px 0; }
@@ -251,6 +252,7 @@
 .future-task-panel-stack > .future-task-stack-panel { width: 100%; min-width: 0; transform: none !important; transform-origin: right top; }
 .future-task-preview { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
 .future-task-preview h1 { margin: 0; font-size: clamp(24px, 3vw, 42px); line-height: 1.15; letter-spacing: .05em; }
+.future-task-preview > .markdown-preview { min-width: 0; transform: none !important; transform-origin: right top; }
 .future-task-editor { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
 .future-slant-control { position: relative; display: block; min-width: 0; isolation: isolate; }
 .future-slant-control::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: skewX(var(--future-skew)); transform-origin: center; background: color-mix(in srgb, var(--surface) 90%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 48%, var(--divider)), 0 0 16px color-mix(in srgb, var(--accent) 12%, transparent); pointer-events: none; }
