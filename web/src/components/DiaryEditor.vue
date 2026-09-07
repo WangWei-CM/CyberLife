@@ -66,7 +66,9 @@ function onChange(value: string) {
   emit('change', value)
   if (auditTimer) clearTimeout(auditTimer)
   auditTimer = window.setTimeout(() => audit(value), 400)
-  scheduleSlantedLines()
+  // CodeMirror 会先替换行节点、再发出更新事件；此处同步一次可避免新行先以
+  // 默认竖直位置绘制一帧。MutationObserver 仍会在同一轮微任务中校准新节点。
+  syncSlantedLines()
 }
 function syncSlantedLines() {
   slantedLineFrame = undefined
@@ -95,10 +97,14 @@ function setupSlantedLines() {
   const editor = root.value?.querySelector<HTMLElement>('.md-editor')
   const content = editor?.querySelector<HTMLElement>('.cm-content')
   if (!editor || !content) { window.requestAnimationFrame(setupSlantedLines); return }
-  slantedLineObserver = new MutationObserver(scheduleSlantedLines)
+  // 行节点在输入、换行与自动换行时会被 CodeMirror 整体替换。不能把这个校准
+  // 延迟到 requestAnimationFrame，否则新行会在默认位置和斜向位置之间闪跳。
+  slantedLineObserver = new MutationObserver(syncSlantedLines)
   slantedLineObserver.observe(content, { childList: true, characterData: true, subtree: true })
   slantedLineResizeObserver = new ResizeObserver(scheduleSlantedLines)
   slantedLineResizeObserver.observe(editor)
+  syncSlantedLines()
+  // 首次挂载时 CodeMirror 可能在本轮之后补齐可见行；下一帧仅作为初始化兜底。
   scheduleSlantedLines()
 }
 function restore(snapshot: Snapshot) {
