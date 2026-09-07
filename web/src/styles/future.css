@@ -238,7 +238,7 @@
 .future-task-drawer-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 34px 16px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); transform: skewX(15deg); transform-origin: right top; }
 .future-task-drawer-head h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: .08em; }
 .future-task-drawer-actions { display: flex; gap: 4px; }
-.future-task-drawer-content { --future-drawer-stack-step: clamp(46px, 6vw, 92px); --future-inline-stack-step: clamp(14px, 1.8vw, 28px); display: grid; gap: 18px; padding: 24px 34px 32px; transform: skewX(15deg); transform-origin: right top; }
+.future-task-drawer-content { --future-drawer-stack-step: clamp(46px, 6vw, 92px); display: grid; gap: 18px; padding: 24px 34px 32px; transform: skewX(15deg); transform-origin: right top; }
 .future-task-error { margin: 0; }
 .future-task-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .future-task-preview, .future-task-editor, .future-task-settings, .future-task-drawer-footer { position: relative; transform: skewX(var(--future-skew)); transform-origin: center; }
@@ -273,22 +273,10 @@
 .future-slant-editor .md-editor-content { position: relative; z-index: 0; background: transparent !important; }
 .future-slant-editor .md-editor-content::before { content: ""; position: absolute; inset: 0; z-index: -1; transform: none; background: color-mix(in srgb, var(--surface) 76%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 26%, var(--divider)); pointer-events: none; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
-.future-task-settings > * { transform: none; transform-origin: right top; }
-.future-task-settings > :nth-child(2) { transform: translateX(calc(-1 * var(--future-inline-stack-step))); }
-.future-task-settings > :nth-child(3) { transform: translateX(calc(-2 * var(--future-inline-stack-step))); }
-.future-task-settings > :nth-child(4) { transform: translateX(calc(-3 * var(--future-inline-stack-step))); }
-.future-task-settings > :nth-child(5) { transform: translateX(calc(-4 * var(--future-inline-stack-step))); }
-.future-task-settings > :nth-child(6) { transform: translateX(calc(-5 * var(--future-inline-stack-step))); }
 .future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .future-task-settings .field { display: grid; gap: 5px; }
 .future-task-settings select { width: 100%; }
-.future-task-settings .future-slant-control::before, .future-task-settings .future-slant-check::before { transform: none; }
-.future-task-settings .future-slant-button > button { background: transparent !important; }
-.future-milestone-form { --future-milestone-stack-step: clamp(12px, 1.5vw, 24px); display: grid; gap: 8px; padding-top: 10px; }
-.future-milestone-form > * { transform: none; transform-origin: right top; }
-.future-milestone-form > :nth-child(2) { transform: translateX(calc(-1 * var(--future-milestone-stack-step))); }
-.future-milestone-form > :nth-child(3) { transform: translateX(calc(-2 * var(--future-milestone-stack-step))); }
-.future-milestone-form > :nth-child(4) { transform: translateX(calc(-3 * var(--future-milestone-stack-step))); }
+.future-milestone-form { display: grid; gap: 8px; padding-top: 10px; }
 .future-milestone-form textarea { resize: vertical; }
 .future-task-drawer-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--divider); }
 .future-drawer-enter-active, .future-drawer-leave-active { transition: opacity var(--dur-mid) var(--ease-out); }
