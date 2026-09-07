@@ -247,8 +247,8 @@
 .future-task-stack-primary { transform: translateX(0) skewX(var(--future-skew)); }
 .future-task-stack-secondary { transform: translateX(calc(-1 * var(--future-drawer-stack-step))) skewX(var(--future-skew)); }
 .future-task-stack-tertiary { transform: translateX(calc(-2 * var(--future-drawer-stack-step))) skewX(var(--future-skew)); }
-.future-task-panel-stack { display: grid; gap: 18px; transform: skewX(var(--future-skew)); transform-origin: right top; }
-.future-task-panel-stack > .future-task-stack-panel { transform: none; transform-origin: right top; }
+.future-task-panel-stack { display: grid; width: 100%; min-width: 0; gap: 18px; align-items: stretch; transform: skewX(var(--future-skew)) !important; transform-origin: right top; }
+.future-task-panel-stack > .future-task-stack-panel { width: 100%; min-width: 0; transform: none !important; transform-origin: right top; }
 .future-task-preview { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
 .future-task-preview h1 { margin: 0; font-size: clamp(24px, 3vw, 42px); line-height: 1.15; letter-spacing: .05em; }
 .future-task-editor { display: grid; gap: 12px; padding: 16px 20px; background: color-mix(in srgb, var(--surface-2) 84%, transparent); }
