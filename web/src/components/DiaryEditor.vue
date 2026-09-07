@@ -98,7 +98,7 @@ onBeforeUnmount(() => { root.value?.removeEventListener('click', onPreviewClick)
 
 <template>
   <div ref="root" class="diary-editor" :class="{ secret }">
-    <MdEditor :model-value="modelValue" :editor-id="editorId" :theme="theme" language="zh-CN" :toolbars="toolbars" :placeholder="placeholder" :no-img-zoom-in="true" :preview="true" :auto-fold-threshold="60" @update:model-value="onChange" @on-upload-img="uploadImages">
+    <MdEditor :model-value="modelValue" :editor-id="editorId" :theme="theme" language="zh-CN" :toolbars="toolbars" :placeholder="placeholder" :no-img-zoom-in="true" :preview="false" :auto-fold-threshold="60" @update:model-value="onChange" @on-upload-img="uploadImages">
       <template #defToolbars>
         <NormalToolbar title="删除备份" class="vault-trigger" @on-click="vaultOpen = !vaultOpen">
           <template #trigger><span class="vault-icon" :class="{ has: snapshots.length }"><AppIcon name="history" :size="16" /><i v-if="snapshots.length" /></span></template>
