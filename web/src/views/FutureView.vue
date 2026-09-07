@@ -390,9 +390,10 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
         </section>
       </Transition>
     </section>
-    <Transition name="future-drawer">
-      <div v-if="taskDrawerOpen" class="future-task-drawer-layer" @click.self="closeTaskDrawer">
-        <aside class="future-task-drawer" role="dialog" aria-modal="true" aria-label="未来待办详情">
+    <Teleport to=".app-shell">
+      <Transition name="future-drawer">
+        <div v-if="taskDrawerOpen" class="future-task-drawer-layer" @click.self="closeTaskDrawer">
+          <aside class="future-task-drawer" role="dialog" aria-modal="true" aria-label="未来待办详情">
           <header class="future-task-drawer-head">
             <div><small class="faint mono">{{ selectedTask?.taskDate ?? selectedDate }}</small><h2>待办详情</h2></div>
             <div class="future-task-drawer-actions"><button v-if="selectedTask" class="icon-button" :aria-label="taskEditing ? '退出编辑' : '编辑待办'" @click="taskEditing = !taskEditing"><AppIcon :name="taskEditing ? 'close' : 'edit'" :size="16" /></button><button class="icon-button" aria-label="关闭待办详情" @click="closeTaskDrawer"><AppIcon name="close" :size="16" /></button></div>
@@ -428,8 +429,9 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
             </template>
             <EmptyState v-else icon="target" :text="taskError || '未找到待办'" compact />
           </div>
-        </aside>
-      </div>
-    </Transition>
+          </aside>
+        </div>
+      </Transition>
+    </Teleport>
   </main>
 </template>

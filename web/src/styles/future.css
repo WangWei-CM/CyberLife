@@ -225,8 +225,8 @@
 .future-page .task-add > * { transform: skewX(15deg); }
 
 /* ---------- 未来待办抽屉：外框与可滚动内容共用 75° 斜率 ---------- */
-.future-task-drawer-layer { position: fixed; inset: 0; z-index: 90; display: flex; justify-content: flex-end; background: var(--scrim); }
-.future-task-drawer { position: relative; isolation: isolate; --future-drawer-corner-safe: clamp(44px, 13.4vh, 152px); width: min(calc(48vw - var(--future-drawer-corner-safe)), calc(760px - var(--future-drawer-corner-safe))); min-width: min(calc(420px - var(--future-drawer-corner-safe)), calc(100vw - var(--future-drawer-corner-safe))); height: 100%; margin-right: var(--future-drawer-corner-safe); overflow: auto; color: var(--text); background: var(--surface); transform: skewX(var(--future-skew)); transform-origin: center; scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
+.future-task-drawer-layer { position: fixed; inset: 0; z-index: 90; display: flex; justify-content: flex-end; --future-edge-angle: 75deg; --future-skew: -15deg; --future-drawer-corner-safe: clamp(44px, 13.4vh, 152px); background: var(--scrim); }
+.future-task-drawer { position: relative; isolation: isolate; width: min(48vw, 760px); min-width: min(420px, 100vw); height: 100%; margin-right: 0; overflow: auto; color: var(--text); background: var(--surface); transform: skewX(var(--future-skew)); transform-origin: right top; scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
 .future-task-drawer::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; background:
   linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 34%, transparent) 22%, transparent 60%) left / 1px 100% no-repeat,
   linear-gradient(180deg, transparent 40%, color-mix(in srgb, var(--accent) 34%, transparent) 76%, var(--accent)) right / 1px 100% no-repeat,
@@ -235,10 +235,10 @@
 .future-task-drawer::-webkit-scrollbar { width: 9px; }
 .future-task-drawer::-webkit-scrollbar-track { background: linear-gradient(105deg, transparent 36%, var(--divider) 37% 63%, transparent 64%); }
 .future-task-drawer::-webkit-scrollbar-thumb { background: var(--accent-soft); border: 1px solid var(--accent); }
-.future-task-drawer-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px calc(34px + var(--future-drawer-corner-safe)) 16px 34px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); transform: skewX(15deg); }
+.future-task-drawer-head { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 34px 16px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(14px); transform: skewX(15deg); transform-origin: right top; }
 .future-task-drawer-head h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: .08em; }
 .future-task-drawer-actions { display: flex; gap: 4px; }
-.future-task-drawer-content { display: grid; gap: 18px; padding: 24px 34px 32px; transform: skewX(15deg); }
+.future-task-drawer-content { display: grid; gap: 18px; padding: 24px 34px 32px; transform: skewX(15deg); transform-origin: right top; }
 .future-task-error { margin: 0; }
 .future-task-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .future-task-preview, .future-task-editor, .future-task-settings, .future-task-drawer-footer { position: relative; transform: skewX(var(--future-skew)); transform-origin: center; }
