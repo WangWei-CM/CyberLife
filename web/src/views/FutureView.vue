@@ -313,6 +313,7 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
   <main class="page future-page" :style="{ '--future-top-height': `${topHeight}px` }">
     <div class="scanlines" aria-hidden="true" />
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
+    <Transition name="plan-dialog">
     <section v-if="planDialogOpen" class="future-top plan-dialog" :style="{ '--list-width': `${listWidth}%`, height: `${topHeight}px` }" role="dialog" aria-modal="true" aria-label="规划详情与编辑">
       <button class="icon-button plan-dialog-close" aria-label="关闭规划面板" @click="closePlanDialog"><AppIcon name="close" :size="16" /></button>
       <aside v-stagger class="future-list cyber-panel bracket">
@@ -376,6 +377,7 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
         </Transition>
       </section>
     </section>
+    </Transition>
     <section class="future-bottom cyber-panel bracket">
       <ZoomCalendar v-model:selected="selectedDate" :tasks="taskList" :plans="plans" :selected-plan="selectedPlanId" :today="today" @range="onRange" @select-plan="choosePlanById" />
       <Transition name="fade-slide" mode="out-in">

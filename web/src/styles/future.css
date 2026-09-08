@@ -184,6 +184,10 @@
 .day-plan-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .plan-editor-trigger { width: 28px; height: 28px; flex: 0 0 auto; }
 .plan-dialog { position: absolute; inset: 8px 0; z-index: 10; min-height: 0; isolation: isolate; overflow: hidden; background: transparent; transform: skewX(var(--future-skew)); transform-origin: center; }
+.plan-dialog-enter-active, .plan-dialog-leave-active { transition: opacity var(--dur-mid) var(--ease-out), transform var(--dur-mid) var(--ease-out); }
+.plan-dialog-enter-from, .plan-dialog-leave-to { opacity: 0; }
+.plan-dialog-enter-from { transform: translateY(18px) skewX(var(--future-skew)); }
+.plan-dialog-leave-to { transform: translateY(-10px) skewX(var(--future-skew)); }
 .plan-dialog::before { content: ""; position: absolute; inset: 0; z-index: -1; background:
   linear-gradient(90deg, var(--accent) 0, color-mix(in srgb, var(--accent) 42%, transparent) 24%, transparent 58%) top / 100% 1px no-repeat,
   linear-gradient(90deg, transparent 42%, color-mix(in srgb, var(--accent) 42%, transparent) 76%, var(--accent) 100%) bottom / 100% 1px no-repeat,
