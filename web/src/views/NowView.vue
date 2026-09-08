@@ -55,7 +55,18 @@ const hhmm = computed(() => timeLabel(now.value))
 const seconds = computed(() => String(now.value.getSeconds()).padStart(2, '0'))
 const dayProgress = computed(() => ((now.value.getHours() * 60 + now.value.getMinutes()) / 1440) * 100)
 const activePlans = computed(() => plans.value.filter(plan => plan.startDate <= today && today <= plan.endDate && plan.progress < 100).sort((a, b) => a.endDate.localeCompare(b.endDate)))
-const bodyPoints = computed<MetricPoint[]>(() => trend.value.map((point, index) => ({ x: index, y: point.body, label: monthDayLabel(point.date) })))
+const bodyPoints = computed<MetricPoint[]>(() => {
+  const records = [...data.value.bodies].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+  return trend.value.flatMap((point, index) => {
+    if (point.date !== today || !records.length) return [{ x: index, y: point.body, label: monthDayLabel(point.date) }]
+    if (records.length === 1) return [{ x: index, y: records[0].score, label: timeLabel(records[0].recordedAt) }]
+    return records.map((record, recordIndex) => ({
+      x: index - 0.8 + (0.8 * recordIndex) / (records.length - 1),
+      y: record.score,
+      label: timeLabel(record.recordedAt),
+    }))
+  })
+})
 const moodPoints = computed<MetricPoint[]>(() => data.value.moods.map(record => { const at = new Date(record.recordedAt); return { x: at.getTime(), y: record.value, label: `${timeLabel(record.recordedAt)} ${record.tags.map(tag => tag.emoji).join('')}` } }).sort((a, b) => a.x - b.x))
 const pendingCount = computed(() => data.value.tasks.filter(task => !task.done).length)
 const pendingDisplay = useCountUp(() => pendingCount.value, 400)
