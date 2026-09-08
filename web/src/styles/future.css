@@ -289,7 +289,7 @@
 /* CodeMirror 已用变形后的文字坐标定位图层。仅斜切具体图元，不能再移动整层。 */
 .future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer,
 .future-slant-editor .diary-editor.slanted-lines .cm-cursorLayer { margin: 0; transform: none; }
-.future-slant-editor .diary-editor.slanted-lines .cm-selectionBackground,
+.future-slant-editor .diary-editor.slanted-lines .cm-selectionBackground { transform: none; }
 .future-slant-editor .diary-editor.slanted-lines .cm-cursor { transform: skewX(var(--future-skew)); transform-origin: left top; }
 .future-slant-editor .diary-editor.slanted-lines .cm-line,
 .future-slant-editor .diary-editor.slanted-lines .cm-placeholder { transform: skewX(15deg); transform-origin: left top; }
