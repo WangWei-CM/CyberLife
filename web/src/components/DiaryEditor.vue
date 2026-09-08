@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { MdEditor, NormalToolbar, type ToolbarNames } from 'md-editor-v3'
+import { config, MdEditor, NormalToolbar, type ToolbarNames } from 'md-editor-v3'
+import type { Extension } from '@codemirror/state'
+import { ViewPlugin } from '@codemirror/view'
 import 'md-editor-v3/lib/style.css'
 import { api } from '../api/client'
 import AppIcon from './AppIcon.vue'
@@ -28,6 +30,21 @@ let auditTimer: number | undefined
 
 const storageKey = computed(() => `cyberlife-diary-vault:${props.vaultKey}`)
 const toolbars: ToolbarNames[] = ['bold', 'underline', 'italic', 'strikeThrough', '-', 'title', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList', 'task', '-', 'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-', 'revoke', 'next', 0, '=', 'preview', 'previewOnly', 'catalog']
+
+const refreshSlantedEditorMetrics = ViewPlugin.fromClass(class {
+  private readonly refresh = () => this.view.requestMeasure()
+  constructor(private readonly view: { requestMeasure: () => void }) {
+    document.fonts.ready.then(this.refresh)
+    document.fonts.addEventListener('loadingdone', this.refresh)
+  }
+  destroy() { document.fonts.removeEventListener('loadingdone', this.refresh) }
+})
+
+config({
+  codeMirrorExtensions: (_theme, extensions: Extension[], _keyBindings, { editorId }) => editorId === 'future-task-detail-editor'
+    ? [...extensions, refreshSlantedEditorMetrics]
+    : extensions,
+})
 
 function loadSnapshots() { try { snapshots.value = JSON.parse(localStorage.getItem(storageKey.value) || '[]') } catch { snapshots.value = [] } }
 function saveSnapshots() { localStorage.setItem(storageKey.value, JSON.stringify(snapshots.value.slice(0, 50))) }
