@@ -28,7 +28,7 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer) })
 <template>
   <section v-if="current" class="plan-carousel" aria-roledescription="轮播" aria-label="进行中的规划" @mouseenter="pause(true)" @mouseleave="pause(false)" @focusin="pause(true)" @focusout="pause(false)">
     <div class="carousel-stage">
-      <Transition name="carousel">
+      <Transition name="carousel" mode="out-in">
         <button :key="current.id" v-glow class="plan-banner glow-edge" @click="emit('select', current)">
           <span class="banner-head">
             <b class="banner-title">{{ current.name }}</b>
