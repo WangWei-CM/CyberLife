@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import ZoomCalendar from '../components/ZoomCalendar.vue'
 import ProgressBar from '../components/ProgressBar.vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
-import SlantedMarkdownEditor from '../components/SlantedMarkdownEditor.vue'
+import DiaryEditor from '../components/DiaryEditor.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { api, type FutureTask, type Plan, type Task } from '../api/client'
@@ -410,7 +410,7 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
                 <form v-if="taskEditing" class="future-task-editor future-task-stack-panel future-task-stack-primary" @submit.prevent="saveTask">
                   <label class="future-slant-control future-slant-field"><input v-model="taskDraft.title" maxlength="120" aria-label="任务标题" /></label>
                   <label class="future-slant-control future-slant-field"><select v-model="taskDraft.priority" aria-label="任务优先级"><option value="high">高优先级</option><option value="normal">普通优先级</option><option value="low">低优先级</option></select></label>
-                  <div class="future-slant-control future-slant-editor"><SlantedMarkdownEditor :model-value="taskDraft.description" placeholder="任务详细描述（支持 Markdown）" @update:model-value="taskDraft.description = $event" /></div>
+                  <div class="future-slant-control future-slant-editor"><DiaryEditor :model-value="taskDraft.description" editor-id="future-task-detail-editor" :theme="theme" :vault-key="taskVaultKey" placeholder="任务详细描述（支持 Markdown）" @update:model-value="taskDraft.description = $event" /></div>
                   <span class="future-slant-control future-slant-button future-task-save"><button class="primary" type="submit" :disabled="taskBusy || !taskDraft.title.trim()">保存待办</button></span>
                 </form>
                 <section v-else class="future-task-preview future-task-stack-panel future-task-stack-primary">
