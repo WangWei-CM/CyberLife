@@ -98,6 +98,8 @@
 
 /* ---------- 右栏：纯当日任务清单 ---------- */
 .task-head { display: grid; gap: 8px; }
+.task-progress-section { display: grid; gap: 8px; }
+.task-progress-head { gap: 0; }
 .schedule-card { display: grid; gap: 12px; }
 .schedule-card > .card-title { margin-bottom: 0; }
 .schedule-card > .card-title small { display: inline-flex; align-items: center; gap: 5px; }
@@ -121,6 +123,11 @@
 .task-add { display: flex; gap: 6px; }
 .task-add .icon-button { flex: 0 0 36px; }
 .tasks-card { padding: 6px 18px; }
+.task-progress-card { position: relative; overflow: hidden; isolation: isolate; border-color: color-mix(in srgb, var(--accent) 42%, var(--divider)); background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.task-progress-card::before, .task-progress-card::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.task-progress-card::before { background: radial-gradient(circle at 10% 50%, color-mix(in srgb, var(--accent) 20%, transparent) 0, color-mix(in srgb, var(--accent) 10%, transparent) 16%, transparent 42%); transform: translateX(-35%) scale(.8); opacity: .65; animation: progress-ripple 2.8s ease-out infinite; }
+.task-progress-card::after { background: linear-gradient(105deg, transparent 0%, transparent 36%, color-mix(in srgb, var(--accent) 20%, transparent) 48%, transparent 60%, transparent 100%); background-size: 240% 100%; animation: progress-sheen 2.4s linear infinite; }
+.task-progress-card > * { position: relative; z-index: 1; }
 .today-tasks { position: relative; }
 .today-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .today-tasks li:last-child { box-shadow: none; }
@@ -131,9 +138,8 @@
 .task-progress-button { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; color: var(--text-faint); background: transparent; cursor: pointer; transition: color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast); }
 .task-progress-button:hover, .task-progress-button.active { color: var(--accent); background: var(--accent-soft); }
 .task-progress-button.active { animation: target-pulse 1.8s ease-in-out infinite; }
-.today-tasks li.in-progress .task-row { position: relative; overflow: hidden; }
-.today-tasks li.in-progress .task-row::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(100deg, transparent 0%, color-mix(in srgb, var(--accent) 7%, transparent) 35%, color-mix(in srgb, var(--accent) 24%, transparent) 50%, transparent 65%); background-size: 220% 100%; animation: progress-shimmer 2.2s linear infinite; }
-@keyframes progress-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes progress-ripple { 0% { transform: translateX(-35%) scale(.8); opacity: .05; } 35% { opacity: .7; } 100% { transform: translateX(125%) scale(1.35); opacity: 0; } }
+@keyframes progress-sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 @keyframes target-pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); } }
 .task-row:hover .task-open-icon { color: var(--accent); transform: translateX(3px); }
 .task-row input[type="checkbox"]:checked { animation: check-pop var(--dur-fast) var(--ease-spring); }
@@ -188,7 +194,7 @@
   .schedule-layout { grid-template-columns: 1fr; }
   .drawer-head, .drawer-content { padding-left: 18px; padding-right: 18px; }
 }
-@media (prefers-reduced-motion: reduce) { .task-progress-button.active, .today-tasks li.in-progress .task-row::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .task-progress-button.active, .task-progress-card::before, .task-progress-card::after { animation: none; } }
 
 @media (min-width: 901px) {
   .now-page { display: grid; grid-template-rows: minmax(0, 1fr); }

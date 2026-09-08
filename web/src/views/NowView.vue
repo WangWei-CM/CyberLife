@@ -70,9 +70,10 @@ const bodyPoints = computed<MetricPoint[]>(() => {
   })
 })
 const moodPoints = computed<MetricPoint[]>(() => data.value.moods.map(record => { const at = new Date(record.recordedAt); return { x: at.getTime(), y: record.value, label: `${timeLabel(record.recordedAt)} ${record.tags.map(tag => tag.emoji).join('')}` } }).sort((a, b) => a.x - b.x))
-const pendingCount = computed(() => data.value.tasks.filter(task => !task.done).length)
+const pendingCount = computed(() => data.value.tasks.filter(task => !task.done && !task.inProgress).length)
 const pendingDisplay = useCountUp(() => pendingCount.value, 400)
-const sortedTasks = computed(() => [...data.value.tasks].sort((a, b) => Number(a.done) - Number(b.done)))
+const activeTasks = computed(() => [...data.value.tasks].filter(task => !task.done && task.inProgress).sort((a, b) => a.title.localeCompare(b.title, 'zh-CN')))
+const todoTasks = computed(() => [...data.value.tasks].filter(task => !task.inProgress).sort((a, b) => Number(a.done) - Number(b.done)))
 const themeClass = computed(() => document.querySelector('.app-shell')?.className.replace(/\b(shell-enter|drop-target|theme-shift)\b/g, '').trim() ?? '')
 const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today.value}${props.secret ? ':secret' : ''}`)
 /** 绝密模式下编辑当天的绝密层日记，公开层不受影响。 */
@@ -324,13 +325,28 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (agendaTimer) clearI
 
       <aside v-stagger class="now-right">
         <ScheduleNowCard :agenda="agenda" :now="now" />
+        <section v-if="activeTasks.length" class="task-progress-section">
+          <header class="task-head task-progress-head"><h2 class="card-title">进行中<small>{{ activeTasks.length }} 项正在进行</small></h2></header>
+          <section class="card tasks-card task-progress-card">
+            <TransitionGroup name="list" tag="ul" class="today-tasks">
+              <li v-for="task in activeTasks" :key="`active-${task.id}`" class="in-progress" :class="{ [`priority-${task.priority}`]: true }">
+                <div class="task-row" role="button" tabindex="0" @click="openTask(task)" @keydown.enter="openTask(task)">
+                  <input type="checkbox" :checked="task.done" :aria-label="`${task.title}完成状态`" @click.stop @change="toggleTask(task)" />
+                  <span class="task-body"><span class="task-title">{{ task.title }}</span><small class="task-meta faint"><span>{{ task.taskDate }}</span><span>已进行 {{ activeDuration(task) }}</span></small></span>
+                  <button class="task-progress-button active" type="button" :aria-label="`停止${task.title}的进行计时`" @click.stop="toggleTaskProgress(task)"><AppIcon name="target" :size="17" /></button>
+                  <AppIcon name="chevron-right" :size="15" class="task-open-icon" />
+                </div>
+              </li>
+            </TransitionGroup>
+          </section>
+        </section>
         <section class="task-head">
           <h2 class="card-title">待办<small>{{ Math.round(pendingDisplay) }} 项未完成</small></h2>
           <form class="task-add" @submit.prevent="addTask"><input v-model="newTask" placeholder="添加今天的待办，回车保存" maxlength="120" aria-label="新待办" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
         </section>
         <section class="card tasks-card">
-          <TransitionGroup v-if="sortedTasks.length" name="list" tag="ul" class="today-tasks">
-            <li v-for="task in sortedTasks" :key="task.id" :class="{ done: task.done, 'in-progress': task.inProgress, [`priority-${task.priority}`]: true }">
+          <TransitionGroup v-if="todoTasks.length" name="list" tag="ul" class="today-tasks">
+            <li v-for="task in todoTasks" :key="`todo-${task.id}`" :class="{ done: task.done, [`priority-${task.priority}`]: true }">
               <div class="task-row" role="button" tabindex="0" @click="openTask(task)" @keydown.enter="openTask(task)">
                 <input type="checkbox" :checked="task.done" :aria-label="`${task.title}完成状态`" @click.stop @change="toggleTask(task)" />
                 <span class="task-body">
