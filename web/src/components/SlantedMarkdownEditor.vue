@@ -11,7 +11,7 @@ const active = ref({ from: 0, to: 0 })
 let observer: ResizeObserver | undefined
 
 const rows = computed<Row[]>(() => {
-  const char = 9.1, step = 20 * Math.tan(Math.PI / 12), run = Math.min(146, Math.max(84, width.value * .14))
+  const char = 9.1, step = 20 * Math.tan(Math.PI / 12), run = Math.min(104, Math.max(42, width.value * .08))
   const output: Row[] = []
   let offset = 0, index = 0
   for (const logical of props.modelValue.split('\n')) {
@@ -27,15 +27,20 @@ const rows = computed<Row[]>(() => {
   return output
 })
 
-function replace(from: number, to: number, value: string, caret = from + value.length) {
+function focusAt(caret: number, preferNext = false) {
+  nextTick(() => {
+    const fields = Array.from(root.value?.querySelectorAll<HTMLInputElement>('.slanted-markdown-row') || [])
+    const field = fields.find(item => Number(item.dataset.from) === caret && preferNext)
+      || fields.find(item => caret >= Number(item.dataset.from) && caret <= Number(item.dataset.to))
+    if (!field) return
+    const position = Math.min(field.value.length, Math.max(0, caret - Number(field.dataset.from)))
+    field.focus(); field.setSelectionRange(position, position)
+  })
+}
+function replace(from: number, to: number, value: string, caret = from + value.length, preferNext = false) {
   emit('update:modelValue', `${props.modelValue.slice(0, from)}${value}${props.modelValue.slice(to)}`)
   active.value = { from: caret, to: caret }
-  nextTick(() => {
-    const input = root.value?.querySelector<HTMLInputElement>(`input[data-from="${from}"]`)
-    if (!input) return
-    const position = Math.min(input.value.length, Math.max(0, caret - from))
-    input.focus(); input.setSelectionRange(position, position)
-  })
+  focusAt(caret, preferNext)
 }
 function input(row: Row, event: Event) {
   const field = event.target as HTMLInputElement
@@ -49,8 +54,14 @@ function focus(row: Row, event: Event) {
 function keydown(row: Row, event: KeyboardEvent) {
   const field = event.target as HTMLInputElement
   const start = field.selectionStart ?? 0
-  if (event.key === 'Enter') { event.preventDefault(); replace(row.from + start, row.from + (field.selectionEnd ?? start), '\n'); return }
+  if (event.key === 'Enter') { event.preventDefault(); replace(row.from + start, row.from + (field.selectionEnd ?? start), '\n', row.from + start + 1, true); return }
   if (event.key === 'Backspace' && start === 0 && row.from > 0) { event.preventDefault(); replace(row.from - 1, row.from, '', row.from - 1) }
+  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    const index = rows.value.findIndex(item => item.from === row.from && item.to === row.to)
+    const target = rows.value[index + (event.key === 'ArrowUp' ? -1 : 1)]
+    if (target) focusAt(target.from + Math.min(start, target.value.length))
+  }
 }
 function wrap(before: string, after = before) {
   const { from, to } = active.value
@@ -73,7 +84,7 @@ onBeforeUnmount(() => observer?.disconnect())
       <label title="上传图片">▧<input type="file" accept="image/*" @change="insertImage" /></label>
     </nav>
     <div class="slanted-markdown-lines">
-      <input v-for="row in rows" :key="`${row.from}:${row.to}`" class="slanted-markdown-row" :style="{ marginLeft: `${row.inset}px`, width: `calc(100% - ${row.inset}px)` }" :data-from="row.from" :value="row.value" :placeholder="row.from === 0 ? placeholder : ''" spellcheck="true" @input="input(row, $event)" @focus="focus(row, $event)" @click="focus(row, $event)" @select="focus(row, $event)" @keydown="keydown(row, $event)" />
+      <input v-for="row in rows" :key="`${row.from}:${row.to}`" class="slanted-markdown-row" :style="{ marginLeft: `${row.inset}px`, width: `calc(100% - ${row.inset}px)` }" :data-from="row.from" :data-to="row.to" :value="row.value" :placeholder="row.from === 0 ? placeholder : ''" spellcheck="true" @input="input(row, $event)" @focus="focus(row, $event)" @click="focus(row, $event)" @select="focus(row, $event)" @keydown="keydown(row, $event)" />
     </div>
   </section>
 </template>
