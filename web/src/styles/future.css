@@ -271,7 +271,7 @@
 .future-slant-editor::before { display: none; }
 .future-task-editor > .future-slant-editor { transform: skewX(15deg) !important; transform-origin: right top; }
 .future-task-editor > .future-slant-editor::before { display: block; transform: skewX(var(--future-skew)); transform-origin: right top; background: linear-gradient(to bottom, color-mix(in srgb, var(--surface-3) 84%, transparent) 0 42px, color-mix(in srgb, var(--surface) 76%, transparent) 42px 100%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 42%, var(--divider)), inset 0 -1px 0 color-mix(in srgb, var(--accent) 52%, var(--divider)), 0 0 16px color-mix(in srgb, var(--accent) 12%, transparent); }
-.future-slant-editor { --future-editor-run: clamp(6px, 1.5vh, 28px); overflow: visible; }
+.future-slant-editor { --future-editor-run: clamp(0px, .8vh, 20px); overflow: visible; }
 .future-slant-editor .diary-editor { min-width: 0; }
 .future-slant-editor .md-editor { width: calc(100% - var(--future-editor-run)); min-height: 0; height: clamp(280px, 46vh, 520px) !important; margin-left: var(--future-editor-run); border: 0 !important; border-radius: 0 !important; background: var(--surface) !important; transform: skewX(var(--future-skew)); transform-origin: right top; }
 .future-slant-editor .md-editor-toolbar, .future-slant-editor .md-editor-input-wrapper, .future-slant-editor .md-editor-preview-wrapper { border-color: color-mix(in srgb, var(--accent) 35%, var(--divider)) !important; }
