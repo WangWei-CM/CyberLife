@@ -14,13 +14,14 @@ import { addDaysISO, beijingNow, fullDateLabel, lunarLabel, monthDayLabel, timeL
 const props = defineProps<{ secret: boolean }>()
 const emit = defineEmits<{ (event: 'navigate-future'): void }>()
 
-type CardKey = 'body' | 'mood' | 'diary'
-const DEFAULT_ORDER: CardKey[] = ['body', 'mood', 'diary']
+type CardKey = 'metrics' | 'diary'
+const DEFAULT_ORDER: CardKey[] = ['metrics', 'diary']
 const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, secretDiary: { id: '', entryDate: '', content: '', secret: true, commentable: false }, moods: [], bodies: [], tasks: [] })
 const trend = ref<TrendPoint[]>([])
 const tags = ref<MoodTag[]>([])
 const plans = ref<Plan[]>([])
 const selectedTags = ref<string[]>([])
+const editingMetric = ref<'mood' | 'body' | null>(null)
 const moodNote = ref('')
 const bodyNote = ref('')
 const bodyScore = ref(70)
@@ -108,7 +109,7 @@ async function load() {
 async function refreshToday() { try { data.value = normalize(await api.today()) } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' } }
 async function recordMood() {
   if (!selectedTags.value.length) return
-  try { await api.addMood(selectedTags.value, moodNote.value.trim(), props.secret); selectedTags.value = []; moodNote.value = ''; await refreshToday() } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
+  try { await api.addMood(selectedTags.value, moodNote.value.trim(), props.secret); selectedTags.value = []; moodNote.value = ''; await refreshToday(); editingMetric.value = null } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
 }
 async function recordBody() {
   try {
@@ -117,6 +118,7 @@ async function recordBody() {
     const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today, -6), today)])
     data.value = normalize(todayData)
     trend.value = history.points
+    editingMetric.value = null
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
 }
 async function addTag() {
@@ -227,45 +229,55 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
 
         <PlanCarousel v-if="activePlans.length" style="order: 1" :plans="activePlans" :interval="carouselInterval" @select="emit('navigate-future')" />
 
-        <article class="card now-card body-card" :class="{ 'drag-source': dragCard === 'body' }" :style="cardStyle('body')" @dragover="onCardDragOver('body', $event)" @drop.prevent="onCardDragEnd">
-          <div class="now-chart">
-            <h2 class="card-title"><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('body', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>身体</span><small>近七日 · 今天 {{ data.bodies.length ? `${data.bodies.length} 次` : '' }}</small></h2>
-            <MetricLine :points="bodyPoints" :min="0" :max="100" :height="128" empty="这七天还没有身体记录" />
-          </div>
-          <form class="now-form" @submit.prevent="recordBody">
-            <div class="score-row"><span class="faint">今天的状态</span><output class="score mono">{{ bodyScore }}</output></div>
-            <input v-model.number="bodyScore" type="range" min="0" max="100" aria-label="身体评分" :style="{ '--range-fill': `${bodyScore}%` }" />
-            <input v-model="bodyNote" placeholder="备注（可选）" maxlength="200" />
-            <button class="primary" type="submit">记录</button>
-          </form>
-        </article>
-
-        <article class="card now-card mood-card" :class="{ 'drag-source': dragCard === 'mood' }" :style="cardStyle('mood')" @dragover="onCardDragOver('mood', $event)" @drop.prevent="onCardDragEnd">
-          <div class="now-chart">
-            <h2 class="card-title"><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('mood', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>心情</span><small>今天 {{ data.moods.length ? `${data.moods.length} 次` : '' }}</small></h2>
-            <MetricLine :points="moodPoints" :min="0" :max="100" :height="128" empty="今天还没有心情记录" />
-          </div>
-          <form class="now-form" @submit.prevent="recordMood">
-            <div class="tag-head">
-              <span class="faint">选择标签</span>
-              <div class="tag-manage">
-                <button type="button" class="text-button" :aria-expanded="newTagOpen" @click="newTagOpen = !newTagOpen"><AppIcon name="plus" :size="14" />新标签</button>
-                <Transition name="popover">
-                  <div v-if="newTagOpen" class="popover tag-popover">
-                    <div class="form-row"><input v-model="newTag.emoji" class="tag-emoji-input" maxlength="4" aria-label="emoji" /><input v-model="newTag.name" placeholder="名称" maxlength="8" aria-label="名称" /></div>
-                    <label class="field"><span>情绪值 <b class="mono">{{ newTag.value }}</b></span><input v-model.number="newTag.value" type="range" min="1" max="100" :style="{ '--range-fill': `${newTag.value}%` }" /></label>
-                    <div class="form-row"><button type="button" class="primary" @click="addTag">添加</button><button type="button" class="text-button" @click="newTagOpen = false">取消</button></div>
+        <article class="card metrics-card" :class="{ 'drag-source': dragCard === 'metrics' }" :style="cardStyle('metrics')" @dragover="onCardDragOver('metrics', $event)" @drop.prevent="onCardDragEnd">
+          <div class="metrics-grid">
+            <section class="metric-panel">
+              <header class="card-title metric-panel-head">
+                <span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('metrics', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>心情 <small>今天 {{ data.moods.length ? `${data.moods.length} 次` : '' }}</small></span>
+                <button class="icon-button metric-edit-trigger" type="button" :aria-label="editingMetric === 'mood' ? '返回心情图表' : '添加心情'" @click="editingMetric = editingMetric === 'mood' ? null : 'mood'"><AppIcon :name="editingMetric === 'mood' ? 'close' : 'plus'" :size="16" /></button>
+              </header>
+              <Transition name="fade-slide" mode="out-in">
+                <div v-if="editingMetric !== 'mood'" key="mood-chart" class="metric-chart"><MetricLine :points="moodPoints" :min="0" :max="100" :height="128" empty="今天还没有心情记录" /></div>
+                <form v-else key="mood-editor" class="now-form metric-editor" @submit.prevent="recordMood">
+                  <div class="tag-head">
+                    <span class="faint">选择标签</span>
+                    <div class="tag-manage">
+                      <button type="button" class="text-button" :aria-expanded="newTagOpen" @click="newTagOpen = !newTagOpen"><AppIcon name="plus" :size="14" />新标签</button>
+                      <Transition name="popover">
+                        <div v-if="newTagOpen" class="popover tag-popover">
+                          <div class="form-row"><input v-model="newTag.emoji" class="tag-emoji-input" maxlength="4" aria-label="emoji" /><input v-model="newTag.name" placeholder="名称" maxlength="8" aria-label="名称" /></div>
+                          <label class="field"><span>情绪值 <b class="mono">{{ newTag.value }}</b></span><input v-model.number="newTag.value" type="range" min="1" max="100" :style="{ '--range-fill': `${newTag.value}%` }" /></label>
+                          <div class="form-row"><button type="button" class="primary" @click="addTag">添加</button><button type="button" class="text-button" @click="newTagOpen = false">取消</button></div>
+                        </div>
+                      </Transition>
+                    </div>
                   </div>
-                </Transition>
-              </div>
-            </div>
-            <div class="tag-grid" role="group" aria-label="心情标签">
-              <button v-for="tag in tags" :key="tag.id" v-glow type="button" class="tag-item" :class="{ selected: selectedTags.includes(tag.id) }" :aria-pressed="selectedTags.includes(tag.id)" @click="toggleTag(tag.id)"><i>{{ tag.emoji }}</i><span>{{ tag.name }}</span></button>
-            </div>
-            <EmptyState v-if="!tags.length" icon="smile" text="先添加几个心情标签" compact />
-            <input v-model="moodNote" placeholder="备注（可选）" maxlength="200" />
-            <button class="primary" type="submit" :disabled="!selectedTags.length">记录</button>
-          </form>
+                  <div class="tag-grid" role="group" aria-label="心情标签">
+                    <button v-for="tag in tags" :key="tag.id" v-glow type="button" class="tag-item" :class="{ selected: selectedTags.includes(tag.id) }" :aria-pressed="selectedTags.includes(tag.id)" @click="toggleTag(tag.id)"><i>{{ tag.emoji }}</i><span>{{ tag.name }}</span></button>
+                  </div>
+                  <EmptyState v-if="!tags.length" icon="smile" text="先添加几个心情标签" compact />
+                  <input v-model="moodNote" placeholder="备注（可选）" maxlength="200" />
+                  <button class="primary" type="submit" :disabled="!selectedTags.length">记录</button>
+                </form>
+              </Transition>
+            </section>
+
+            <section class="metric-panel">
+              <header class="card-title metric-panel-head">
+                <span class="card-title-main">身体 <small>今天 {{ data.bodies.length ? `${data.bodies.length} 次` : '' }}</small></span>
+                <button class="icon-button metric-edit-trigger" type="button" :aria-label="editingMetric === 'body' ? '返回身体图表' : '添加身体记录'" @click="editingMetric = editingMetric === 'body' ? null : 'body'"><AppIcon :name="editingMetric === 'body' ? 'close' : 'plus'" :size="16" /></button>
+              </header>
+              <Transition name="fade-slide" mode="out-in">
+                <div v-if="editingMetric !== 'body'" key="body-chart" class="metric-chart"><MetricLine :points="bodyPoints" :min="0" :max="100" :height="128" empty="这七天还没有身体记录" /></div>
+                <form v-else key="body-editor" class="now-form metric-editor" @submit.prevent="recordBody">
+                  <div class="score-row"><span class="faint">今天的状态</span><output class="score mono">{{ bodyScore }}</output></div>
+                  <input v-model.number="bodyScore" type="range" min="0" max="100" aria-label="身体评分" :style="{ '--range-fill': `${bodyScore}%` }" />
+                  <input v-model="bodyNote" placeholder="备注（可选）" maxlength="200" />
+                  <button class="primary" type="submit">记录</button>
+                </form>
+              </Transition>
+            </section>
+          </div>
         </article>
 
         <article class="card diary-card" :class="{ 'drag-source': dragCard === 'diary' }" :style="cardStyle('diary')" @dragover="onCardDragOver('diary', $event)" @drop.prevent="onCardDragEnd">

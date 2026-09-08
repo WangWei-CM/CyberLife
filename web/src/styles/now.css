@@ -55,6 +55,13 @@
 
 /* ---------- 身体 / 心情 卡片：左右两半 ---------- */
 .now-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.metrics-card { display: block; }
+.metrics-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.metric-panel { min-width: 0; }
+.metric-panel + .metric-panel { padding-left: 20px; border-left: 1px solid var(--divider); }
+.metric-panel-head { margin-bottom: 8px; }
+.metric-edit-trigger { width: 28px; height: 28px; flex: 0 0 28px; }
+.metric-editor { min-height: 128px; }
 .now-chart { display: grid; align-content: start; gap: 4px; min-width: 0; }
 .now-form { display: grid; gap: 10px; align-content: start; min-width: 0; }
 .now-form .primary { justify-self: end; }
@@ -132,6 +139,8 @@
   .now-layout { grid-template-columns: 1fr; gap: var(--gap); min-height: 0; }
   .now-divider { display: none; }
   .now-card { grid-template-columns: 1fr; }
+  .metrics-grid { grid-template-columns: 1fr; }
+  .metric-panel + .metric-panel { padding-top: 14px; padding-left: 0; border-top: 1px solid var(--divider); border-left: 0; }
   .card-grip { opacity: 1; }
   .clock-display { display: flex; align-items: flex-start; flex-direction: column; gap: 12px; }
   .now-clock { padding-top: 12px; }
