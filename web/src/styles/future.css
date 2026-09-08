@@ -296,7 +296,7 @@
 .task-editor-modal-head h2 { margin: 2px 0 0; font-size: 20px; }
 .task-editor-modal-body { display: grid; align-content: start; gap: 16px; min-height: 0; overflow: auto; padding: 20px; }
 .task-editor-modal-body > .field { display: grid; gap: 6px; }
-.task-editor-modal-body input, .task-editor-modal-body select, .task-editor-modal-body textarea { width: 100%; }
+.task-editor-modal-body input:not([type="checkbox"]), .task-editor-modal-body select, .task-editor-modal-body textarea { width: 100%; }
 .task-editor-modal-section { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--divider); background: color-mix(in srgb, var(--surface-2) 62%, transparent); }
 .task-editor-modal-section > header { display: flex; justify-content: space-between; gap: 12px; }
 .task-editor-modal-section .md-editor { min-height: 420px; height: min(58vh, 560px); }
