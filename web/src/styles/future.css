@@ -46,6 +46,9 @@
 .future-list { display: grid; align-content: start; gap: 10px; overflow: auto; }
 .plan-form, .progress-form { position: relative; z-index: 0; isolation: isolate; display: grid; gap: 8px; background: transparent; clip-path: none; transform-origin: center; }
 .plan-form { padding: 12px; }
+/* `bracket::before` is a visual overlay; keep the interactive create form
+   above it so its fields are not darkened or visually re-clipped. */
+.plan-dialog .future-list .plan-form { z-index: 2; }
 .plan-form::before, .progress-form::before { content: ""; position: absolute; inset: 0; z-index: -1; background:
   linear-gradient(90deg, var(--accent-soft), color-mix(in srgb, var(--accent) 24%, transparent) 24%, transparent 58%) top / 100% 1px no-repeat,
   linear-gradient(90deg, transparent 42%, color-mix(in srgb, var(--accent) 24%, transparent) 76%, var(--accent-soft)) bottom / 100% 1px no-repeat,
