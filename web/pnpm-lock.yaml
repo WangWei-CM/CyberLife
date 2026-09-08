@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@codemirror/state':
+        specifier: 6.7.2
+        version: 6.7.2
+      '@codemirror/view':
+        specifier: 6.43.10
+        version: 6.43.10
       '@fullcalendar/core':
         specifier: 6.1.19
         version: 6.1.19

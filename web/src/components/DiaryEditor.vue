@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { MdEditor, NormalToolbar, type ToolbarNames } from 'md-editor-v3'
+import { Prec, type Extension } from '@codemirror/state'
+import { EditorView, type KeyBinding } from '@codemirror/view'
 import 'md-editor-v3/lib/style.css'
 import { api } from '../api/client'
 import AppIcon from './AppIcon.vue'
@@ -28,6 +30,38 @@ let auditTimer: number | undefined
 
 const storageKey = computed(() => `cyberlife-diary-vault:${props.vaultKey}`)
 const toolbars: ToolbarNames[] = ['bold', 'underline', 'italic', 'strikeThrough', '-', 'title', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList', 'task', '-', 'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-', 'revoke', 'next', 0, '=', 'preview', 'previewOnly', 'catalog']
+
+function slantedPosition(view: EditorView, event: MouseEvent) {
+  const contentTop = view.contentDOM.getBoundingClientRect().top
+  const slope = Math.tan(Math.PI / 12)
+  return view.posAtCoords({ x: event.clientX + (event.clientY - contentTop) * slope, y: event.clientY })
+}
+
+const slantedCodeMirrorExtensions = (_theme: unknown, extensions: Extension[], _keyBindings: KeyBinding[], options: { editorId: string }): Extension[] => {
+  if (!props.slantedLines || options.editorId !== props.editorId) return extensions
+  const pointerExtension = Prec.high(EditorView.domEventHandlers({
+    mousedown(event, view) {
+      if (event.button !== 0 || !view.contentDOM.contains(event.target as Node)) return false
+      const position = slantedPosition(view, event)
+      if (position === null) return false
+      const anchor = event.shiftKey ? view.state.selection.main.anchor : position
+      const updateSelection = (pointer: MouseEvent) => {
+        const head = slantedPosition(view, pointer)
+        if (head !== null) view.dispatch({ selection: { anchor, head }, userEvent: 'select.pointer' })
+      }
+      const stopSelection = () => {
+        window.removeEventListener('mousemove', updateSelection, true)
+        window.removeEventListener('mouseup', stopSelection, true)
+      }
+      view.dispatch({ selection: { anchor, head: position }, userEvent: 'select.pointer' })
+      window.addEventListener('mousemove', updateSelection, true)
+      window.addEventListener('mouseup', stopSelection, true)
+      event.preventDefault()
+      return true
+    },
+  }))
+  return [...extensions, pointerExtension]
+}
 
 function loadSnapshots() { try { snapshots.value = JSON.parse(localStorage.getItem(storageKey.value) || '[]') } catch { snapshots.value = [] } }
 function saveSnapshots() { localStorage.setItem(storageKey.value, JSON.stringify(snapshots.value.slice(0, 50))) }
@@ -98,7 +132,7 @@ onBeforeUnmount(() => { root.value?.removeEventListener('click', onPreviewClick)
 
 <template>
   <div ref="root" class="diary-editor" :class="{ secret, 'slanted-lines': slantedLines }">
-    <MdEditor :model-value="modelValue" :editor-id="editorId" :theme="theme" language="zh-CN" :toolbars="toolbars" :placeholder="placeholder" :no-img-zoom-in="true" :preview="false" :auto-fold-threshold="60" @update:model-value="onChange" @on-upload-img="uploadImages">
+    <MdEditor :model-value="modelValue" :editor-id="editorId" :theme="theme" language="zh-CN" :toolbars="toolbars" :code-mirror-extensions="slantedCodeMirrorExtensions" :placeholder="placeholder" :no-img-zoom-in="true" :preview="false" :auto-fold-threshold="60" @update:model-value="onChange" @on-upload-img="uploadImages">
       <template #defToolbars>
         <NormalToolbar title="删除备份" class="vault-trigger" @on-click="vaultOpen = !vaultOpen">
           <template #trigger><span class="vault-icon" :class="{ has: snapshots.length }"><AppIcon name="history" :size="16" /><i v-if="snapshots.length" /></span></template>
