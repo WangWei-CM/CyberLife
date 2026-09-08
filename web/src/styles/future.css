@@ -300,6 +300,7 @@
 .task-editor-modal-section { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--divider); background: color-mix(in srgb, var(--surface-2) 62%, transparent); }
 .task-editor-modal-section > header { display: flex; justify-content: space-between; gap: 12px; }
 .task-editor-modal-section .md-editor { min-height: 420px; height: min(58vh, 560px); }
+.task-editor-modal-section .md-editor .cm-content, .task-editor-modal-section .md-editor .cm-line, .task-editor-modal-section .md-editor .cm-line * { color: #F4F7FF !important; }
 .task-editor-modal-foot { border-top: 1px solid var(--divider); border-bottom: 0; }
 .task-editor-modal-foot > span { display: flex; gap: 8px; }
 .task-editor-modal-enter-active, .task-editor-modal-leave-active { transition: opacity var(--dur-mid) var(--ease-out); }
