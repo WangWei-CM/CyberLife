@@ -61,8 +61,9 @@
 .metric-panel + .metric-panel { padding-left: 20px; border-left: 1px solid var(--divider); }
 .metric-panel-head { margin-bottom: 8px; }
 .metric-edit-trigger { width: 28px; height: 28px; flex: 0 0 28px; }
-.metric-chart, .metric-editor { min-height: 196px; box-sizing: border-box; }
+.metric-chart, .metric-editor { height: 150px; min-height: 150px; box-sizing: border-box; }
 .metric-editor { gap: 6px; }
+.metric-editor { overflow-y: auto; }
 .metric-editor .tag-grid { gap: 4px; }
 .metric-editor .tag-item { padding: 4px 2px; }
 .metric-editor .tag-item i { font-size: 18px; }
