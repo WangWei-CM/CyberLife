@@ -321,8 +321,8 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
           <form v-if="creating && isWriter" class="plan-form" @submit.prevent="createPlan">
             <div class="form-control"><input v-model="form.name" placeholder="规划名称" maxlength="60" required /></div>
             <div class="form-row"><input v-model="form.startDate" type="date" required aria-label="开始日期" /><input v-model="form.endDate" type="date" required aria-label="截止日期" /></div>
-            <div class="form-control plan-form-slant"><textarea v-model="form.intro" placeholder="简介（支持 Markdown）" rows="3" /></div>
-            <span class="plan-form-button"><button class="primary" type="submit" :disabled="busy || !form.name.trim()">创建规划</button></span>
+            <div class="form-control"><textarea v-model="form.intro" placeholder="简介（支持 Markdown）" rows="3" /></div>
+            <button class="primary" type="submit" :disabled="busy || !form.name.trim()">创建规划</button>
           </form>
         </Transition>
         <TransitionGroup v-if="sortedPlans.length" name="list" tag="ul" class="plan-list">
