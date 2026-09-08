@@ -38,7 +38,7 @@ const planOrderBusy = ref(false)
 const taskDrawerOpen = ref(false)
 const taskLoading = ref(false)
 const selectedTask = ref<Task | null>(null)
-const taskEditing = ref(false)
+const taskEditorOpen = ref(false)
 const taskBusy = ref(false)
 const taskError = ref('')
 const taskDraft = ref({ title: '', description: '', priority: 'normal' as Task['priority'] })
@@ -195,14 +195,33 @@ async function toggleTask(task: FutureTask) {
   try { syncTask(await api.setTaskDone(task.id, next, task.date)) } catch (cause) { tasks.value = new Map(tasks.value).set(task.id, { ...task, done: !next }); error.value = cause instanceof Error ? cause.message : '更新失败' }
 }
 function taskPriorityLabel(priority: Task['priority']) { return priority === 'high' ? '高优先级' : priority === 'low' ? '低优先级' : '普通优先级' }
-function closeTaskDrawer() { taskDrawerOpen.value = false; taskLoading.value = false; selectedTask.value = null; taskEditing.value = false; taskError.value = '' }
+function resetTaskDrafts() {
+  const task = selectedTask.value
+  if (!task) return
+  taskDraft.value = { title: task.title, description: task.description, priority: task.priority }
+  taskAccessDraft.value = { presetId: task.presetId ?? '', secret: !!task.secret, commentable: !!task.commentable }
+  milestoneDraft.value = { description: '', detail: '' }
+}
+function closeTaskDrawer() { taskDrawerOpen.value = false; taskEditorOpen.value = false; taskLoading.value = false; selectedTask.value = null; taskError.value = '' }
+function taskEditorDirty() {
+  const task = selectedTask.value
+  if (!task) return false
+  return taskDraft.value.title !== task.title || taskDraft.value.description !== task.description || taskDraft.value.priority !== task.priority
+    || taskAccessDraft.value.presetId !== (task.presetId ?? '') || taskAccessDraft.value.secret !== !!task.secret || taskAccessDraft.value.commentable !== !!task.commentable
+    || !!milestoneDraft.value.description.trim() || !!milestoneDraft.value.detail.trim()
+}
+function openTaskEditor() { if (!selectedTask.value || !isWriter.value) return; resetTaskDrafts(); taskEditorOpen.value = true }
+function requestCloseTaskEditor() {
+  if (taskEditorDirty() && !window.confirm('有未保存的待办编辑内容，确定放弃吗？')) return
+  resetTaskDrafts()
+  taskEditorOpen.value = false
+}
 async function openTaskDrawer(task: FutureTask) {
   if (!isWriter.value) return
   taskDrawerOpen.value = true
   taskLoading.value = true
   taskError.value = ''
   selectedTask.value = null
-  taskEditing.value = false
   try {
     const detail = await api.task(task.id, task.date)
     selectedTask.value = detail
@@ -215,7 +234,7 @@ async function saveTask() {
   if (!task || taskBusy.value || !taskDraft.value.title.trim()) return
   taskBusy.value = true
   taskError.value = ''
-  try { syncTask(await api.updateFutureTask(task.id, task.taskDate, taskDraft.value)); taskEditing.value = false } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '保存失败' } finally { taskBusy.value = false }
+  try { syncTask(await api.updateFutureTask(task.id, task.taskDate, taskDraft.value)); taskEditorOpen.value = false; resetTaskDrafts() } catch (cause) { taskError.value = cause instanceof Error ? cause.message : '保存失败' } finally { taskBusy.value = false }
 }
 async function saveTaskAccess() {
   const task = selectedTask.value
@@ -396,7 +415,7 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
           <aside class="future-task-drawer" role="dialog" aria-modal="true" aria-label="未来待办详情">
           <header class="future-task-drawer-head">
             <div><small class="faint mono">{{ selectedTask?.taskDate ?? selectedDate }}</small><h2>待办详情</h2></div>
-            <div class="future-task-drawer-actions"><button v-if="selectedTask" class="icon-button" :aria-label="taskEditing ? '退出编辑' : '编辑待办'" @click="taskEditing = !taskEditing"><AppIcon :name="taskEditing ? 'close' : 'edit'" :size="16" /></button><button class="icon-button" aria-label="关闭待办详情" @click="closeTaskDrawer"><AppIcon name="close" :size="16" /></button></div>
+            <div class="future-task-drawer-actions"><button v-if="selectedTask && isWriter" class="icon-button" aria-label="编辑待办" @click="openTaskEditor"><AppIcon name="edit" :size="16" /></button><button class="icon-button" aria-label="关闭待办详情" @click="closeTaskDrawer"><AppIcon name="close" :size="16" /></button></div>
           </header>
           <div class="future-task-drawer-content">
             <EmptyState v-if="taskLoading" icon="target" text="正在读取待办详情" compact />
@@ -407,31 +426,34 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
                 <span class="future-slant-control future-slant-button"><button class="text-button" :disabled="taskBusy" @click="toggleTaskFromDrawer"><AppIcon :name="selectedTask.done ? 'repeat' : 'check'" :size="14" />{{ selectedTask.done ? '标记未完成' : '标记完成' }}</button></span>
               </div>
               <div class="future-task-panel-stack">
-                <form v-if="taskEditing" class="future-task-editor future-task-stack-panel future-task-stack-primary" @submit.prevent="saveTask">
-                  <label class="future-slant-control future-slant-field"><input v-model="taskDraft.title" maxlength="120" aria-label="任务标题" /></label>
-                  <label class="future-slant-control future-slant-field"><select v-model="taskDraft.priority" aria-label="任务优先级"><option value="high">高优先级</option><option value="normal">普通优先级</option><option value="low">低优先级</option></select></label>
-                  <div class="future-slant-control future-slant-editor"><DiaryEditor :model-value="taskDraft.description" editor-id="future-task-detail-editor" :theme="theme" :vault-key="taskVaultKey" placeholder="任务详细描述（支持 Markdown）" @update:model-value="taskDraft.description = $event" /></div>
-                  <span class="future-slant-control future-slant-button future-task-save"><button class="primary" type="submit" :disabled="taskBusy || !taskDraft.title.trim()">保存待办</button></span>
-                </form>
-                <section v-else class="future-task-preview future-task-stack-panel future-task-stack-primary">
+                <section class="future-task-preview future-task-stack-panel future-task-stack-primary">
                   <h1>{{ selectedTask.title }}</h1>
                   <MarkdownPreview v-if="selectedTask.description" :model-value="selectedTask.description" :editor-id="`future-task-${selectedTask.id}`" :theme="theme" theme-class="theme-future" />
                   <EmptyState v-else icon="book" text="没有详细描述" compact />
                 </section>
-                <section class="future-task-settings future-task-stack-panel future-task-stack-secondary">
-                  <header><b>权限与互动</b><small class="faint">附件默认继承任务权限</small></header>
-                  <label class="field"><span>权限预设</span><span class="future-slant-control future-slant-field"><select v-model="taskAccessDraft.presetId"><option value="">锚点范围内公开</option><option v-for="preset in presets" :key="preset.id" :value="preset.id">{{ preset.name }}</option></select></span></label>
-                  <label class="check-field future-slant-check"><input v-model="taskAccessDraft.secret" type="checkbox" />绝密（仅书写者可见）</label>
-                  <label class="check-field future-slant-check"><input v-model="taskAccessDraft.commentable" type="checkbox" />允许评论</label>
-                  <span class="future-slant-control future-slant-button"><button class="text-button" :disabled="taskBusy" @click="saveTaskAccess"><AppIcon name="shield" :size="14" />保存权限设置</button></span>
-                  <div class="future-milestone-form"><b>标记里程碑</b><label class="future-slant-control future-slant-field"><input v-model="milestoneDraft.description" placeholder="里程碑描述" maxlength="120" /></label><label class="future-slant-control future-slant-field"><textarea v-model="milestoneDraft.detail" placeholder="详细信息（可选）" maxlength="500" rows="2" /></label><span class="future-slant-control future-slant-button"><button class="text-button" :disabled="taskBusy || !milestoneDraft.description.trim()" @click="addTaskMilestone"><AppIcon name="medal" :size="14" />添加里程碑</button></span></div>
-                </section>
-                <footer class="future-task-drawer-footer future-task-stack-panel future-task-stack-tertiary"><span class="future-slant-control future-slant-button"><button class="text-button danger" :disabled="taskBusy" @click="removeTask"><AppIcon name="trash" :size="14" />删除待办</button></span><span class="faint">日期固定为 {{ selectedTask.taskDate }}</span></footer>
               </div>
             </template>
             <EmptyState v-else icon="target" :text="taskError || '未找到待办'" compact />
           </div>
           </aside>
+        </div>
+      </Transition>
+    </Teleport>
+    <Teleport to=".app-shell">
+      <Transition name="task-editor-modal">
+        <div v-if="taskEditorOpen && selectedTask" class="task-editor-modal-layer" @click.self="requestCloseTaskEditor">
+          <form class="task-editor-modal" role="dialog" aria-modal="true" aria-label="编辑未来待办" @submit.prevent="saveTask">
+            <header class="task-editor-modal-head"><div><small class="faint mono">{{ selectedTask.taskDate }}</small><h2>编辑待办</h2></div><button class="icon-button" type="button" aria-label="关闭编辑" @click="requestCloseTaskEditor"><AppIcon name="close" :size="18" /></button></header>
+            <p v-if="taskError" class="error" role="alert">{{ taskError }}</p>
+            <main class="task-editor-modal-body">
+              <label class="field"><span>任务标题</span><input v-model="taskDraft.title" maxlength="120" /></label>
+              <label class="field"><span>优先级</span><select v-model="taskDraft.priority"><option value="high">高优先级</option><option value="normal">普通优先级</option><option value="low">低优先级</option></select></label>
+              <section class="task-editor-modal-section"><b>任务详情</b><DiaryEditor :model-value="taskDraft.description" editor-id="future-task-detail-editor" :theme="theme" :vault-key="taskVaultKey" placeholder="任务详细描述（支持 Markdown）" @update:model-value="taskDraft.description = $event" /></section>
+              <section class="task-editor-modal-section"><header><b>权限与互动</b><small class="faint">附件默认继承任务权限</small></header><label class="field"><span>权限预设</span><select v-model="taskAccessDraft.presetId"><option value="">锚点范围内公开</option><option v-for="preset in presets" :key="preset.id" :value="preset.id">{{ preset.name }}</option></select></label><label class="check-field"><input v-model="taskAccessDraft.secret" type="checkbox" />绝密（仅书写者可见）</label><label class="check-field"><input v-model="taskAccessDraft.commentable" type="checkbox" />允许评论</label><button class="text-button" type="button" :disabled="taskBusy" @click="saveTaskAccess"><AppIcon name="shield" :size="14" />保存权限设置</button></section>
+              <section class="task-editor-modal-section"><b>标记里程碑</b><label class="field"><span>描述</span><input v-model="milestoneDraft.description" maxlength="120" placeholder="里程碑描述" /></label><label class="field"><span>详细信息</span><textarea v-model="milestoneDraft.detail" maxlength="500" rows="3" placeholder="详细信息（可选）" /></label><button class="text-button" type="button" :disabled="taskBusy || !milestoneDraft.description.trim()" @click="addTaskMilestone"><AppIcon name="medal" :size="14" />添加里程碑</button></section>
+            </main>
+            <footer class="task-editor-modal-foot"><button class="text-button danger" type="button" :disabled="taskBusy" @click="removeTask"><AppIcon name="trash" :size="14" />删除待办</button><span><button class="text-button" type="button" :disabled="taskBusy" @click="requestCloseTaskEditor">取消</button><button class="primary" type="submit" :disabled="taskBusy || !taskDraft.title.trim()">保存待办</button></span></footer>
+          </form>
         </div>
       </Transition>
     </Teleport>

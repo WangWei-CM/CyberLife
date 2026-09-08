@@ -290,6 +290,22 @@
 .future-drawer-enter-active .future-task-drawer, .future-drawer-leave-active .future-task-drawer { transition: transform var(--dur-mid) var(--ease-out); }
 .future-drawer-enter-from, .future-drawer-leave-to { opacity: 0; }
 .future-drawer-enter-from .future-task-drawer, .future-drawer-leave-to .future-task-drawer { transform: translateX(100%) skewX(var(--future-skew)); }
+.task-editor-modal-layer { position: fixed; inset: 0; z-index: 110; display: grid; place-items: center; padding: clamp(16px, 4vh, 48px); background: color-mix(in srgb, var(--scrim) 86%, transparent); }
+.task-editor-modal { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; width: min(980px, 100%); max-height: 85vh; overflow: hidden; border: 1px solid var(--divider); border-radius: 0; background: var(--surface); color: var(--text); box-shadow: 0 24px 72px rgba(0, 0, 0, .58), 0 0 24px var(--accent-soft); }
+.task-editor-modal-head, .task-editor-modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; border-bottom: 1px solid var(--divider); background: var(--surface-2); }
+.task-editor-modal-head h2 { margin: 2px 0 0; font-size: 20px; }
+.task-editor-modal-body { display: grid; align-content: start; gap: 16px; min-height: 0; overflow: auto; padding: 20px; }
+.task-editor-modal-body > .field { display: grid; gap: 6px; }
+.task-editor-modal-body input, .task-editor-modal-body select, .task-editor-modal-body textarea { width: 100%; }
+.task-editor-modal-section { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--divider); background: color-mix(in srgb, var(--surface-2) 62%, transparent); }
+.task-editor-modal-section > header { display: flex; justify-content: space-between; gap: 12px; }
+.task-editor-modal-section .md-editor { min-height: 420px; height: min(58vh, 560px); }
+.task-editor-modal-foot { border-top: 1px solid var(--divider); border-bottom: 0; }
+.task-editor-modal-foot > span { display: flex; gap: 8px; }
+.task-editor-modal-enter-active, .task-editor-modal-leave-active { transition: opacity var(--dur-mid) var(--ease-out); }
+.task-editor-modal-enter-active .task-editor-modal, .task-editor-modal-leave-active .task-editor-modal { transition: transform var(--dur-mid) var(--ease-out), opacity var(--dur-mid) var(--ease-out); }
+.task-editor-modal-enter-from, .task-editor-modal-leave-to { opacity: 0; }
+.task-editor-modal-enter-from .task-editor-modal, .task-editor-modal-leave-to .task-editor-modal { opacity: 0; transform: translateY(18px); }
 
 /* 编辑区保持页面 75° 轮廓，内部滚动条以同角度显示，外层页面不滚动。 */
 .future-list, .future-detail, .future-bottom { scrollbar-width: thin; scrollbar-color: var(--accent) transparent; scrollbar-gutter: stable; }
@@ -317,6 +333,10 @@
   .future-task-drawer { width: calc(100% - var(--future-drawer-corner-safe)); min-width: 0; }
   .future-task-drawer-head, .future-task-drawer-content { padding-left: 22px; padding-right: 22px; }
   .future-task-drawer-footer { align-items: flex-start; flex-direction: column; }
+  .task-editor-modal-layer { padding: 8px; }
+  .task-editor-modal { width: 100%; max-height: calc(100vh - 16px); }
+  .task-editor-modal-head, .task-editor-modal-body, .task-editor-modal-foot { padding-left: 14px; padding-right: 14px; }
+  .task-editor-modal-foot { align-items: flex-start; flex-direction: column; }
 }
 
 @media (min-width: 901px) {
