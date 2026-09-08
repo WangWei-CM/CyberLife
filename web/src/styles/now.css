@@ -159,7 +159,15 @@
   .now-left, .now-right { min-height: 0; overflow: auto; scrollbar-width: none; }
   .now-left { display: flex; flex-direction: column; overflow: hidden; }
   .now-left > :not(.diary-card) { flex: 0 0 auto; }
-  .now-left .diary-card { flex: 1 1 0; min-height: 0; overflow: auto; }
+  .now-left .diary-card { flex: 1 1 0; min-height: 0; overflow: hidden; grid-template-rows: auto minmax(0, 1fr); }
+  .now-left .diary-card > .diary-editor { min-height: 0; height: 100%; }
+  .now-left .diary-card > .diary-editor .md-editor { height: 100%; min-height: 0; }
+  .now-left .diary-card .md-editor-content,
+  .now-left .diary-card .md-editor-content-wrapper,
+  .now-left .diary-card .md-editor-input-wrapper,
+  .now-left .diary-card .md-editor-preview-wrapper { min-height: 0; }
+  .now-left .diary-card .md-editor-input-wrapper,
+  .now-left .diary-card .md-editor-preview-wrapper { overflow: auto; }
   .now-left::-webkit-scrollbar, .now-right::-webkit-scrollbar { display: none; }
   .now-left, .now-right { gap: 12px; }
   .now-clock { gap: 10px; padding: 12px 0 4px; }
