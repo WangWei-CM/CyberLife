@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import FullCalendar from '@fullcalendar/vue3'
-import dayGridPlugin from '@fullcalendar/daygrid'
-import interactionPlugin from '@fullcalendar/interaction'
 import MetricLine, { type MetricPoint } from '../components/MetricLine.vue'
 import PlanCarousel from '../components/PlanCarousel.vue'
 import DiaryEditor from '../components/DiaryEditor.vue'
+import MarkdownPreview from '../components/MarkdownPreview.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { api, type MoodTag, type NowData, type Plan, type Task, type TrendPoint } from '../api/client'
 import { authState } from '../stores/auth'
 import { useCountUp } from '../lib/motion'
-import { addDaysISO, beijingNow, lunarLabel, monthDayLabel, timeLabel, todayISO, weekdayLabel } from '../lib/dates'
+import { addDaysISO, beijingNow, fullDateLabel, lunarLabel, monthDayLabel, timeLabel, todayISO, weekdayLabel } from '../lib/dates'
 
 const props = defineProps<{ secret: boolean }>()
 const emit = defineEmits<{ (event: 'navigate-future'): void }>()
@@ -35,7 +33,13 @@ const error = ref('')
 const newTask = ref('')
 const newTagOpen = ref(false)
 const newTag = ref({ emoji: '🙂', name: '', value: 60 })
-const calendarView = ref<'dayGridMonth' | 'dayGridDay'>('dayGridMonth')
+const selectedTask = ref<Task | null>(null)
+const taskEditing = ref(false)
+const taskDraft = ref({ title: '', description: '', priority: 'normal' as Task['priority'] })
+const taskBusy = ref(false)
+const presets = ref<{ id: string; name: string }[]>([])
+const taskAccessDraft = ref({ presetId: '', secret: false, commentable: false })
+const milestoneDraft = ref({ description: '', detail: '' })
 const cardOrder = ref<CardKey[]>(readOrder())
 const dragCard = ref<CardKey | null>(null)
 const carouselInterval = Number(localStorage.getItem('now-plan-carousel-ms') || 6000)
@@ -44,7 +48,7 @@ let saveTimer: number | undefined
 let clock: number | undefined
 
 const today = todayISO()
-const dateLabel = computed(() => monthDayLabel(now.value))
+const dateLabel = computed(() => fullDateLabel(now.value))
 const weekday = computed(() => weekdayLabel(now.value))
 const lunar = computed(() => lunarLabel(now.value))
 const hhmm = computed(() => timeLabel(now.value))
@@ -56,13 +60,7 @@ const moodPoints = computed<MetricPoint[]>(() => data.value.moods.map(record => 
 const pendingCount = computed(() => data.value.tasks.filter(task => !task.done).length)
 const pendingDisplay = useCountUp(() => pendingCount.value, 400)
 const sortedTasks = computed(() => [...data.value.tasks].sort((a, b) => Number(a.done) - Number(b.done)))
-const events = computed(() => data.value.tasks.map(task => ({ id: task.id, title: task.title, date: task.taskDate, classNames: [task.done ? 'fc-task-done' : 'fc-task-open', `fc-priority-${task.priority}`] })))
-const calendarOptions = computed(() => ({
-  plugins: [dayGridPlugin, interactionPlugin], initialView: calendarView.value, initialDate: today, now: today, locale: 'zh-cn', firstDay: 1,
-  headerToolbar: { left: 'prev,next', center: 'title', right: 'dayGridDay,dayGridMonth' }, buttonText: { day: '今日', month: '本月' },
-  height: 'auto', fixedWeekCount: false, dayMaxEventRows: 3, events: events.value,
-  viewDidMount: (info: { view: { type: string } }) => { calendarView.value = info.view.type as 'dayGridMonth' | 'dayGridDay' },
-}))
+const themeClass = computed(() => document.querySelector('.app-shell')?.className.replace(/\b(shell-enter|drop-target|theme-shift)\b/g, '').trim() ?? '')
 const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today}${props.secret ? ':secret' : ''}`)
 /** 绝密模式下编辑当天的绝密层日记，公开层不受影响。 */
 const activeDiary = computed(() => props.secret ? data.value.secretDiary! : data.value.diary)
@@ -93,6 +91,7 @@ async function load() {
   try {
     const [todayData, tagData, planData, history] = await Promise.all([api.today(), api.moodTags(), api.plans(), api.history(addDaysISO(today, -6), today)])
     data.value = normalize(todayData)
+    if (authState.actor?.type === 'writer') { try { presets.value = (await api.presets()).items } catch { presets.value = [] } }
     tags.value = tagData.items
     plans.value = planData.items
     trend.value = history.points
@@ -126,6 +125,49 @@ async function addTask() {
   const title = newTask.value.trim()
   if (!title) return
   try { await api.addTask(title, '', 'normal'); newTask.value = ''; await refreshToday() } catch (cause) { error.value = cause instanceof Error ? cause.message : '添加失败' }
+}
+function openTask(task: Task) {
+  selectedTask.value = task
+  taskEditing.value = true
+  taskDraft.value = { title: task.title, description: task.description, priority: task.priority }
+  taskAccessDraft.value = { presetId: task.presetId ?? '', secret: !!task.secret, commentable: !!task.commentable }
+}
+async function saveTaskAccess() {
+  const task = selectedTask.value
+  if (!task || taskBusy.value) return
+  taskBusy.value = true
+  try { const updated = await api.setTaskAccess(task.id, taskAccessDraft.value.presetId, taskAccessDraft.value.secret, taskAccessDraft.value.commentable); Object.assign(task, updated); selectedTask.value = updated } catch (cause) { error.value = cause instanceof Error ? cause.message : '权限保存失败' } finally { taskBusy.value = false }
+}
+async function addTaskMilestone() {
+  const task = selectedTask.value
+  if (!task || !milestoneDraft.value.description.trim() || taskBusy.value) return
+  taskBusy.value = true
+  try { await api.addMilestone({ target_type: 'task', target_id: task.id, description: milestoneDraft.value.description.trim(), detail: milestoneDraft.value.detail.trim(), preset_id: taskAccessDraft.value.presetId, secret: taskAccessDraft.value.secret }); milestoneDraft.value = { description: '', detail: '' } } catch (cause) { error.value = cause instanceof Error ? cause.message : '里程碑保存失败' } finally { taskBusy.value = false }
+}
+function closeTask() { selectedTask.value = null; taskEditing.value = false }
+async function saveTask() {
+  const task = selectedTask.value
+  if (!task || !taskDraft.value.title.trim() || taskBusy.value) return
+  taskBusy.value = true
+  try {
+    const updated = await api.updateTask(task.id, task.taskDate, taskDraft.value)
+    const index = data.value.tasks.findIndex(item => item.id === task.id)
+    if (index >= 0) data.value.tasks[index] = updated
+    selectedTask.value = updated
+    taskEditing.value = false
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { taskBusy.value = false }
+}
+async function removeTask() {
+  const task = selectedTask.value
+  if (!task || taskBusy.value) return
+  taskBusy.value = true
+  try { await api.deleteTask(task.id, task.taskDate); data.value.tasks = data.value.tasks.filter(item => item.id !== task.id); closeTask() } catch (cause) { error.value = cause instanceof Error ? cause.message : '删除失败' } finally { taskBusy.value = false }
+}
+async function toggleTaskFromDrawer() {
+  const task = selectedTask.value
+  if (!task) return
+  await toggleTask(task)
+  selectedTask.value = task
 }
 function toggleTag(id: string) { selectedTags.value = selectedTags.value.includes(id) ? selectedTags.value.filter(item => item !== id) : [...selectedTags.value, id] }
 function scheduleSave() {
@@ -163,11 +205,15 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
     <section class="now-layout" :style="{ '--left-width': `${leftWidth}%` }">
       <div v-stagger class="now-left" :class="{ reordering: dragCard }">
         <section class="now-clock" aria-live="off" style="order: 0">
-          <div class="clock-row">
-            <Transition name="fade" mode="out-in"><strong :key="dateLabel" class="clock-date">{{ dateLabel }}</strong></Transition>
-            <span class="clock-week">{{ weekday }}</span>
-            <Transition name="fade" mode="out-in"><span :key="lunar" class="clock-lunar">{{ lunar }}</span></Transition>
-            <time class="clock-time mono" :datetime="now.toISOString()">{{ hhmm }}<Transition name="fade" mode="out-in"><small :key="seconds" class="clock-seconds">{{ seconds }}</small></Transition></time>
+          <div class="clock-display">
+            <time class="clock-time mono" :datetime="now.toISOString()">
+              <span class="clock-main">{{ hhmm }}</span><Transition name="fade" mode="out-in"><small :key="seconds" class="clock-seconds">{{ seconds }}</small></Transition>
+            </time>
+            <div class="clock-meta">
+              <Transition name="fade" mode="out-in"><strong :key="dateLabel" class="clock-date">{{ dateLabel }}</strong></Transition>
+              <Transition name="fade" mode="out-in"><span :key="lunar" class="clock-lunar">{{ lunar }}</span></Transition>
+              <span class="clock-week">{{ weekday }}</span>
+            </div>
           </div>
           <i class="day-progress" :title="`今天已过去 ${Math.round(dayProgress)}%`" aria-hidden="true"><b :style="{ width: `${dayProgress}%` }" /></i>
         </section>
@@ -176,7 +222,7 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
 
         <article class="card now-card body-card" :class="{ 'drag-source': dragCard === 'body' }" :style="cardStyle('body')" @dragover="onCardDragOver('body', $event)" @drop.prevent="onCardDragEnd">
           <div class="now-chart">
-            <h2 class="card-title"><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('body', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>身体</span><small>近七日</small></h2>
+            <h2 class="card-title"><span class="card-title-main"><span class="card-grip" draggable="true" title="拖动调整卡片顺序" @dragstart="onCardDragStart('body', $event)" @dragend="onCardDragEnd"><AppIcon name="grip" :size="14" /></span>身体</span><small>近七日 · 今天 {{ data.bodies.length ? `${data.bodies.length} 次` : '' }}</small></h2>
             <MetricLine :points="bodyPoints" :min="0" :max="100" :height="128" empty="这七天还没有身体记录" />
           </div>
           <form class="now-form" @submit.prevent="recordBody">
@@ -231,22 +277,57 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
           <h2 class="card-title">待办<small>{{ Math.round(pendingDisplay) }} 项未完成</small></h2>
           <form class="task-add" @submit.prevent="addTask"><input v-model="newTask" placeholder="添加今天的待办，回车保存" maxlength="120" aria-label="新待办" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
         </section>
-        <section class="card calendar-card"><FullCalendar :options="calendarOptions" /></section>
         <section class="card tasks-card">
           <TransitionGroup v-if="sortedTasks.length" name="list" tag="ul" class="today-tasks">
             <li v-for="task in sortedTasks" :key="task.id" :class="{ done: task.done, [`priority-${task.priority}`]: true }">
-              <label class="task-row">
-                <input type="checkbox" :checked="task.done" @change="toggleTask(task)" />
+              <div class="task-row" role="button" tabindex="0" @click="openTask(task)" @keydown.enter="openTask(task)">
+                <input type="checkbox" :checked="task.done" :aria-label="`${task.title}完成状态`" @click.stop @change="toggleTask(task)" />
                 <span class="task-body">
                   <span class="task-title" :class="{ done: task.done }">{{ task.title }}</span>
-                  <small v-if="task.description" class="faint">{{ task.description }}</small>
+                  <small class="task-meta faint"><span>{{ task.taskDate }}</span><span>{{ task.priority === 'high' ? '高优先级' : task.priority === 'low' ? '低优先级' : '普通' }}</span></small>
                 </span>
-                <i class="task-priority" :title="task.priority === 'high' ? '高优先级' : task.priority === 'low' ? '低优先级' : '普通'" />
-              </label>
+                <AppIcon name="chevron-right" :size="15" class="task-open-icon" />
+              </div>
             </li>
           </TransitionGroup>
           <EmptyState v-else icon="check" text="今天还没有待办" />
         </section>
+        <Transition name="drawer">
+          <div v-if="selectedTask" class="task-drawer-layer" @click.self="closeTask">
+            <aside class="task-drawer" role="dialog" aria-modal="true" aria-label="任务详情">
+              <header class="drawer-head">
+                <div><small class="faint mono">{{ selectedTask.taskDate }}</small><h2>任务详情</h2></div>
+                <div class="drawer-actions"><button class="icon-button" :aria-label="taskEditing ? '退出编辑' : '编辑任务'" @click="taskEditing = !taskEditing"><AppIcon :name="taskEditing ? 'close' : 'edit'" /></button><button class="icon-button" aria-label="关闭任务详情" @click="closeTask"><AppIcon name="close" /></button></div>
+              </header>
+              <div class="drawer-content">
+                <div class="task-drawer-status">
+                  <span class="task-priority-label" :class="`priority-${selectedTask.priority}`">{{ selectedTask.priority === 'high' ? '高优先级' : selectedTask.priority === 'low' ? '低优先级' : '普通优先级' }}</span>
+                  <button class="text-button" @click="toggleTaskFromDrawer"><AppIcon :name="selectedTask.done ? 'repeat' : 'check'" :size="14" />{{ selectedTask.done ? '标记未完成' : '标记完成' }}</button>
+                </div>
+                <template v-if="taskEditing">
+                  <input v-model="taskDraft.title" class="drawer-title-input" maxlength="120" aria-label="任务标题" />
+                  <select v-model="taskDraft.priority" aria-label="任务优先级"><option value="high">高优先级</option><option value="normal">普通优先级</option><option value="low">低优先级</option></select>
+                  <DiaryEditor :model-value="taskDraft.description" editor-id="task-detail-editor" :theme="theme" :vault-key="`${vaultKey}:task:${selectedTask.id}`" placeholder="任务详细描述（支持 Markdown）" @update:model-value="taskDraft.description = $event" />
+                  <button class="primary" :disabled="taskBusy || !taskDraft.title.trim()" @click="saveTask">保存任务</button>
+                </template>
+                <template v-else>
+                  <h1 class="drawer-title">{{ selectedTask.title }}</h1>
+                  <MarkdownPreview :model-value="selectedTask.description" editor-id="task-detail-preview" :theme="theme" :theme-class="themeClass" />
+                  <EmptyState v-if="!selectedTask.description" icon="book" text="没有详细描述" compact />
+                </template>
+                <section v-if="authState.actor?.type === 'writer'" class="drawer-settings">
+                  <header class="drawer-section-head"><b>权限与互动</b><small class="faint">附件默认继承任务权限</small></header>
+                  <label class="field"><span>权限预设</span><select v-model="taskAccessDraft.presetId"><option value="">锚点范围内公开</option><option v-for="preset in presets" :key="preset.id" :value="preset.id">{{ preset.name }}</option></select></label>
+                  <label class="check-field"><input v-model="taskAccessDraft.secret" type="checkbox" />绝密（仅书写者可见）</label>
+                  <label class="check-field"><input v-model="taskAccessDraft.commentable" type="checkbox" />允许评论</label>
+                  <button class="text-button" :disabled="taskBusy" @click="saveTaskAccess"><AppIcon name="shield" :size="14" />保存权限设置</button>
+                  <div class="milestone-form"><b>标记里程碑</b><input v-model="milestoneDraft.description" placeholder="里程碑描述" maxlength="120" /><textarea v-model="milestoneDraft.detail" placeholder="详细信息（可选）" maxlength="500" rows="2" /><button class="text-button" :disabled="taskBusy || !milestoneDraft.description.trim()" @click="addTaskMilestone"><AppIcon name="medal" :size="14" />添加里程碑</button></div>
+                </section>
+                <div class="drawer-footer"><button class="text-button danger" :disabled="taskBusy" @click="removeTask"><AppIcon name="trash" :size="14" />删除任务</button><span class="faint">附件与权限设置沿用内容权限规则</span></div>
+              </div>
+            </aside>
+          </div>
+        </Transition>
       </aside>
     </section>
   </main>
