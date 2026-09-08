@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { config, MdEditor, NormalToolbar, type ToolbarNames } from 'md-editor-v3'
 import type { Extension } from '@codemirror/state'
-import { ViewPlugin } from '@codemirror/view'
+import { EditorView, ViewPlugin } from '@codemirror/view'
 import 'md-editor-v3/lib/style.css'
 import { api } from '../api/client'
 import AppIcon from './AppIcon.vue'
@@ -31,18 +31,40 @@ let auditTimer: number | undefined
 const storageKey = computed(() => `cyberlife-diary-vault:${props.vaultKey}`)
 const toolbars: ToolbarNames[] = ['bold', 'underline', 'italic', 'strikeThrough', '-', 'title', 'sub', 'sup', 'quote', 'unorderedList', 'orderedList', 'task', '-', 'codeRow', 'code', 'link', 'image', 'table', 'mermaid', 'katex', '-', 'revoke', 'next', 0, '=', 'preview', 'previewOnly', 'catalog']
 
-const refreshSlantedEditorMetrics = ViewPlugin.fromClass(class {
-  private readonly refresh = () => this.view.requestMeasure()
-  constructor(private readonly view: { requestMeasure: () => void }) {
-    document.fonts.ready.then(this.refresh)
-    document.fonts.addEventListener('loadingdone', this.refresh)
+const slantedLineLayout = ViewPlugin.fromClass(class {
+  private frame = 0
+  private readonly observer: ResizeObserver
+  private readonly schedule = () => {
+    cancelAnimationFrame(this.frame)
+    this.frame = requestAnimationFrame(() => this.layout())
   }
-  destroy() { document.fonts.removeEventListener('loadingdone', this.refresh) }
+  constructor(private readonly view: EditorView) {
+    this.observer = new ResizeObserver(this.schedule)
+    this.observer.observe(view.scrollDOM)
+    this.schedule()
+  }
+  update(update: { docChanged: boolean; viewportChanged: boolean; geometryChanged: boolean }) {
+    if (update.docChanged || update.viewportChanged || update.geometryChanged) this.schedule()
+  }
+  private layout() {
+    const content = this.view.contentDOM.getBoundingClientRect()
+    const run = this.view.scrollDOM.clientHeight * Math.tan(Math.PI / 12)
+    this.view.contentDOM.querySelectorAll<HTMLElement>('.cm-line').forEach(line => {
+      const y = line.getBoundingClientRect().top - content.top
+      const inset = Math.max(0, run - y * Math.tan(Math.PI / 12))
+      line.style.marginLeft = `${inset}px`
+      line.style.width = `calc(100% - ${inset}px)`
+    })
+  }
+  destroy() {
+    cancelAnimationFrame(this.frame)
+    this.observer.disconnect()
+  }
 })
 
 config({
   codeMirrorExtensions: (_theme, extensions: Extension[], _keyBindings, { editorId }) => editorId === 'future-task-detail-editor'
-    ? [...extensions, refreshSlantedEditorMetrics]
+    ? [...extensions, slantedLineLayout]
     : extensions,
 })
 
