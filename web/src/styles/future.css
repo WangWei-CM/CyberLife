@@ -290,7 +290,7 @@
 .future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer,
 .future-slant-editor .diary-editor.slanted-lines .cm-cursorLayer { margin: 0; transform: none; }
 .future-slant-editor .diary-editor.slanted-lines .cm-selectionBackground { transform: none; }
-.future-slant-editor .diary-editor.slanted-lines .cm-cursor { transform: skewX(var(--future-skew)); transform-origin: left top; }
+.future-slant-editor .diary-editor.slanted-lines .cm-cursor { transform: translateX(24px) skewX(var(--future-skew)); transform-origin: left top; }
 .future-slant-editor .diary-editor.slanted-lines .cm-line,
 .future-slant-editor .diary-editor.slanted-lines .cm-placeholder { transform: skewX(15deg); transform-origin: left top; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
