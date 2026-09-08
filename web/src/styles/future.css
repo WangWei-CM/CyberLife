@@ -194,7 +194,7 @@
 .plan-dialog > .future-list.bracket::before { display: none; }
 .plan-dialog .divider-v::before { transform: none; }
 .plan-dialog-close { position: absolute; top: 14px; right: var(--plan-dialog-safe, 12px); z-index: 3; transform: skewX(15deg); transform-origin: center; }
-.plan-dialog .future-list .plan-form { transform: skewX(15deg); transform-origin: center; }
+.plan-dialog .future-list .plan-form { transform: none; }
 /* Creation keeps native input geometry and uses one shared 15° visual edge.
    This avoids compounding the panel and field transforms. */
 .plan-dialog .future-list .plan-form::before {
@@ -208,11 +208,11 @@
    The textarea is 97px high and the button is 32px high, so their runs differ. */
 .plan-dialog .future-list .plan-form > .form-control > textarea {
   transform: none !important;
-  clip-path: polygon(26px 0, 100% 0, calc(100% - 26px) 100%, 0 100%) !important;
+  clip-path: none !important;
 }
 .plan-dialog .future-list .plan-form > .primary {
   transform: none !important;
-  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%) !important;
+  clip-path: none !important;
 }
 /* 规划编辑使用未变形的交互坐标系；仅由轮廓裁切出统一的 75° 外观，
    避免将表单内容反向抵消后又还原成直角框。 */
