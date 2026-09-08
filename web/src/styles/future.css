@@ -286,11 +286,10 @@
 /* 同一变换矩阵：内容坐标整体形成 75°，每一行反向变换仅恢复字形水平。
    CodeMirror 的命中、光标和选择层仍在同一坐标系中，避免视觉与交互错位。 */
 .future-slant-editor .diary-editor.slanted-lines .cm-content { transform: translateX(calc(var(--future-editor-run) + 12px)) skewX(var(--future-skew)); transform-origin: left top; }
-/* md-editor-v3 为文字内容保留 10px margin，选择层没有；补齐同一基准。 */
-.future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer { transform: translateX(calc(var(--future-editor-run) + 22px)) skewX(var(--future-skew)); transform-origin: left top; }
+/* 选择层与 cm-content 共享原生 10px 布局基准，避免只用视觉平移产生命中偏差。 */
+.future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer { margin: 10px; transform: translateX(calc(var(--future-editor-run) + 12px)) skewX(var(--future-skew)); transform-origin: left top; }
 .future-slant-editor .diary-editor.slanted-lines .cm-line,
-.future-slant-editor .diary-editor.slanted-lines .cm-placeholder,
-.future-slant-editor .diary-editor.slanted-lines .cm-cursor { transform: skewX(15deg); transform-origin: left top; }
+.future-slant-editor .diary-editor.slanted-lines .cm-placeholder { transform: skewX(15deg); transform-origin: left top; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
 .future-task-settings > * { transform: none; transform-origin: right top; }
 .future-task-settings > header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
