@@ -200,6 +200,16 @@
 .plan-dialog .future-list .plan-form :is(input, textarea, select, .primary) {
   clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
 }
+/* These controls have materially different heights, so their edge run must
+   scale with height to remain at the same 15° angle as the name/date row. */
+.plan-dialog .future-list .plan-form textarea {
+  transform: none !important;
+  clip-path: polygon(19px 0, 100% 0, calc(100% - 19px) 100%, 0 100%);
+}
+.plan-dialog .future-list .plan-form .primary {
+  transform: none !important;
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
 /* 规划编辑使用未变形的交互坐标系；仅由轮廓裁切出统一的 75° 外观，
    避免将表单内容反向抵消后又还原成直角框。 */
 .plan-dialog .future-detail .progress-form { transform: none; }
