@@ -286,8 +286,10 @@
 /* 同一变换矩阵：内容坐标整体形成 75°，每一行反向变换仅恢复字形水平。
    CodeMirror 的命中、光标和选择层仍在同一坐标系中，避免视觉与交互错位。 */
 .future-slant-editor .diary-editor.slanted-lines .cm-content { transform: translateX(calc(var(--future-editor-run) + 12px)) skewX(var(--future-skew)); transform-origin: left top; }
-/* 选择层与 cm-content 共享原生 10px 布局基准，避免只用视觉平移产生命中偏差。 */
-.future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer { margin: 10px; transform: translateX(calc(var(--future-editor-run) + 12px)) skewX(var(--future-skew)); transform-origin: left top; }
+/* 选择背景从 CodeMirror 行盒 x=0 开始，额外补齐内容 margin 与行左内边距；不移动 y 轴。 */
+.future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer { transform: translateX(calc(var(--future-editor-run) + 26px)) skewX(var(--future-skew)); transform-origin: left top; }
+/* 光标位于独立图层，必须进入同一 / 倾斜坐标系。 */
+.future-slant-editor .diary-editor.slanted-lines .cm-cursorLayer { transform: translateX(calc(var(--future-editor-run) + 12px)) skewX(var(--future-skew)); transform-origin: left top; }
 .future-slant-editor .diary-editor.slanted-lines .cm-line,
 .future-slant-editor .diary-editor.slanted-lines .cm-placeholder { transform: skewX(15deg); transform-origin: left top; }
 .future-task-settings { display: grid; gap: 10px; padding: 18px 20px; background: color-mix(in srgb, var(--surface-2) 66%, transparent); }
