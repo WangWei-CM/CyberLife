@@ -77,14 +77,14 @@ onBeforeUnmount(() => observer?.disconnect())
 </script>
 
 <template>
-  <section ref="root" class="slanted-markdown-editor" aria-label="Markdown 编辑器">
+  <section ref="root" class="slanted-markdown-editor" :style="{ '--slanted-run': `${rows[0]?.inset ?? 0}px` }" aria-label="Markdown 编辑器">
     <nav class="slanted-markdown-toolbar" aria-label="Markdown 工具栏">
       <button type="button" title="加粗" @click="wrap('**', '**')">B</button><button type="button" title="斜体" @click="wrap('*', '*')">I</button><button type="button" title="删除线" @click="wrap('~~', '~~')">S</button><i />
       <button type="button" title="标题" @click="wrap('## ')">H</button><button type="button" title="引用" @click="wrap('> ')">❯</button><button type="button" title="列表" @click="wrap('- ')">☷</button><button type="button" title="代码" @click="wrap('`', '`')">&lt;/&gt;</button><button type="button" title="链接" @click="wrap('[', '](url)')">↗</button>
       <label title="上传图片">▧<input type="file" accept="image/*" @change="insertImage" /></label>
     </nav>
     <div class="slanted-markdown-lines">
-      <input v-for="row in rows" :key="`${row.from}:${row.to}`" class="slanted-markdown-row" :style="{ marginLeft: `${row.inset}px`, width: `calc(100% - ${row.inset}px)` }" :data-from="row.from" :data-to="row.to" :value="row.value" :placeholder="row.from === 0 ? placeholder : ''" spellcheck="true" @input="input(row, $event)" @focus="focus(row, $event)" @click="focus(row, $event)" @select="focus(row, $event)" @keydown="keydown(row, $event)" />
+      <input v-for="row in rows" :key="`${row.from}:${row.to}`" class="slanted-markdown-row" :style="{ marginLeft: `${row.inset}px` }" :data-from="row.from" :data-to="row.to" :value="row.value" :placeholder="row.from === 0 ? placeholder : ''" spellcheck="true" @input="input(row, $event)" @focus="focus(row, $event)" @click="focus(row, $event)" @select="focus(row, $event)" @keydown="keydown(row, $event)" />
     </div>
   </section>
 </template>
