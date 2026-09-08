@@ -22,6 +22,7 @@ const tags = ref<MoodTag[]>([])
 const plans = ref<Plan[]>([])
 const selectedTags = ref<string[]>([])
 const editingMetric = ref<'mood' | 'body' | null>(null)
+const deletingMetric = ref(false)
 const moodNote = ref('')
 const bodyNote = ref('')
 const bodyScore = ref(70)
@@ -120,6 +121,21 @@ async function recordBody() {
     trend.value = history.points
     editingMetric.value = null
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
+}
+async function deleteLastState(kind: 'mood' | 'body') {
+  const label = kind === 'mood' ? '心情' : '身体'
+  if (!window.confirm(`确认删除今天最后一条${label}记录吗？`)) return
+  if (deletingMetric.value) return
+  deletingMetric.value = true
+  try {
+    await api.deleteLastState(kind, props.secret)
+    const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today, -6), today)])
+    data.value = normalize(todayData)
+    trend.value = history.points
+    if (kind === 'body') bodyScore.value = todayData.bodies.at(-1)?.score ?? 70
+    if (kind === 'mood') { selectedTags.value = []; moodNote.value = '' }
+    editingMetric.value = null
+  } catch (cause) { error.value = cause instanceof Error ? cause.message : '删除失败' } finally { deletingMetric.value = false }
 }
 async function addTag() {
   if (!newTag.value.name.trim()) return
@@ -257,7 +273,10 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
                   </div>
                   <EmptyState v-if="!tags.length" icon="smile" text="先添加几个心情标签" compact />
                   <input v-model="moodNote" placeholder="备注（可选）" maxlength="200" />
-                  <button class="primary" type="submit" :disabled="!selectedTags.length">记录</button>
+                  <div class="metric-editor-actions">
+                    <button v-if="data.moods.some(item => !!item.secret === props.secret)" class="text-button danger" type="button" :disabled="deletingMetric" @click="deleteLastState('mood')"><AppIcon name="trash" :size="14" />删除上次状态</button>
+                    <button class="primary" type="submit" :disabled="!selectedTags.length">记录</button>
+                  </div>
                 </form>
               </Transition>
             </section>
@@ -273,7 +292,10 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
                   <div class="score-row"><span class="faint">今天的状态</span><output class="score mono">{{ bodyScore }}</output></div>
                   <input v-model.number="bodyScore" type="range" min="0" max="100" aria-label="身体评分" :style="{ '--range-fill': `${bodyScore}%` }" />
                   <input v-model="bodyNote" placeholder="备注（可选）" maxlength="200" />
-                  <button class="primary" type="submit">记录</button>
+                  <div class="metric-editor-actions">
+                    <button v-if="data.bodies.some(item => !!item.secret === props.secret)" class="text-button danger" type="button" :disabled="deletingMetric" @click="deleteLastState('body')"><AppIcon name="trash" :size="14" />删除上次状态</button>
+                    <button class="primary" type="submit" :disabled="deletingMetric">记录</button>
+                  </div>
                 </form>
               </Transition>
             </section>

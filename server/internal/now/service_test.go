@@ -93,6 +93,48 @@ func TestTagsCopyForward(t *testing.T) {
 	}
 }
 
+func TestDeleteLastState(t *testing.T) {
+	store, life := newLife(t)
+	ctx := context.Background()
+	service := New(store)
+
+	bodyFirst, err := service.AddBody(ctx, life, 40, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.AddBody(ctx, life, 80, "", false); err != nil {
+		t.Fatal(err)
+	}
+	if err = service.DeleteLastState(ctx, life, "body", false); err != nil {
+		t.Fatal(err)
+	}
+	_, _, bodies, _, err := service.Today(ctx, life)
+	if err != nil || len(bodies) != 1 || bodies[0].ID != bodyFirst.ID {
+		t.Fatalf("expected only the first body record to remain, got %+v err=%v", bodies, err)
+	}
+
+	if _, err = service.AddTag(ctx, life, "平静", "😌", 70); err != nil {
+		t.Fatal(err)
+	}
+	tags, err := service.Tags(ctx, life)
+	if err != nil || len(tags) != 1 {
+		t.Fatalf("expected one mood tag, got %+v err=%v", tags, err)
+	}
+	if _, err = service.AddMood(ctx, life, "", []string{tags[0].ID}, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.AddMood(ctx, life, "", []string{tags[0].ID}, false); err != nil {
+		t.Fatal(err)
+	}
+	if err = service.DeleteLastState(ctx, life, "mood", false); err != nil {
+		t.Fatal(err)
+	}
+	_, moods, _, _, err := service.Today(ctx, life)
+	if err != nil || len(moods) != 1 {
+		t.Fatalf("expected one mood record after deletion, got %+v err=%v", moods, err)
+	}
+}
+
 // TestTasksOnOtherDates: tasks can be created on and toggled in another month.
 func TestTasksOnOtherDates(t *testing.T) {
 	store, life := newLife(t)

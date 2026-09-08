@@ -82,6 +82,7 @@ func (s *Service) db(ctx context.Context, life string, t time.Time) (*sql.DB, er
 	return sql.Open("sqlite", "file:"+s.store.LifeDBPath(life, t.In(time.FixedZone("CST", 28800)).Format("2006-01"))+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 }
 func date(t time.Time) string { return t.In(time.FixedZone("CST", 28800)).Format("2006-01-02") }
+
 type tagRow struct {
 	id, name, emoji, createdAt string
 	value, sortOrder           int
@@ -219,6 +220,34 @@ func (s *Service) AddBody(ctx context.Context, life string, score int, note stri
 	_, e = db.ExecContext(ctx, "INSERT INTO body_records(id,life_id,recorded_at,recorded_date,score,note,secret,created_at) VALUES(?,?,?,?,?,?,?,?)", x.ID, life, x.RecordedAt, x.RecordedDate, x.Score, x.Note, secret, x.RecordedAt)
 	return x, e
 }
+
+// DeleteLastState removes the latest state record of the requested type for today and layer.
+func (s *Service) DeleteLastState(ctx context.Context, life, kind string, secret bool) error {
+	table, label := "", ""
+	switch kind {
+	case "mood":
+		table, label = "mood_records", "心情"
+	case "body":
+		table, label = "body_records", "身体"
+	default:
+		return fmt.Errorf("状态类型无效")
+	}
+	now := time.Now().UTC()
+	db, e := s.db(ctx, life, now)
+	if e != nil {
+		return e
+	}
+	defer db.Close()
+	query := fmt.Sprintf(`DELETE FROM %s WHERE id=(SELECT id FROM %s WHERE life_id=? AND recorded_date=? AND COALESCE(secret,0)=? ORDER BY recorded_at DESC, created_at DESC, id DESC LIMIT 1)`, table, table)
+	result, e := db.ExecContext(ctx, query, life, date(now), secret)
+	if e != nil {
+		return e
+	}
+	if n, _ := result.RowsAffected(); n != 1 {
+		return fmt.Errorf("今天没有可删除的%s记录", label)
+	}
+	return nil
+}
 func (s *Service) SaveAttachment(ctx context.Context, life, name, mime string, size int64, source io.Reader) (Attachment, error) {
 	if size < 1 || size > 20<<20 {
 		return Attachment{}, fmt.Errorf("附件大小必须在 1B 至 20MB 之间")
@@ -261,6 +290,7 @@ func (s *Service) SaveAttachment(ctx context.Context, life, name, mime string, s
 	}
 	return x, e
 }
+
 // AttachmentForRead walks the month databases (newest first) because attachments are stored in the
 // month they were uploaded; the file lives in that month's upload directory.
 func (s *Service) AttachmentForRead(ctx context.Context, life, id string) (Attachment, string, string, error) {
@@ -310,6 +340,7 @@ func (s *Service) SetAttachmentAccess(ctx context.Context, life, id, presetID st
 	}
 	return Attachment{}, fmt.Errorf("附件不存在")
 }
+
 // SaveDraft stores today's draft. The secret layer keeps its own draft row; diary_drafts is keyed by
 // entry_date alone, so the secret draft is stored under "<date>#secret".
 func (s *Service) SaveDraft(ctx context.Context, life, content string, secret bool) (Draft, error) {
@@ -331,9 +362,19 @@ func (s *Service) SaveDraft(ctx context.Context, life, content string, secret bo
 // SaveDiary upserts today's diary for one layer: the public entry (secret=false) or the writer-only
 // secret entry (secret=true). Both layers may coexist on the same day.
 func (s *Service) SaveDiary(ctx context.Context, life, content string, secret bool) (Diary, error) {
+	return s.SaveDiaryDate(ctx, life, date(time.Now().UTC()), content, secret)
+}
+
+// SaveDiaryDate upserts a diary for a specific Beijing calendar date. It is used by the past-page
+// explicit edit action; the regular now-page endpoint remains bound to today.
+func (s *Service) SaveDiaryDate(ctx context.Context, life, entryDate, content string, secret bool) (Diary, error) {
+	at, e := taskMoment(entryDate)
+	if e != nil {
+		return Diary{}, e
+	}
 	now := time.Now().UTC()
-	x := Diary{EntryDate: date(now), Content: content, Secret: secret}
-	db, e := s.db(ctx, life, now)
+	x := Diary{EntryDate: entryDate, Content: content, Secret: secret}
+	db, e := s.db(ctx, life, at)
 	if e != nil {
 		return x, e
 	}
@@ -385,6 +426,7 @@ func (s *Service) SetDiaryAccess(ctx context.Context, life, presetID string, sec
 	d, _, _, _, e := s.Today(ctx, life)
 	return d, e
 }
+
 // SetTaskAccess walks the month databases because the task may belong to an earlier month.
 func (s *Service) SetTaskAccess(ctx context.Context, life, id, presetID string, secret, commentable bool) (Task, error) {
 	months, e := s.store.LifeMonths(ctx, life)
@@ -416,6 +458,7 @@ func nullString(value string) any {
 	}
 	return value
 }
+
 // taskMoment resolves an optional YYYY-MM-DD task date (Beijing time) to the instant used to pick the
 // month database; an empty date means today.
 func taskMoment(taskDate string) (time.Time, error) {
@@ -544,6 +587,54 @@ func (s *Service) SetTaskDone(ctx context.Context, life, id string, done bool, t
 		return Task{}, fmt.Errorf("任务不存在")
 	}
 	return readTask(ctx, db, id)
+}
+
+// UpdateTask changes editable task details while retaining its completion and access fields.
+func (s *Service) UpdateTask(ctx context.Context, life, id, taskDate, title, description, priority string) (Task, error) {
+	if strings.TrimSpace(title) == "" {
+		return Task{}, fmt.Errorf("任务标题不能为空")
+	}
+	if priority != "low" && priority != "normal" && priority != "high" {
+		priority = "normal"
+	}
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return Task{}, e
+	}
+	db, e := s.db(ctx, life, at)
+	if e != nil {
+		return Task{}, e
+	}
+	defer db.Close()
+	result, e := db.ExecContext(ctx, "UPDATE tasks SET title=?,description=?,priority=?,updated_at=? WHERE id=? AND life_id=?", strings.TrimSpace(title), description, priority, time.Now().UTC().Format(time.RFC3339Nano), id, life)
+	if e != nil {
+		return Task{}, e
+	}
+	if n, _ := result.RowsAffected(); n != 1 {
+		return Task{}, fmt.Errorf("任务不存在")
+	}
+	return readTask(ctx, db, id)
+}
+
+// DeleteTask removes a task from its month database. Callers provide its date to avoid scanning.
+func (s *Service) DeleteTask(ctx context.Context, life, id, taskDate string) error {
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return e
+	}
+	db, e := s.db(ctx, life, at)
+	if e != nil {
+		return e
+	}
+	defer db.Close()
+	result, e := db.ExecContext(ctx, "DELETE FROM tasks WHERE id=? AND life_id=?", id, life)
+	if e != nil {
+		return e
+	}
+	if n, _ := result.RowsAffected(); n != 1 {
+		return fmt.Errorf("任务不存在")
+	}
+	return nil
 }
 
 func readTask(ctx context.Context, db *sql.DB, id string) (Task, error) {

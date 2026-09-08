@@ -37,6 +37,8 @@ export const api = {
   adminLogin: async (password: string) => { const result = await request<{ actor: unknown }>('/api/v1/admin/auth/login', { method: 'POST', body: JSON.stringify({ password }) }); return { actor: normalizeActor(result.actor) } },
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
   me: async () => { const result = await request<{ actor: unknown; capabilities: string[] }>('/api/v1/auth/me'); return { actor: normalizeActor(result.actor), capabilities: result.capabilities ?? [] } },
+  uiSettings: () => request<UISettings>('/api/v1/settings'),
+  saveUISettings: (settings: UISettings) => request<UISettings>('/api/v1/settings', { method: 'PUT', body: JSON.stringify(settings) }),
   writers: () => request<{ items: Writer[] }>('/api/v1/admin/writers'),
   createWriter: (nickname: string) => request<{ writer: Writer; master_key: string }>('/api/v1/admin/writers', { method: 'POST', body: JSON.stringify({ nickname }) }),
   readerKeys: (lifeID: string) => request<{ items: ReaderKey[] }>(`/api/v1/admin/writers/${encode(lifeID)}/reader-keys`),
@@ -60,6 +62,7 @@ export const api = {
   addMoodTag: (payload: Pick<MoodTag, 'name' | 'emoji' | 'value'>) => request<MoodTag>('/api/v1/now/mood-tags', { method: 'POST', body: JSON.stringify(payload) }),
   addMood: (tagIDs: string[], note: string, secret: boolean) => request<MoodRecord>('/api/v1/now/moods', { method: 'POST', body: JSON.stringify({ tag_ids: tagIDs, note, secret }) }),
   addBody: (score: number, note: string, secret: boolean) => request<BodyRecord>('/api/v1/now/body', { method: 'POST', body: JSON.stringify({ score, note, secret }) }),
+  deleteLastState: (kind: 'mood' | 'body', secret: boolean) => request<void>('/api/v1/now/last-state', { method: 'DELETE', body: JSON.stringify({ kind, secret }) }),
   uploadAttachment: (file: File) => upload<Attachment>('/api/v1/now/diary/attachments', file),
   attachmentUrl: (id: string) => `/api/v1/attachments/${encode(id)}`,
   musicPlaylists: () => request<{ items: Playlist[] }>('/api/v1/now/music/playlists'),
@@ -76,6 +79,9 @@ export const api = {
   deleteFutureTask: (id: string, date: string) => request<void>(`/api/v1/now/tasks/${encode(id)}/future-detail`, { method: 'DELETE', body: JSON.stringify({ date }) }),
   /** 任务按月分库，传 date 以便服务端定位到对应月份。 */
   setTaskDone: (id: string, done: boolean, date = '') => request<Task>(`/api/v1/now/tasks/${encode(id)}/done`, { method: 'POST', body: JSON.stringify({ done, date }) }),
+  updateTask: (id: string, date: string, payload: { title: string; description: string; priority: Task['priority'] }) => request<Task>(`/api/v1/now/tasks/${encode(id)}`, { method: 'PUT', body: JSON.stringify({ date, title: payload.title, description: payload.description, priority: payload.priority }) }),
+  deleteTask: (id: string, date: string) => request<void>(`/api/v1/now/tasks/${encode(id)}`, { method: 'DELETE', body: JSON.stringify({ date }) }),
+  saveDiaryDate: (date: string, content: string, secret = false) => request<Diary>('/api/v1/now/diary/date', { method: 'PUT', body: JSON.stringify({ date, content, secret }) }),
   readerKeysForWriter: () => request<{ items: ReaderKey[] }>('/api/v1/now/reader-keys'),
   presets: () => request<{ items: Preset[] }>('/api/v1/now/presets'),
   replacePresetRules: (id: string, rules: PresetRule[]) => request<void>(`/api/v1/now/presets/${encode(id)}/rules`, { method: 'PUT', body: JSON.stringify({ rules }) }),
@@ -89,6 +95,7 @@ export const api = {
 }
 
 export type Writer = { id: string; nickname: string; life_id: string; status: string; created_at: string }
+export type UISettings = { appearance: 'dark' | 'light' | 'auto'; navPosition: 'top' | 'left' | 'right' | 'bottom'; pageInset: number; volume: number; carouselSeconds: number }
 export type ReaderKey = { id: string; nickname: string; anchor_local_date: string; expires_at?: string | null; revoked_at?: string | null; note: string; created_at: string }
 export type MoodTag = { id: string; name: string; emoji: string; value: number; sortOrder?: number }
 export type MoodRecord = { id: string; recordedAt: string; recordedDate: string; value: number; note: string; tags: MoodTag[]; secret?: boolean }

@@ -22,6 +22,7 @@ import (
 	"cyberlife/server/internal/music"
 	"cyberlife/server/internal/notification"
 	nowservice "cyberlife/server/internal/now"
+	"cyberlife/server/internal/settings"
 )
 
 type Server struct {
@@ -35,10 +36,11 @@ type Server struct {
 	history      *history.Service
 	future       *future.Service
 	notification *notification.Service
+	settings     *settings.Service
 }
 
-func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, musicService *music.Service, aclService *acl.Service, interactionService *interaction.Service, historyService *history.Service, futureService *future.Service, notificationService *notification.Service) *Server {
-	return &Server{cfg: cfg, auth: authService, admin: adminService, now: nowService, music: musicService, acl: aclService, interaction: interactionService, history: historyService, future: futureService, notification: notificationService}
+func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, musicService *music.Service, aclService *acl.Service, interactionService *interaction.Service, historyService *history.Service, futureService *future.Service, notificationService *notification.Service, settingsService *settings.Service) *Server {
+	return &Server{cfg: cfg, auth: authService, admin: adminService, now: nowService, music: musicService, acl: aclService, interaction: interactionService, history: historyService, future: futureService, notification: notificationService, settings: settingsService}
 }
 
 func (s *Server) Router() *gin.Engine {
@@ -65,6 +67,8 @@ func (s *Server) Router() *gin.Engine {
 	protected := r.Group("/api/v1")
 	protected.Use(s.requireActor())
 	protected.GET("/auth/me", s.me)
+	protected.GET("/settings", s.getSettings)
+	protected.PUT("/settings", s.updateSettings)
 	protected.GET("/today", s.visibleToday)
 	protected.GET("/history", s.historyRange)
 	protected.GET("/notifications", s.listNotifications)
@@ -103,6 +107,7 @@ func (s *Server) Router() *gin.Engine {
 	writer.POST("/milestones", s.addMilestone)
 	writer.POST("/moods", s.addMood)
 	writer.POST("/body", s.addBody)
+	writer.DELETE("/last-state", s.deleteLastState)
 	writer.POST("/diary/attachments", s.uploadAttachment)
 	writer.GET("/music/playlists", s.listMusicPlaylists)
 	writer.PUT("/music/playlists/:page", s.replaceMusicPlaylist)
@@ -112,6 +117,7 @@ func (s *Server) Router() *gin.Engine {
 	writer.PUT("/diary/attachments/:id/access", s.setAttachmentAccess)
 	writer.PUT("/diary/draft", s.saveDraft)
 	writer.PUT("/diary", s.saveDiary)
+	writer.PUT("/diary/date", s.saveDiaryDate)
 	writer.PUT("/diary/access", s.setDiaryAccess)
 	writer.POST("/tasks", s.addTask)
 	writer.GET("/tasks/:id", s.getTask)
@@ -119,6 +125,8 @@ func (s *Server) Router() *gin.Engine {
 	writer.DELETE("/tasks/:id/future-detail", s.deleteFutureTask)
 	writer.POST("/tasks/:id/done", s.setTaskDone)
 	writer.PUT("/tasks/:id/access", s.setTaskAccess)
+	writer.PUT("/tasks/:id", s.updateTask)
+	writer.DELETE("/tasks/:id", s.deleteTask)
 	adminGroup := protected.Group("/admin")
 	adminGroup.Use(s.requireAdmin())
 	adminGroup.GET("/writers", s.listWriters)
@@ -180,6 +188,28 @@ func (s *Server) logout(c *gin.Context) {
 func (s *Server) me(c *gin.Context) {
 	actor := c.MustGet("actor").(auth.Actor)
 	c.JSON(http.StatusOK, gin.H{"actor": actor, "capabilities": capabilities(actor)})
+}
+func (s *Server) getSettings(c *gin.Context) {
+	actor := c.MustGet("actor").(auth.Actor)
+	preferences, err := s.settings.Get(c.Request.Context(), actor)
+	if err != nil {
+		fail(c, http.StatusForbidden, "forbidden", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, preferences)
+}
+func (s *Server) updateSettings(c *gin.Context) {
+	var preferences settings.Preferences
+	if !bind(c, &preferences) {
+		return
+	}
+	actor := c.MustGet("actor").(auth.Actor)
+	preferences, err := s.settings.Update(c.Request.Context(), actor, preferences)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "validation_failed", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, preferences)
 }
 func (s *Server) listWriters(c *gin.Context) {
 	items, err := s.admin.ListWriters(c.Request.Context())
@@ -243,6 +273,7 @@ func (s *Server) revokeReaderKey(c *gin.Context) {
 	}
 	c.Status(http.StatusNoContent)
 }
+
 // planReadable applies the ACL to a plan. The end date is the anchor date: a plan that is still running
 // after a reader key was issued stays visible to that reader.
 func (s *Server) planReadable(ctx context.Context, a auth.Actor, plan future.Plan) (bool, error) {
@@ -614,6 +645,7 @@ func (s *Server) addVisibleComment(c *gin.Context) {
 	s.notifyComment(c.Request.Context(), a, target, x)
 	c.JSON(201, x)
 }
+
 // notifyComment tells the writer about a reader's comment; the message carries the day so the client
 // can open it on the past page.
 func (s *Server) notifyComment(ctx context.Context, a auth.Actor, target interaction.TargetAccess, comment interaction.Comment) {
@@ -638,6 +670,7 @@ func (s *Server) notifyComment(ctx context.Context, a auth.Actor, target interac
 	}
 	_ = s.notification.Enqueue(ctx, a.LifeID, writer, "comment", target.TargetID, target.Date, fmt.Sprintf("%s 评论了 %s 的%s：%s", name, target.Date, kind, string(snippet)))
 }
+
 // sweepNotifications generates due reminders lazily on every inbox read: plans ending within three
 // days and reader keys expiring within seven days. EnsureOnce keeps them from duplicating.
 func (s *Server) sweepNotifications(ctx context.Context, a auth.Actor) {
@@ -901,6 +934,21 @@ func (s *Server) addBody(c *gin.Context) {
 	}
 	c.JSON(201, x)
 }
+func (s *Server) deleteLastState(c *gin.Context) {
+	var r struct {
+		Kind   string `json:"kind"`
+		Secret bool   `json:"secret"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	if e := s.now.DeleteLastState(c.Request.Context(), a.LifeID, strings.TrimSpace(r.Kind), r.Secret); e != nil {
+		fail(c, 404, "not_found", e.Error())
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
 func (s *Server) listMusicPlaylists(c *gin.Context) {
 	a := c.MustGet("actor").(auth.Actor)
 	items, err := s.music.List(c.Request.Context(), a.LifeID)
@@ -1036,6 +1084,23 @@ func (s *Server) saveDraft(c *gin.Context) {
 	}
 	c.JSON(200, x)
 }
+func (s *Server) saveDiaryDate(c *gin.Context) {
+	var r struct {
+		Date    string `json:"date"`
+		Content string `json:"content"`
+		Secret  bool   `json:"secret"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.now.SaveDiaryDate(c.Request.Context(), a.LifeID, strings.TrimSpace(r.Date), r.Content, r.Secret)
+	if e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, x)
+}
 func (s *Server) saveDiary(c *gin.Context) {
 	var r struct {
 		Content string `json:"content"`
@@ -1120,7 +1185,9 @@ func (s *Server) updateFutureTask(c *gin.Context) {
 	c.JSON(200, x)
 }
 func (s *Server) deleteFutureTask(c *gin.Context) {
-	var r struct { Date string `json:"date"` }
+	var r struct {
+		Date string `json:"date"`
+	}
 	if !bind(c, &r) {
 		return
 	}
@@ -1148,6 +1215,39 @@ func (s *Server) setTaskAccess(c *gin.Context) {
 	}
 	c.JSON(200, x)
 }
+func (s *Server) updateTask(c *gin.Context) {
+	var r struct {
+		Date        string `json:"date"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Priority    string `json:"priority"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.now.UpdateTask(c.Request.Context(), a.LifeID, c.Param("id"), strings.TrimSpace(r.Date), strings.TrimSpace(r.Title), r.Description, r.Priority)
+	if e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, x)
+}
+func (s *Server) deleteTask(c *gin.Context) {
+	var r struct {
+		Date string `json:"date"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	if e := s.now.DeleteTask(c.Request.Context(), a.LifeID, c.Param("id"), strings.TrimSpace(r.Date)); e != nil {
+		fail(c, 404, "not_found", e.Error())
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (s *Server) setTaskDone(c *gin.Context) {
 	var r struct {
 		Done bool   `json:"done"`

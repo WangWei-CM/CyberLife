@@ -61,7 +61,13 @@
 .metric-panel + .metric-panel { padding-left: 20px; border-left: 1px solid var(--divider); }
 .metric-panel-head { margin-bottom: 8px; }
 .metric-edit-trigger { width: 28px; height: 28px; flex: 0 0 28px; }
-.metric-editor { min-height: 128px; }
+.metric-chart, .metric-editor { min-height: 196px; box-sizing: border-box; }
+.metric-editor { gap: 6px; }
+.metric-editor .tag-grid { gap: 4px; }
+.metric-editor .tag-item { padding: 4px 2px; }
+.metric-editor .tag-item i { font-size: 18px; }
+.metric-editor-actions { display: flex; align-items: center; gap: 6px; }
+.metric-editor-actions .primary { margin-left: auto; }
 .now-chart { display: grid; align-content: start; gap: 4px; min-width: 0; }
 .now-form { display: grid; gap: 10px; align-content: start; min-width: 0; }
 .now-form .primary { justify-self: end; }
