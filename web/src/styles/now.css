@@ -62,7 +62,8 @@
 .metric-panel-head { margin-bottom: 8px; }
 .metric-edit-trigger { width: 28px; height: 28px; flex: 0 0 28px; }
 .metric-chart, .metric-editor { height: 150px; min-height: 150px; box-sizing: border-box; }
-.metric-editor { gap: 6px; }
+.metric-editor { gap: 6px; scrollbar-width: none; }
+.metric-editor::-webkit-scrollbar { display: none; }
 .metric-editor { overflow-y: auto; }
 .metric-editor .tag-grid { gap: 4px; }
 .metric-editor .tag-item { padding: 4px 2px; }
