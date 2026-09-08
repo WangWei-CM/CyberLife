@@ -190,11 +190,16 @@
 .plan-dialog > .cyber-panel { transform: none; }
 .plan-dialog .divider-v::before { transform: none; }
 .plan-dialog-close { position: absolute; top: 14px; right: var(--plan-dialog-safe, 12px); z-index: 3; transform: skewX(15deg); transform-origin: center; }
-.plan-dialog .future-list .plan-form { transform: skewX(var(--future-skew)); transform-origin: center; }
-/* The dialog form already owns the -15° plane.  Do not counter-skew every
-   field again: that made the name, date row and intro editor use a second,
-   mismatched angle. */
+.plan-dialog .future-list .plan-form { transform: none; }
+/* Creation keeps native input geometry and uses one shared 15° visual edge.
+   This avoids compounding the panel and field transforms. */
+.plan-dialog .future-list .plan-form::before {
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
 .plan-dialog .future-list .plan-form > * { transform: none; }
+.plan-dialog .future-list .plan-form :is(input, textarea, select, .primary) {
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
 /* 规划编辑使用未变形的交互坐标系；仅由轮廓裁切出统一的 75° 外观，
    避免将表单内容反向抵消后又还原成直角框。 */
 .plan-dialog .future-detail .progress-form { transform: none; }
@@ -319,6 +324,7 @@
 .task-editor-modal-section { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--divider); background: color-mix(in srgb, var(--surface-2) 62%, transparent); }
 .task-editor-modal-section > header { display: flex; justify-content: space-between; gap: 12px; }
 .task-editor-modal-section .md-editor { min-height: 420px; height: min(58vh, 560px); }
+.plan-editor-modal .form-row > .field { flex: 1 1 0; min-width: 0; }
 .task-editor-modal-section .md-editor .cm-content, .task-editor-modal-section .md-editor .cm-line, .task-editor-modal-section .md-editor .cm-line * { color: #F4F7FF !important; }
 .task-editor-modal-foot { border-top: 1px solid var(--divider); border-bottom: 0; }
 .task-editor-modal-foot > span { display: flex; gap: 8px; }

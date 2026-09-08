@@ -18,7 +18,7 @@ const tasks = ref(new Map<string, FutureTask>())
 const fetched = ref(new Set<string>())
 const selectedPlanId = ref('')
 const selectedDate = ref(today)
-const editMode = ref(false)
+const planEditorOpen = ref(false)
 const planDialogOpen = ref(false)
 const progress = ref(0)
 const progressDate = ref(today)
@@ -99,10 +99,27 @@ async function ensureTasks(from: string, to: string) {
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' }
 }
 function onRange(from: string, to: string) { ensureTasks(from, to) }
-function choose(plan: Plan) { selectedPlanId.value = plan.id; progress.value = plan.progress; progressDate.value = today; editMode.value = false; edit.value = { name: plan.name, startDate: plan.startDate, endDate: plan.endDate, intro: plan.intro } }
+function choose(plan: Plan) { selectedPlanId.value = plan.id; progress.value = plan.progress; progressDate.value = today; planEditorOpen.value = false; edit.value = { name: plan.name, startDate: plan.startDate, endDate: plan.endDate, intro: plan.intro } }
 function choosePlanById(id: string) { const plan = plans.value.find(item => item.id === id); if (plan) choose(plan) }
 function openPlanDialog() { if (!selectedPlan.value && sortedPlans.value.length) choose(sortedPlans.value.find(isOngoing) ?? sortedPlans.value[0]); planDialogOpen.value = true }
-function closePlanDialog() { planDialogOpen.value = false; editMode.value = false }
+function closePlanDialog() { planDialogOpen.value = false; planEditorOpen.value = false }
+function resetPlanDraft() {
+  const plan = selectedPlan.value
+  if (!plan) return
+  edit.value = { name: plan.name, startDate: plan.startDate, endDate: plan.endDate, intro: plan.intro }
+  progress.value = plan.progress
+  progressDate.value = today
+}
+function planEditorDirty() {
+  const plan = selectedPlan.value
+  return !!plan && (edit.value.name !== plan.name || edit.value.startDate !== plan.startDate || edit.value.endDate !== plan.endDate || edit.value.intro !== plan.intro || progress.value !== plan.progress)
+}
+function openPlanEditor() { if (!selectedPlan.value || !isWriter.value) return; resetPlanDraft(); planEditorOpen.value = true }
+function requestClosePlanEditor() {
+  if (planEditorDirty() && !window.confirm('有未保存的规划编辑内容，确定放弃吗？')) return
+  resetPlanDraft()
+  planEditorOpen.value = false
+}
 function replacePlan(next: Plan) { plans.value = plans.value.map(plan => plan.id === next.id ? { ...plan, ...next } : plan) }
 function startPlanDrag(plan: Plan, event: DragEvent) {
   if (!isWriter.value || planOrderBusy.value) return
@@ -152,7 +169,7 @@ async function savePlan() {
     await loadPlans()
     const refreshed = plans.value.find(item => item.id === plan.id)
     if (refreshed) edit.value = { name: refreshed.name, startDate: refreshed.startDate, endDate: refreshed.endDate, intro: refreshed.intro }
-    editMode.value = false
+    planEditorOpen.value = false
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' } finally { busy.value = false }
 }
 async function uploadImage(kind: 'cover' | 'icon', event: Event) {
@@ -335,37 +352,22 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
                   <p class="detail-dates mono">{{ selectedPlan.startDate }} — {{ selectedPlan.endDate }}<span>{{ remainingDays >= 0 ? `剩余 ${remainingDays} 天` : `已过 ${-remainingDays} 天` }}</span></p>
                 </div>
               </div>
-              <button v-if="isWriter" class="text-button" :aria-pressed="editMode" @click="editMode = !editMode"><AppIcon :name="editMode ? 'close' : 'edit'" :size="14" />{{ editMode ? '退出编辑' : '编辑模式' }}</button>
+              <button v-if="isWriter" class="text-button" @click="openPlanEditor"><AppIcon name="edit" :size="14" />编辑规划</button>
             </header>
             <div class="dual-progress">
               <div class="dual-row"><span class="cyber-heading">时间进度</span><ProgressBar :value="selectedPlan.timeProgress" :height="6" /><b class="mono">{{ Math.round(timeDisplay) }}%</b></div>
               <div class="dual-row"><span class="cyber-heading magenta">计划进度</span><ProgressBar :value="selectedPlan.progress" tone="accent-2" :height="6" /><b class="mono">{{ Math.round(planDisplay) }}%</b></div>
             </div>
-            <Transition name="fade-slide" mode="out-in">
-              <form v-if="editMode && isWriter" class="progress-form" @submit.prevent="savePlan">
-                <div class="form-control"><input v-model="edit.name" placeholder="规划名称" maxlength="60" required aria-label="规划名称" /></div>
-                <div class="form-row"><input v-model="edit.startDate" type="date" required aria-label="开始日期" /><input v-model="edit.endDate" type="date" required aria-label="截止日期" /></div>
-                <div class="form-control"><textarea v-model="edit.intro" rows="6" placeholder="简介（支持 Markdown）" aria-label="简介" /></div>
-                <div class="asset-row">
-                  <label class="text-button upload-trigger" :class="{ busy: uploading === 'cover' }"><AppIcon name="image" :size="14" />{{ selectedPlan.coverUrl ? '更换封面' : '上传封面' }}<input type="file" accept="image/*" :disabled="!!uploading" @change="uploadImage('cover', $event)" /></label>
-                  <label class="text-button upload-trigger" :class="{ busy: uploading === 'icon' }"><AppIcon name="spark" :size="14" />{{ selectedPlan.iconUrl ? '更换图标' : '上传图标' }}<input type="file" accept="image/*" :disabled="!!uploading" @change="uploadImage('icon', $event)" /></label>
-                  <label class="text-button upload-trigger" :class="{ busy: uploading === 'file' }"><AppIcon name="upload" :size="14" />添加文件<input type="file" :disabled="!!uploading" @change="uploadFile" /></label>
-                  <small class="faint">图片 ≤ 5MB，文件 ≤ 20MB</small>
-                </div>
-                <label class="field"><span>标记完成百分比 <b class="mono">{{ progress }}%</b></span><input v-model.number="progress" type="range" min="0" max="100" :style="{ '--range-fill': `${progress}%` }" /></label>
-                <div class="form-row"><input v-model="progressDate" type="date" :max="today" aria-label="标记日期" /><button class="primary" type="submit" :disabled="busy || !edit.name.trim()">保存</button></div>
-              </form>
-              <section v-else class="detail-intro">
-                <MarkdownPreview v-if="selectedPlan.intro" :editor-id="`plan-${selectedPlan.id}`" :model-value="selectedPlan.intro" theme="dark" theme-class="theme-future" />
-                <EmptyState v-else icon="book" text="这项规划还没有简介" compact />
-              </section>
-            </Transition>
+            <section class="detail-intro">
+              <MarkdownPreview v-if="selectedPlan.intro" :editor-id="`plan-${selectedPlan.id}`" :model-value="selectedPlan.intro" theme="dark" theme-class="theme-future" />
+              <EmptyState v-else icon="book" text="这项规划还没有简介" compact />
+            </section>
             <section v-if="selectedPlan.files?.length" class="plan-files">
               <span class="cyber-heading"><AppIcon name="download" :size="12" />文件</span>
               <TransitionGroup name="list" tag="ul" class="file-list">
                 <li v-for="file in selectedPlan.files" :key="file.id">
                   <a class="file-link" :href="file.url" download><AppIcon name="book" :size="14" /><span class="file-name">{{ file.originalName }}</span><small class="mono faint">{{ fileSize(file.byteSize) }}</small></a>
-                  <button v-if="isWriter && editMode" class="icon-button" aria-label="删除文件" @click="removeFile(file.id)"><AppIcon name="trash" :size="14" /></button>
+                  <button v-if="isWriter && planEditorOpen" class="icon-button" aria-label="删除文件" @click="removeFile(file.id)"><AppIcon name="trash" :size="14" /></button>
                 </li>
               </TransitionGroup>
             </section>
@@ -436,6 +438,23 @@ onMounted(() => { loadPlans(); loadTaskPresets(); ensureTasks(addDaysISO(today, 
             <EmptyState v-else icon="target" :text="taskError || '未找到待办'" compact />
           </div>
           </aside>
+        </div>
+      </Transition>
+    </Teleport>
+    <Teleport to=".app-shell">
+      <Transition name="task-editor-modal">
+        <div v-if="planEditorOpen && selectedPlan" class="task-editor-modal-layer" @click.self="requestClosePlanEditor">
+          <form class="task-editor-modal plan-editor-modal" role="dialog" aria-modal="true" aria-label="编辑规划" @submit.prevent="savePlan">
+            <header class="task-editor-modal-head"><div><small class="faint mono">{{ selectedPlan.startDate }} — {{ selectedPlan.endDate }}</small><h2>编辑规划</h2></div><button class="icon-button" type="button" aria-label="关闭规划编辑" @click="requestClosePlanEditor"><AppIcon name="close" :size="18" /></button></header>
+            <main class="task-editor-modal-body">
+              <label class="field"><span>规划名称</span><input v-model="edit.name" maxlength="60" required /></label>
+              <div class="form-row"><label class="field"><span>开始日期</span><input v-model="edit.startDate" type="date" required /></label><label class="field"><span>截止日期</span><input v-model="edit.endDate" type="date" required /></label></div>
+              <label class="field"><span>简介（支持 Markdown）</span><textarea v-model="edit.intro" rows="8" /></label>
+              <section class="task-editor-modal-section"><b>资源</b><div class="asset-row"><label class="text-button upload-trigger" :class="{ busy: uploading === 'cover' }"><AppIcon name="image" :size="14" />{{ selectedPlan.coverUrl ? '更换封面' : '上传封面' }}<input type="file" accept="image/*" :disabled="!!uploading" @change="uploadImage('cover', $event)" /></label><label class="text-button upload-trigger" :class="{ busy: uploading === 'icon' }"><AppIcon name="spark" :size="14" />{{ selectedPlan.iconUrl ? '更换图标' : '上传图标' }}<input type="file" accept="image/*" :disabled="!!uploading" @change="uploadImage('icon', $event)" /></label><label class="text-button upload-trigger" :class="{ busy: uploading === 'file' }"><AppIcon name="upload" :size="14" />添加文件<input type="file" :disabled="!!uploading" @change="uploadFile" /></label></div><ul v-if="selectedPlan.files?.length" class="file-list"><li v-for="file in selectedPlan.files" :key="file.id"><a class="file-link" :href="file.url" download><span class="file-name">{{ file.originalName }}</span><small class="mono faint">{{ fileSize(file.byteSize) }}</small></a><button class="icon-button" type="button" aria-label="删除文件" @click="removeFile(file.id)"><AppIcon name="trash" :size="14" /></button></li></ul></section>
+              <section class="task-editor-modal-section"><label class="field"><span>标记完成百分比 <b class="mono">{{ progress }}%</b></span><input v-model.number="progress" type="range" min="0" max="100" :style="{ '--range-fill': `${progress}%` }" /></label><label class="field"><span>标记日期</span><input v-model="progressDate" type="date" :max="today" /></label></section>
+            </main>
+            <footer class="task-editor-modal-foot"><button class="text-button" type="button" :disabled="busy" @click="requestClosePlanEditor">取消</button><button class="primary" type="submit" :disabled="busy || !edit.name.trim()">保存规划</button></footer>
+          </form>
         </div>
       </Transition>
     </Teleport>
