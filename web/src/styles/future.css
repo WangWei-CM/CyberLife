@@ -285,7 +285,7 @@
 .future-slant-editor .md-editor .cm-line { box-sizing: border-box; }
 /* 同一变换矩阵：内容坐标整体形成 75°，每一行反向变换仅恢复字形水平。
    CodeMirror 的命中、光标和选择层仍在同一坐标系中，避免视觉与交互错位。 */
-.future-slant-editor .diary-editor.slanted-lines .cm-content { transform: translateX(calc(var(--future-editor-run) + 12px)) skewX(var(--future-skew)); transform-origin: left top; }
+.future-slant-editor .diary-editor.slanted-lines .cm-content { transform: translateX(calc(var(--future-editor-run) + 4px)) skewX(var(--future-skew)); transform-origin: left top; }
 /* CodeMirror 已用变形后的文字坐标定位图层。仅斜切具体图元，不能再移动整层。 */
 .future-slant-editor .diary-editor.slanted-lines .cm-selectionLayer,
 .future-slant-editor .diary-editor.slanted-lines .cm-cursorLayer { margin: 0; transform: none; }
