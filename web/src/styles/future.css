@@ -191,6 +191,7 @@
   linear-gradient(180deg, transparent 42%, color-mix(in srgb, var(--accent) 38%, transparent) 76%, var(--accent) 100%) right / 1px 100% no-repeat,
   color-mix(in srgb, var(--bg) 82%, transparent); transform: none; }
 .plan-dialog > .cyber-panel { transform: none; }
+.plan-dialog > .future-list.bracket::before { display: none; }
 .plan-dialog .divider-v::before { transform: none; }
 .plan-dialog-close { position: absolute; top: 14px; right: var(--plan-dialog-safe, 12px); z-index: 3; transform: skewX(15deg); transform-origin: center; }
 .plan-dialog .future-list .plan-form { transform: none; }
