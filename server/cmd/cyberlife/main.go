@@ -20,6 +20,8 @@ import (
 	"cyberlife/server/internal/music"
 	"cyberlife/server/internal/notification"
 	nowservice "cyberlife/server/internal/now"
+	"cyberlife/server/internal/schedule"
+	"cyberlife/server/internal/settings"
 	"cyberlife/server/internal/storage"
 )
 
@@ -37,8 +39,17 @@ func main() {
 	if err := authService.EnsureAdmin(context.Background(), cfg.AdminPassword); err != nil {
 		log.Fatalf("initialize admin: %v", err)
 	}
+	if cfg.ResetAdminPassword {
+		if err := authService.ResetAdminPassword(context.Background(), cfg.AdminPassword); err != nil {
+			log.Fatalf("reset admin password: %v", err)
+		}
+	}
 	aclService := acl.New(store.Global())
-	server := &http.Server{Addr: cfg.Address, Handler: httpapi.New(cfg, authService, admin.New(store.Global(), store), nowservice.New(store), music.New(store), aclService, interaction.New(store), history.New(store, aclService), future.New(store), notification.New(store)).Router(), ReadHeaderTimeout: 10 * time.Second}
+	nowSvc := nowservice.New(store)
+	ctxRun, cancelRun := context.WithCancel(context.Background())
+	defer cancelRun()
+	go runMidnightSettlement(ctxRun, nowSvc)
+	server := &http.Server{Addr: cfg.Address, Handler: httpapi.New(cfg, authService, admin.New(store.Global(), store), nowSvc, music.New(store), aclService, interaction.New(store), history.New(store, aclService), future.New(store), notification.New(store), settings.New(store.Global()), schedule.New(store)).Router(), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		log.Printf("Cyberlife API listening on %s", cfg.Address)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -52,5 +63,30 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
+	}
+}
+
+func runMidnightSettlement(ctx context.Context, service *nowservice.Service) {
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		loc = time.FixedZone("CST", 8*3600)
+	}
+	startup := time.Now().In(loc)
+	if err := service.CloseActiveTasksAt(ctx, startup); err != nil {
+		log.Printf("startup task settlement: %v", err)
+	}
+	for {
+		now := time.Now().In(loc)
+		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, loc)
+		t := time.NewTimer(time.Until(next))
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return
+		case <-t.C:
+			if err := service.CloseActiveTasksAt(ctx, next); err != nil {
+				log.Printf("midnight task settlement: %v", err)
+			}
+		}
 	}
 }

@@ -30,6 +30,8 @@ async function upload<T>(path: string, file: File): Promise<T> {
   }
   return response.json() as Promise<T>
 }
+async function uploadForm<T>(path: string, file: File): Promise<T> { const form = new FormData(); form.append('file', file); return requestForm<T>(path, form) }
+async function requestForm<T>(path: string, body: FormData): Promise<T> { const response = await fetch(path, { method: 'POST', credentials: 'include', body }); if (!response.ok) { const data = await response.json().catch(() => null) as ApiError | null; throw new Error(data?.error?.message ?? `请求失败（${response.status}）`) }; return response.json() as Promise<T> }
 const encode = encodeURIComponent
 
 export const api = {
@@ -79,6 +81,14 @@ export const api = {
   deleteFutureTask: (id: string, date: string) => request<void>(`/api/v1/now/tasks/${encode(id)}/future-detail`, { method: 'DELETE', body: JSON.stringify({ date }) }),
   /** 任务按月分库，传 date 以便服务端定位到对应月份。 */
   setTaskDone: (id: string, done: boolean, date = '') => request<Task>(`/api/v1/now/tasks/${encode(id)}/done`, { method: 'POST', body: JSON.stringify({ done, date }) }),
+  setTaskInProgress: (id: string, active: boolean, date = '') => request<Task>(`/api/v1/now/tasks/${encode(id)}/in-progress`, { method: 'POST', body: JSON.stringify({ active, date }) }),
+  scheduleClasses: () => request<{ items: ScheduleClass[] }>('/api/v1/now/schedule'),
+  scheduleAgenda: () => request<ScheduleAgenda>('/api/v1/now/schedule/agenda'),
+  createScheduleClass: (payload: ScheduleClassInput) => request<ScheduleClass>('/api/v1/now/schedule/classes', { method: 'POST', body: JSON.stringify(payload) }),
+  updateScheduleClass: (id: string, payload: ScheduleClassInput) => request<ScheduleClass>(`/api/v1/now/schedule/classes/${encode(id)}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteScheduleClass: (id: string) => request<void>(`/api/v1/now/schedule/classes/${encode(id)}`, { method: 'DELETE' }),
+  previewScheduleImport: async (file: File) => uploadForm<ScheduleImportPreview>('/api/v1/now/schedule/import/preview', file),
+  applyScheduleImport: async (file: File, mode: 'replace' | 'merge', mapping: ScheduleCSVMapping) => { const form = new FormData(); form.append('file', file); form.append('mode', mode); form.append('mapping', JSON.stringify(mapping)); return requestForm<{ imported: number; warnings: string[] }>('/api/v1/now/schedule/import/apply', form) },
   updateTask: (id: string, date: string, payload: { title: string; description: string; priority: Task['priority'] }) => request<Task>(`/api/v1/now/tasks/${encode(id)}`, { method: 'PUT', body: JSON.stringify({ date, title: payload.title, description: payload.description, priority: payload.priority }) }),
   deleteTask: (id: string, date: string) => request<void>(`/api/v1/now/tasks/${encode(id)}`, { method: 'DELETE', body: JSON.stringify({ date }) }),
   saveDiaryDate: (date: string, content: string, secret = false) => request<Diary>('/api/v1/now/diary/date', { method: 'PUT', body: JSON.stringify({ date, content, secret }) }),
@@ -111,7 +121,13 @@ export type PresetRule = { readerKeyId: string; allowed: boolean }
 export type Preset = { id: string; name: string; rules: PresetRule[] }
 export type Comment = { id: string; targetType: string; targetId: string; authorKeyId: string; content: string; createdAt: string }
 export type Milestone = { id: string; targetType: string; targetId: string; description: string; detail: string; presetId: string; secret: boolean }
-export type Task = { id: string; taskDate: string; title: string; description: string; priority: 'low' | 'normal' | 'high'; done: boolean; presetId?: string; secret?: boolean; commentable?: boolean }
+export type Task = { id: string; taskDate: string; title: string; description: string; priority: 'low' | 'normal' | 'high'; done: boolean; presetId?: string; secret?: boolean; commentable?: boolean; inProgress: boolean; inProgressSince?: string; accumulatedActiveSeconds: number }
+export type ScheduleClass = { id: string; lifeId: string; title: string; weekday?: number; sessionDate?: string; startTime: string; endTime: string; effectiveStartDate?: string; effectiveEndDate?: string; location: string; note: string; source: string }
+export type ScheduleClassInput = Omit<ScheduleClass, 'id' | 'lifeId' | 'source'> & { source?: string }
+export type ScheduleOccurrence = { classId: string; title: string; startsAt: string; endsAt: string; location: string; note: string }
+export type ScheduleAgenda = { generatedAt: string; current?: ScheduleOccurrence | null; next: ScheduleOccurrence[] }
+export type ScheduleCSVMapping = { title: string; weekday: string; sessionDate: string; startTime: string; endTime: string; location: string; note: string; effectiveStartDate: string; effectiveEndDate: string }
+export type ScheduleImportPreview = { format: string; detectedMapping: ScheduleCSVMapping; columns: string[]; items: ScheduleClass[]; warnings: string[] }
 export type NowData = { diary: Diary; secretDiary?: Diary; moods: MoodRecord[]; bodies: BodyRecord[]; tasks: Task[] }
 export type PlanFile = { id: string; planId: string; originalName: string; mimeType: string; byteSize: number; url: string }
 export type Plan = { id: string; name: string; startDate: string; endDate: string; intro: string; progress: number; timeProgress: number; sortOrder?: number; secret?: boolean; presetId?: string; coverUrl?: string; iconUrl?: string; files?: PlanFile[] }

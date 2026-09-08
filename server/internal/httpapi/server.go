@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,6 +24,7 @@ import (
 	"cyberlife/server/internal/music"
 	"cyberlife/server/internal/notification"
 	nowservice "cyberlife/server/internal/now"
+	"cyberlife/server/internal/schedule"
 	"cyberlife/server/internal/settings"
 )
 
@@ -37,10 +40,11 @@ type Server struct {
 	future       *future.Service
 	notification *notification.Service
 	settings     *settings.Service
+	schedule     *schedule.Service
 }
 
-func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, musicService *music.Service, aclService *acl.Service, interactionService *interaction.Service, historyService *history.Service, futureService *future.Service, notificationService *notification.Service, settingsService *settings.Service) *Server {
-	return &Server{cfg: cfg, auth: authService, admin: adminService, now: nowService, music: musicService, acl: aclService, interaction: interactionService, history: historyService, future: futureService, notification: notificationService, settings: settingsService}
+func New(cfg config.Config, authService *auth.Service, adminService *admin.Service, nowService *nowservice.Service, musicService *music.Service, aclService *acl.Service, interactionService *interaction.Service, historyService *history.Service, futureService *future.Service, notificationService *notification.Service, settingsService *settings.Service, scheduleService *schedule.Service) *Server {
+	return &Server{cfg: cfg, auth: authService, admin: adminService, now: nowService, music: musicService, acl: aclService, interaction: interactionService, history: historyService, future: futureService, notification: notificationService, settings: settingsService, schedule: scheduleService}
 }
 
 func (s *Server) Router() *gin.Engine {
@@ -86,6 +90,13 @@ func (s *Server) Router() *gin.Engine {
 	writer := protected.Group("/now")
 	writer.Use(s.requireWriter())
 	writer.GET("", s.nowToday)
+	writer.GET("/schedule", s.listSchedule)
+	writer.GET("/schedule/agenda", s.scheduleAgenda)
+	writer.POST("/schedule/classes", s.createScheduleClass)
+	writer.PUT("/schedule/classes/:id", s.updateScheduleClass)
+	writer.DELETE("/schedule/classes/:id", s.deleteScheduleClass)
+	writer.POST("/schedule/import/preview", s.previewScheduleImport)
+	writer.POST("/schedule/import/apply", s.applyScheduleImport)
 	writer.POST("/plans", s.createPlan)
 	// Keep reordering on a distinct method/path shape so it can never be interpreted
 	// as an update for a plan whose ID happens to be the route segment.
@@ -124,6 +135,7 @@ func (s *Server) Router() *gin.Engine {
 	writer.PUT("/tasks/:id/future-detail", s.updateFutureTask)
 	writer.DELETE("/tasks/:id/future-detail", s.deleteFutureTask)
 	writer.POST("/tasks/:id/done", s.setTaskDone)
+	writer.POST("/tasks/:id/in-progress", s.setTaskInProgress)
 	writer.PUT("/tasks/:id/access", s.setTaskAccess)
 	writer.PUT("/tasks/:id", s.updateTask)
 	writer.DELETE("/tasks/:id", s.deleteTask)
@@ -1263,6 +1275,136 @@ func (s *Server) setTaskDone(c *gin.Context) {
 		return
 	}
 	c.JSON(200, x)
+}
+func (s *Server) setTaskInProgress(c *gin.Context) {
+	var r struct {
+		Active bool   `json:"active"`
+		Date   string `json:"date"`
+	}
+	if !bind(c, &r) {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.now.SetTaskInProgress(c.Request.Context(), a.LifeID, c.Param("id"), r.Active, strings.TrimSpace(r.Date))
+	if e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, x)
+}
+
+func scheduleInput(c *gin.Context) (schedule.Class, bool) {
+	var r struct {
+		Title              string `json:"title"`
+		Weekday            *int   `json:"weekday"`
+		SessionDate        string `json:"sessionDate"`
+		StartTime          string `json:"startTime"`
+		EndTime            string `json:"endTime"`
+		EffectiveStartDate string `json:"effectiveStartDate"`
+		EffectiveEndDate   string `json:"effectiveEndDate"`
+		Location           string `json:"location"`
+		Note               string `json:"note"`
+		Source             string `json:"source"`
+	}
+	if !bind(c, &r) {
+		return schedule.Class{}, false
+	}
+	return schedule.Class{Title: strings.TrimSpace(r.Title), Weekday: r.Weekday, SessionDate: strings.TrimSpace(r.SessionDate), StartTime: r.StartTime, EndTime: r.EndTime, EffectiveStartDate: r.EffectiveStartDate, EffectiveEndDate: r.EffectiveEndDate, Location: r.Location, Note: r.Note, Source: r.Source}, true
+}
+func (s *Server) listSchedule(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.schedule.List(c.Request.Context(), a.LifeID)
+	if e != nil {
+		internal(c, e)
+		return
+	}
+	c.JSON(200, gin.H{"items": x})
+}
+func (s *Server) scheduleAgenda(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	x, e := s.schedule.Agenda(c.Request.Context(), a.LifeID, time.Now())
+	if e != nil {
+		internal(c, e)
+		return
+	}
+	c.JSON(200, x)
+}
+func (s *Server) createScheduleClass(c *gin.Context) {
+	x, ok := scheduleInput(c)
+	if !ok {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	out, e := s.schedule.Create(c.Request.Context(), a.LifeID, x)
+	if e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(201, out)
+}
+func (s *Server) updateScheduleClass(c *gin.Context) {
+	x, ok := scheduleInput(c)
+	if !ok {
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	out, e := s.schedule.Update(c.Request.Context(), a.LifeID, c.Param("id"), x)
+	if e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, out)
+}
+func (s *Server) deleteScheduleClass(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	if e := s.schedule.Delete(c.Request.Context(), a.LifeID, c.Param("id")); e != nil {
+		fail(c, 404, "not_found", e.Error())
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+func scheduleFile(c *gin.Context) (string, []byte, error) {
+	f, h, e := c.Request.FormFile("file")
+	if e != nil {
+		return "", nil, e
+	}
+	defer f.Close()
+	data, e := io.ReadAll(f)
+	return h.Filename, data, e
+}
+func (s *Server) previewScheduleImport(c *gin.Context) {
+	name, data, e := scheduleFile(c)
+	if e != nil {
+		fail(c, 400, "validation_failed", "请上传课表文件")
+		return
+	}
+	p, e := schedule.Preview(name, data, schedule.CSVMapping{})
+	if e != nil && len(p.Items) == 0 {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, p)
+}
+func (s *Server) applyScheduleImport(c *gin.Context) {
+	name, data, e := scheduleFile(c)
+	if e != nil {
+		fail(c, 400, "validation_failed", "请上传课表文件")
+		return
+	}
+	mode := c.PostForm("mode")
+	var m schedule.CSVMapping
+	_ = json.Unmarshal([]byte(c.PostForm("mapping")), &m)
+	p, e := schedule.Preview(name, data, m)
+	if e != nil && len(p.Items) == 0 {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	a := c.MustGet("actor").(auth.Actor)
+	if e = s.schedule.Import(c.Request.Context(), a.LifeID, mode, p.Items); e != nil {
+		fail(c, 400, "validation_failed", e.Error())
+		return
+	}
+	c.JSON(200, gin.H{"imported": len(p.Items), "warnings": p.Warnings})
 }
 func (s *Server) requireActor() gin.HandlerFunc {
 	return func(c *gin.Context) {

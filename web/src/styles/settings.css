@@ -6,6 +6,24 @@
 .settings-panel { display: grid; gap: var(--gap); }
 .settings-panel .card { display: grid; gap: 12px; align-content: start; }
 .settings-panel .card .card-title { margin-bottom: 0; }
+.schedule-settings { gap: 14px; }
+.schedule-editor { display: grid; gap: 10px; margin-bottom: 16px; }
+.schedule-editor .field { display: grid; gap: 4px; min-width: 120px; }
+.schedule-editor .field span { color: var(--text-faint); font-size: 11px; }
+.schedule-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--divider); }
+.schedule-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--divider); }
+.schedule-list li span:first-child { display: grid; gap: 3px; min-width: 0; }
+.schedule-list li small { color: var(--text-faint); font-size: 11px; }
+.schedule-list-actions { display: flex; gap: 8px; }
+.empty-settings { padding: 12px 0; }
+.schedule-import-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.schedule-import-actions input[type=file] { display: none; }
+.import-preview { display: grid; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--divider); }
+.mapping-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mapping-grid label { display: grid; gap: 4px; color: var(--text-faint); font-size: 11px; }
+.import-warnings { display: grid; gap: 4px; margin: 0; padding-left: 18px; color: var(--warn); font-size: 12px; }
+.radio-field { display: inline-flex; align-items: center; gap: 5px; color: var(--text-dim); font-size: 12px; }
+@media (max-width: 700px) { .mapping-grid { grid-template-columns: 1fr; } .schedule-list li { align-items: flex-start; flex-direction: column; } }
 .presets { grid-template-columns: minmax(240px, 1fr) minmax(0, 1.6fr); }
 .track-list { display: grid; }
 .track-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; box-shadow: inset 0 -1px 0 var(--divider); }

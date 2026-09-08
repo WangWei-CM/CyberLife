@@ -98,15 +98,43 @@
 
 /* ---------- 右栏：纯当日任务清单 ---------- */
 .task-head { display: grid; gap: 8px; }
+.schedule-card { display: grid; gap: 12px; }
+.schedule-card > .card-title { margin-bottom: 0; }
+.schedule-card > .card-title small { display: inline-flex; align-items: center; gap: 5px; }
+.schedule-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; min-height: 164px; }
+.schedule-featured { position: relative; display: grid; align-content: center; gap: 7px; min-width: 0; overflow: hidden; padding: 16px; border-radius: var(--radius); background: var(--surface-2); }
+.schedule-featured.active { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--surface-2)), var(--surface-2)); }
+.schedule-featured h3 { margin: 0; font-size: clamp(20px, 2.2vw, 30px); line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-featured-kicker { color: var(--accent); font-size: 12px; font-weight: 700; }
+.schedule-location, .schedule-next-item span { margin: 0; color: var(--text-faint); font-size: 11px; }
+.schedule-time { color: var(--text-dim); font-size: 13px; }
+.schedule-progress { display: block; height: 4px; border-radius: 4px; overflow: hidden; background: var(--surface-3); }
+.schedule-progress b { display: block; width: var(--course-progress); height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent-soft), var(--accent)); box-shadow: 0 0 10px var(--accent-glow); transition: width 1s linear; }
+.schedule-empty { place-items: center; color: var(--text-faint); font-size: 12px; }
+.schedule-empty span { display: block; }
+.schedule-next-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.schedule-next-item { display: grid; align-content: center; gap: 4px; min-width: 0; padding: 10px; border: 1px solid var(--divider); border-radius: var(--radius); background: color-mix(in srgb, var(--surface) 65%, transparent); }
+.schedule-next-item small { color: var(--accent); font-size: 10px; }
+.schedule-next-item strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.schedule-next-item time { color: var(--text-dim); font-size: 11px; }
+.schedule-next-empty { opacity: .45; }
 .task-add { display: flex; gap: 6px; }
 .task-add .icon-button { flex: 0 0 36px; }
 .tasks-card { padding: 6px 18px; }
 .today-tasks { position: relative; }
 .today-tasks li { box-shadow: inset 0 -1px 0 var(--divider); }
 .today-tasks li:last-child { box-shadow: none; }
-.task-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; cursor: pointer; }
+.task-row { position: relative; z-index: 0; display: flex; align-items: center; gap: 12px; padding: 11px 0; cursor: pointer; }
+.task-row > * { position: relative; z-index: 1; }
 .task-meta { display: flex; gap: 10px; font-size: 11px; }
 .task-open-icon { color: var(--text-faint); flex: 0 0 auto; transition: transform var(--dur-fast) var(--ease-out), color var(--dur-fast); }
+.task-progress-button { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; color: var(--text-faint); background: transparent; cursor: pointer; transition: color var(--dur-fast), background var(--dur-fast), transform var(--dur-fast); }
+.task-progress-button:hover, .task-progress-button.active { color: var(--accent); background: var(--accent-soft); }
+.task-progress-button.active { animation: target-pulse 1.8s ease-in-out infinite; }
+.today-tasks li.in-progress .task-row { position: relative; overflow: hidden; }
+.today-tasks li.in-progress .task-row::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(100deg, transparent 0%, color-mix(in srgb, var(--accent) 7%, transparent) 35%, color-mix(in srgb, var(--accent) 24%, transparent) 50%, transparent 65%); background-size: 220% 100%; animation: progress-shimmer 2.2s linear infinite; }
+@keyframes progress-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes target-pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); } }
 .task-row:hover .task-open-icon { color: var(--accent); transform: translateX(3px); }
 .task-row input[type="checkbox"]:checked { animation: check-pop var(--dur-fast) var(--ease-spring); }
 .task-body { display: grid; gap: 2px; min-width: 0; flex: 1; }
@@ -157,8 +185,10 @@
   .plan-banner { grid-template-columns: 1fr; gap: 10px; }
   .banner-arrow { display: none; }
   .task-drawer { width: 100%; min-width: 0; }
+  .schedule-layout { grid-template-columns: 1fr; }
   .drawer-head, .drawer-content { padding-left: 18px; padding-right: 18px; }
 }
+@media (prefers-reduced-motion: reduce) { .task-progress-button.active, .today-tasks li.in-progress .task-row::after { animation: none; } }
 
 @media (min-width: 901px) {
   .now-page { display: grid; grid-template-rows: minmax(0, 1fr); }

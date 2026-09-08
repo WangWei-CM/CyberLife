@@ -6,20 +6,19 @@ import { ui } from '../stores/ui'
 import SegmentedControl from '../components/SegmentedControl.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
+import ScheduleSettingsPanel from '../components/ScheduleSettingsPanel.vue'
 import type { Appearance } from '../App.vue'
 
-const props = defineProps<{ appearance: Appearance; navPosition: 'top' | 'left' | 'right' | 'bottom'; pageInset: number }>()
-const emit = defineEmits<{ (event: 'update:appearance', value: Appearance): void; (event: 'update:navPosition', value: 'top' | 'left' | 'right' | 'bottom'): void; (event: 'update:pageInset', value: number): void; (event: 'logout'): void }>()
+const props = defineProps<{ appearance: Appearance; navPosition: 'top' | 'left' | 'right' | 'bottom'; pageInset: number; volume: number; carouselSeconds: number }>()
+const emit = defineEmits<{ (event: 'update:appearance', value: Appearance): void; (event: 'update:navPosition', value: 'top' | 'left' | 'right' | 'bottom'): void; (event: 'update:pageInset', value: number): void; (event: 'update:volume', value: number): void; (event: 'update:carouselSeconds', value: number): void; (event: 'logout'): void }>()
 
-type Tab = 'music' | 'presets' | 'theme' | 'keys'
+type Tab = 'music' | 'schedule' | 'presets' | 'theme' | 'keys'
 const tabs = computed(() => isWriter.value
-  ? [{ value: 'music', label: '歌单' }, { value: 'presets', label: '权限预设' }, { value: 'theme', label: '主题' }, { value: 'keys', label: '密钥' }]
+  ? [{ value: 'music', label: '歌单' }, { value: 'schedule', label: '课表' }, { value: 'presets', label: '权限预设' }, { value: 'theme', label: '主题' }, { value: 'keys', label: '密钥' }]
   : [{ value: 'theme', label: '主题' }, { value: 'music', label: '音乐' }])
 const tab = ref<Tab>((ui.pendingSettingsTab as Tab) || (isWriter.value ? 'music' : 'theme'))
 ui.pendingSettingsTab = ''
 const error = ref('')
-const volume = ref(Number(localStorage.getItem('cyberlife-volume') || 70))
-const carouselSeconds = ref(Math.round(Number(localStorage.getItem('now-plan-carousel-ms') || 6000) / 1000))
 const page = ref<PlaylistPage>('now')
 const playlists = ref<Record<PlaylistPage, Playlist | null>>({ now: null, past: null, future: null })
 const uploading = ref(false)
@@ -58,8 +57,8 @@ async function addTrack(event: Event) {
   try { await api.uploadMusicTrack(page.value, file); await loadPlaylists() } catch (cause) { fail(cause, '上传失败') } finally { uploading.value = false; input.value = '' }
 }
 async function removeTrack(id: string) { try { await api.deleteMusicTrack(id); await loadPlaylists() } catch (cause) { fail(cause, '删除失败') } }
-function saveVolume() { localStorage.setItem('cyberlife-volume', String(volume.value)); window.dispatchEvent(new Event('cyberlife-playlist-change')) }
-function saveCarousel() { localStorage.setItem('now-plan-carousel-ms', String(Math.max(2, carouselSeconds.value) * 1000)) }
+function updateVolume(value: number) { emit('update:volume', Math.min(100, Math.max(0, value))); window.dispatchEvent(new Event('cyberlife-playlist-change')) }
+function updateCarouselSeconds(value: number) { emit('update:carouselSeconds', Math.min(120, Math.max(2, value))) }
 async function loadPresets() {
   if (!isWriter.value) return
   try { const [presetResult, keyResult] = await Promise.all([api.presets(), api.readerKeysForWriter()]); presets.value = presetResult.items; readerKeys.value = keyResult.items; if (selectedPreset.value) selectPreset(presets.value.find(item => item.id === selectedPreset.value?.id) ?? null) } catch (cause) { fail(cause, '读取权限预设失败') }
@@ -108,9 +107,11 @@ onMounted(() => { loadPlaylists(); if (isWriter.value) loadPresets() })
         </template>
         <article class="card">
           <h2 class="card-title">音量<small>三页共用</small></h2>
-          <label class="volume-row"><AppIcon name="volume" :size="16" /><input v-model.number="volume" type="range" min="0" max="100" :style="{ '--range-fill': `${volume}%` }" @change="saveVolume" /><b class="mono">{{ volume }}%</b></label>
+          <label class="volume-row"><AppIcon name="volume" :size="16" /><input :value="props.volume" type="range" min="0" max="100" :style="{ '--range-fill': `${props.volume}%` }" @input="updateVolume(Number(($event.target as HTMLInputElement).value))" /><b class="mono">{{ props.volume }}%</b></label>
         </article>
       </section>
+
+      <ScheduleSettingsPanel v-else-if="tab === 'schedule'" key="schedule" />
 
       <section v-else-if="tab === 'presets'" key="presets" v-stagger class="settings-panel presets">
         <article class="card">
@@ -151,11 +152,11 @@ onMounted(() => { loadPlaylists(); if (isWriter.value) loadPresets() })
         </article>
         <article v-if="isWriter" class="card">
           <h2 class="card-title">规划横幅轮播间隔</h2>
-          <label class="form-row interval-row"><input v-model.number="carouselSeconds" type="number" min="2" max="120" @change="saveCarousel" /><span class="faint">秒</span></label>
+          <label class="form-row interval-row"><input :value="props.carouselSeconds" type="number" min="2" max="120" @change="updateCarouselSeconds(Number(($event.target as HTMLInputElement).value))" /><span class="faint">秒</span></label>
         </article>
         <article v-if="!isWriter" class="card">
           <h2 class="card-title">音量</h2>
-          <label class="volume-row"><AppIcon name="volume" :size="16" /><input v-model.number="volume" type="range" min="0" max="100" :style="{ '--range-fill': `${volume}%` }" @change="saveVolume" /><b class="mono">{{ volume }}%</b></label>
+          <label class="volume-row"><AppIcon name="volume" :size="16" /><input :value="props.volume" type="range" min="0" max="100" :style="{ '--range-fill': `${props.volume}%` }" @input="updateVolume(Number(($event.target as HTMLInputElement).value))" /><b class="mono">{{ props.volume }}%</b></label>
         </article>
       </section>
 

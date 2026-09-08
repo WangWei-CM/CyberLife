@@ -17,6 +17,11 @@ type Store struct {
 	global  *sql.DB
 }
 
+type LifeMonthRef struct {
+	LifeID   string
+	MonthKey string
+}
+
 func Open(dataDir string) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(dataDir, "lives"), 0o750); err != nil {
 		return nil, fmt.Errorf("create data directory: %w", err)
@@ -100,6 +105,37 @@ CREATE TABLE IF NOT EXISTS music_tracks (
   sort_order INTEGER NOT NULL, created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_music_tracks_playlist ON music_tracks(playlist_id, sort_order);
+CREATE TABLE IF NOT EXISTS ui_settings (
+  actor_type TEXT NOT NULL CHECK(actor_type IN ('writer','reader')),
+  actor_id TEXT NOT NULL,
+  life_id TEXT NOT NULL REFERENCES lives(id),
+  appearance TEXT NOT NULL DEFAULT 'light' CHECK(appearance IN ('dark','light','auto')),
+  nav_position TEXT NOT NULL DEFAULT 'top' CHECK(nav_position IN ('top','left','right','bottom')),
+  page_inset INTEGER NOT NULL DEFAULT 5 CHECK(page_inset BETWEEN 0 AND 20),
+  volume INTEGER NOT NULL DEFAULT 70 CHECK(volume BETWEEN 0 AND 100),
+  carousel_seconds INTEGER NOT NULL DEFAULT 6 CHECK(carousel_seconds BETWEEN 2 AND 120),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(actor_type, actor_id)
+);
+CREATE TABLE IF NOT EXISTS schedule_classes (
+  id TEXT PRIMARY KEY,
+  life_id TEXT NOT NULL REFERENCES lives(id),
+  title TEXT NOT NULL,
+  weekday INTEGER,
+  session_date TEXT,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  effective_start_date TEXT,
+  effective_end_date TEXT,
+  location TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','ics','csv')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK ((weekday BETWEEN 1 AND 7 AND session_date IS NULL) OR (weekday IS NULL AND session_date IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_schedule_classes_life_weekday ON schedule_classes(life_id, weekday);
+CREATE INDEX IF NOT EXISTS idx_schedule_classes_life_date ON schedule_classes(life_id, session_date);
 `)
 	if err != nil {
 		return fmt.Errorf("migrate global database: %w", err)
@@ -154,7 +190,7 @@ CREATE TABLE IF NOT EXISTS plan_files (id TEXT PRIMARY KEY, plan_id TEXT NOT NUL
 	}
 	for _, change := range []struct{ table, column, definition string }{
 		{"diary_entries", "visibility_preset_id", "TEXT"}, {"diary_entries", "commentable", "INTEGER NOT NULL DEFAULT 0"},
-		{"tasks", "visibility_preset_id", "TEXT"}, {"tasks", "commentable", "INTEGER NOT NULL DEFAULT 0"}, {"tasks", "secret", "INTEGER NOT NULL DEFAULT 0"},
+		{"tasks", "visibility_preset_id", "TEXT"}, {"tasks", "commentable", "INTEGER NOT NULL DEFAULT 0"}, {"tasks", "secret", "INTEGER NOT NULL DEFAULT 0"}, {"tasks", "active_started_at", "TEXT"}, {"tasks", "active_seconds", "INTEGER NOT NULL DEFAULT 0"},
 		{"mood_records", "secret", "INTEGER NOT NULL DEFAULT 0"}, {"body_records", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"content_attachments", "visibility_preset_id", "TEXT"}, {"content_attachments", "secret", "INTEGER NOT NULL DEFAULT 0"},
 		{"inbox_messages", "ref_date", "TEXT"}, {"plans", "cover_path", "TEXT"}, {"plans", "icon_path", "TEXT"}, {"plans", "sort_order", "INTEGER NOT NULL DEFAULT 0"},
@@ -246,6 +282,23 @@ func (s *Store) LifeMonths(ctx context.Context, lifeID string) ([]string, error)
 		}
 	}
 	return append([]string{current}, months...), nil
+}
+
+func (s *Store) LifeMonthRefs(ctx context.Context) ([]LifeMonthRef, error) {
+	rows, err := s.global.QueryContext(ctx, "SELECT life_id, month_key FROM life_months ORDER BY life_id, month_key")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	refs := []LifeMonthRef{}
+	for rows.Next() {
+		var ref LifeMonthRef
+		if err := rows.Scan(&ref.LifeID, &ref.MonthKey); err != nil {
+			return nil, err
+		}
+		refs = append(refs, ref)
+	}
+	return refs, rows.Err()
 }
 
 // OpenLifeMonth opens the month database for a key, creating and migrating it if necessary.

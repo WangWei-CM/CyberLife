@@ -51,15 +51,18 @@ type Diary struct {
 	Commentable bool   `json:"commentable"`
 }
 type Task struct {
-	ID          string `json:"id"`
-	TaskDate    string `json:"taskDate"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Priority    string `json:"priority"`
-	Done        bool   `json:"done"`
-	PresetID    string `json:"presetId"`
-	Secret      bool   `json:"secret"`
-	Commentable bool   `json:"commentable"`
+	ID                       string `json:"id"`
+	TaskDate                 string `json:"taskDate"`
+	Title                    string `json:"title"`
+	Description              string `json:"description"`
+	Priority                 string `json:"priority"`
+	Done                     bool   `json:"done"`
+	PresetID                 string `json:"presetId"`
+	Secret                   bool   `json:"secret"`
+	Commentable              bool   `json:"commentable"`
+	InProgress               bool   `json:"inProgress"`
+	InProgressSince          string `json:"inProgressSince,omitempty"`
+	AccumulatedActiveSeconds int64  `json:"accumulatedActiveSeconds"`
 }
 type Draft struct {
 	EntryDate string `json:"entryDate"`
@@ -578,7 +581,18 @@ func (s *Service) SetTaskDone(ctx context.Context, life, id string, done bool, t
 		return Task{}, e
 	}
 	defer db.Close()
-	result, e := db.ExecContext(ctx, "UPDATE tasks SET done=?,updated_at=? WHERE id=? AND life_id=?", done, time.Now().UTC().Format(time.RFC3339Nano), id, life)
+	tx, e := db.BeginTx(ctx, nil)
+	if e != nil {
+		return Task{}, e
+	}
+	defer tx.Rollback()
+	now := time.Now().UTC()
+	if done {
+		if e = stopTaskProgress(ctx, tx, id, now); e != nil {
+			return Task{}, e
+		}
+	}
+	result, e := tx.ExecContext(ctx, "UPDATE tasks SET done=?,updated_at=? WHERE id=? AND life_id=?", done, now.Format(time.RFC3339Nano), id, life)
 	if e != nil {
 		return Task{}, e
 	}
@@ -586,7 +600,131 @@ func (s *Service) SetTaskDone(ctx context.Context, life, id string, done bool, t
 	if n != 1 {
 		return Task{}, fmt.Errorf("任务不存在")
 	}
+	if e = tx.Commit(); e != nil {
+		return Task{}, e
+	}
 	return readTask(ctx, db, id)
+}
+
+func (s *Service) SetTaskInProgress(ctx context.Context, life, id string, active bool, taskDate string) (Task, error) {
+	at, e := taskMoment(taskDate)
+	if e != nil {
+		return Task{}, e
+	}
+	db, e := s.db(ctx, life, at)
+	if e != nil {
+		return Task{}, e
+	}
+	defer db.Close()
+	tx, e := db.BeginTx(ctx, nil)
+	if e != nil {
+		return Task{}, e
+	}
+	defer tx.Rollback()
+	var done int
+	var started sql.NullString
+	var seconds int64
+	if e = tx.QueryRowContext(ctx, "SELECT done,active_started_at,COALESCE(active_seconds,0) FROM tasks WHERE id=? AND life_id=?", id, life).Scan(&done, &started, &seconds); e != nil {
+		return Task{}, fmt.Errorf("任务不存在")
+	}
+	if active {
+		if done == 1 {
+			return Task{}, fmt.Errorf("已完成任务不能开始计时")
+		}
+		if !started.Valid {
+			_, e = tx.ExecContext(ctx, "UPDATE tasks SET active_started_at=?,updated_at=? WHERE id=? AND life_id=?", time.Now().UTC().Format(time.RFC3339Nano), time.Now().UTC().Format(time.RFC3339Nano), id, life)
+		}
+	} else if started.Valid {
+		st, _ := time.Parse(time.RFC3339Nano, started.String)
+		delta := int64(time.Since(st).Seconds())
+		if delta < 0 {
+			delta = 0
+		}
+		_, e = tx.ExecContext(ctx, "UPDATE tasks SET active_started_at=NULL,active_seconds=COALESCE(active_seconds,0)+?,updated_at=? WHERE id=? AND life_id=?", delta, time.Now().UTC().Format(time.RFC3339Nano), id, life)
+	}
+	if e != nil {
+		return Task{}, e
+	}
+	if e = tx.Commit(); e != nil {
+		return Task{}, e
+	}
+	return readTask(ctx, db, id)
+}
+
+type sqlRunner interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func stopTaskProgress(ctx context.Context, db sqlRunner, id string, now time.Time) error {
+	var started sql.NullString
+	if err := db.QueryRowContext(ctx, "SELECT active_started_at FROM tasks WHERE id=?", id).Scan(&started); err != nil {
+		return err
+	}
+	if !started.Valid {
+		return nil
+	}
+	st, e := time.Parse(time.RFC3339Nano, started.String)
+	if e != nil {
+		return e
+	}
+	delta := int64(now.Sub(st).Seconds())
+	if delta < 0 {
+		delta = 0
+	}
+	_, e = db.ExecContext(ctx, "UPDATE tasks SET active_started_at=NULL,active_seconds=COALESCE(active_seconds,0)+?,updated_at=? WHERE id=?", delta, now.Format(time.RFC3339Nano), id)
+	return e
+}
+
+func (s *Service) CloseActiveTasksAt(ctx context.Context, cutoff time.Time) error {
+	refs, e := s.store.LifeMonthRefs(ctx)
+	if e != nil {
+		return e
+	}
+	loc, _ := time.LoadLocation("Asia/Shanghai")
+	cutoff = time.Date(cutoff.In(loc).Year(), cutoff.In(loc).Month(), cutoff.In(loc).Day(), 0, 0, 0, 0, loc)
+	for _, ref := range refs {
+		db, e := s.store.OpenLifeMonth(ctx, ref.LifeID, ref.MonthKey)
+		if e != nil {
+			return e
+		}
+		rows, e := db.QueryContext(ctx, "SELECT id,active_started_at FROM tasks WHERE active_started_at IS NOT NULL")
+		if e != nil {
+			db.Close()
+			return e
+		}
+		type item struct {
+			id      string
+			started string
+		}
+		items := []item{}
+		for rows.Next() {
+			var x item
+			if e = rows.Scan(&x.id, &x.started); e != nil {
+				rows.Close()
+				db.Close()
+				return e
+			}
+			items = append(items, x)
+		}
+		rows.Close()
+		for _, x := range items {
+			st, pe := time.Parse(time.RFC3339Nano, x.started)
+			if pe != nil || !st.Before(cutoff) {
+				continue
+			}
+			delta := int64(cutoff.Sub(st).Seconds())
+			if delta < 0 {
+				delta = 0
+			}
+			if _, e = db.ExecContext(ctx, "UPDATE tasks SET active_started_at=NULL,active_seconds=COALESCE(active_seconds,0)+?,updated_at=? WHERE id=? AND active_started_at=?", delta, cutoff.UTC().Format(time.RFC3339Nano), x.id, x.started); e != nil {
+				db.Close()
+				return e
+			}
+		}
+		db.Close()
+	}
+	return nil
 }
 
 // UpdateTask changes editable task details while retaining its completion and access fields.
@@ -640,13 +778,18 @@ func (s *Service) DeleteTask(ctx context.Context, life, id, taskDate string) err
 func readTask(ctx context.Context, db *sql.DB, id string) (Task, error) {
 	var x Task
 	var done, secret, commentable int
-	e := db.QueryRowContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE id=?", id).Scan(&x.ID, &x.TaskDate, &x.Title, &x.Description, &x.Priority, &done, &x.PresetID, &secret, &commentable)
+	var active sql.NullString
+	e := db.QueryRowContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0),active_started_at,COALESCE(active_seconds,0) FROM tasks WHERE id=?", id).Scan(&x.ID, &x.TaskDate, &x.Title, &x.Description, &x.Priority, &done, &x.PresetID, &secret, &commentable, &active, &x.AccumulatedActiveSeconds)
 	if e != nil {
 		return Task{}, fmt.Errorf("任务不存在")
 	}
 	x.Done = done == 1
 	x.Secret = secret == 1
 	x.Commentable = commentable == 1
+	if active.Valid {
+		x.InProgress = true
+		x.InProgressSince = active.String
+	}
 	return x, nil
 }
 func (s *Service) Today(ctx context.Context, life string) (Diary, []MoodRecord, []BodyRecord, []Task, error) {
@@ -696,19 +839,24 @@ func (s *Service) Today(ctx context.Context, life string) (Diary, []MoodRecord, 
 	}
 	r.Close()
 	tasks := []Task{}
-	r, e = db.QueryContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0) FROM tasks WHERE task_date=? ORDER BY done,created_at", d.EntryDate)
+	r, e = db.QueryContext(ctx, "SELECT id,task_date,title,description,priority,done,COALESCE(visibility_preset_id,''),COALESCE(secret,0),COALESCE(commentable,0),active_started_at,COALESCE(active_seconds,0) FROM tasks WHERE task_date=? ORDER BY done,created_at", d.EntryDate)
 	if e != nil {
 		return d, moods, bodies, nil, e
 	}
 	for r.Next() {
 		var x Task
 		var done, secret, commentable int
-		if e = r.Scan(&x.ID, &x.TaskDate, &x.Title, &x.Description, &x.Priority, &done, &x.PresetID, &secret, &commentable); e != nil {
+		var active sql.NullString
+		if e = r.Scan(&x.ID, &x.TaskDate, &x.Title, &x.Description, &x.Priority, &done, &x.PresetID, &secret, &commentable, &active, &x.AccumulatedActiveSeconds); e != nil {
 			return d, moods, bodies, nil, e
 		}
 		x.Done = done == 1
 		x.Secret = secret == 1
 		x.Commentable = commentable == 1
+		if active.Valid {
+			x.InProgress = true
+			x.InProgressSince = active.String
+		}
 		tasks = append(tasks, x)
 	}
 	return d, moods, bodies, tasks, r.Close()

@@ -6,7 +6,8 @@ import DiaryEditor from '../components/DiaryEditor.vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
-import { api, type MoodTag, type NowData, type Plan, type Task, type TrendPoint } from '../api/client'
+import ScheduleNowCard from '../components/ScheduleNowCard.vue'
+import { api, type MoodTag, type NowData, type Plan, type Task, type TrendPoint, type ScheduleAgenda } from '../api/client'
 import { authState } from '../stores/auth'
 import { useCountUp } from '../lib/motion'
 import { addDaysISO, beijingNow, fullDateLabel, lunarLabel, monthDayLabel, timeLabel, todayISO, weekdayLabel } from '../lib/dates'
@@ -17,6 +18,7 @@ const emit = defineEmits<{ (event: 'navigate-future'): void }>()
 type CardKey = 'metrics' | 'diary'
 const DEFAULT_ORDER: CardKey[] = ['metrics', 'diary']
 const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, secretDiary: { id: '', entryDate: '', content: '', secret: true, commentable: false }, moods: [], bodies: [], tasks: [] })
+const agenda = ref<ScheduleAgenda | null>(null)
 const trend = ref<TrendPoint[]>([])
 const tags = ref<MoodTag[]>([])
 const plans = ref<Plan[]>([])
@@ -48,20 +50,22 @@ const carouselInterval = Number(localStorage.getItem('now-plan-carousel-ms') || 
 const theme = computed(() => (document.querySelector('.app-shell')?.classList.contains('light') ? 'light' : 'dark') as 'light' | 'dark')
 let saveTimer: number | undefined
 let clock: number | undefined
+let agendaTimer: number | undefined
+let dayKey = todayISO()
 
-const today = todayISO()
+const today = computed(() => dayKey)
 const dateLabel = computed(() => fullDateLabel(now.value))
 const weekday = computed(() => weekdayLabel(now.value))
 const lunar = computed(() => lunarLabel(now.value))
 const hhmm = computed(() => timeLabel(now.value))
 const seconds = computed(() => String(now.value.getSeconds()).padStart(2, '0'))
 const dayProgress = computed(() => ((now.value.getHours() * 60 + now.value.getMinutes()) / 1440) * 100)
-const activePlans = computed(() => plans.value.filter(plan => plan.startDate <= today && today <= plan.endDate && plan.progress < 100).sort((a, b) => a.endDate.localeCompare(b.endDate)))
+const activePlans = computed(() => plans.value.filter(plan => plan.startDate <= today.value && today.value <= plan.endDate && plan.progress < 100).sort((a, b) => a.endDate.localeCompare(b.endDate)))
 const bodyPoints = computed<MetricPoint[]>(() => {
   const records = [...data.value.bodies].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
   return trend.value.flatMap(point => {
     const dayAtNoon = new Date(`${point.date}T12:00:00+08:00`).getTime()
-    if (point.date !== today || !records.length) return [{ x: dayAtNoon, y: point.body, label: monthDayLabel(point.date) }]
+    if (point.date !== today.value || !records.length) return [{ x: dayAtNoon, y: point.body, label: monthDayLabel(point.date) }]
     return records.map(record => ({ x: new Date(record.recordedAt).getTime(), y: record.score, label: timeLabel(record.recordedAt) }))
   })
 })
@@ -70,11 +74,11 @@ const pendingCount = computed(() => data.value.tasks.filter(task => !task.done).
 const pendingDisplay = useCountUp(() => pendingCount.value, 400)
 const sortedTasks = computed(() => [...data.value.tasks].sort((a, b) => Number(a.done) - Number(b.done)))
 const themeClass = computed(() => document.querySelector('.app-shell')?.className.replace(/\b(shell-enter|drop-target|theme-shift)\b/g, '').trim() ?? '')
-const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today}${props.secret ? ':secret' : ''}`)
+const vaultKey = computed(() => `${authState.actor?.lifeId ?? 'life'}:${today.value}${props.secret ? ':secret' : ''}`)
 /** 绝密模式下编辑当天的绝密层日记，公开层不受影响。 */
 const activeDiary = computed(() => props.secret ? data.value.secretDiary! : data.value.diary)
 function normalize(payload: NowData): NowData {
-  return { ...payload, secretDiary: payload.secretDiary ?? { id: '', entryDate: today, content: '', secret: true, commentable: false } }
+  return { ...payload, secretDiary: payload.secretDiary ?? { id: '', entryDate: today.value, content: '', secret: true, commentable: false } }
 }
 
 function readOrder(): CardKey[] {
@@ -98,16 +102,18 @@ function onCardDragEnd() { dragCard.value = null; localStorage.setItem('now-card
 
 async function load() {
   try {
-    const [todayData, tagData, planData, history] = await Promise.all([api.today(), api.moodTags(), api.plans(), api.history(addDaysISO(today, -6), today)])
+    const [todayData, tagData, planData, history, scheduleData] = await Promise.all([api.today(), api.moodTags(), api.plans(), api.history(addDaysISO(today.value, -6), today.value), api.scheduleAgenda()])
     data.value = normalize(todayData)
     if (authState.actor?.type === 'writer') { try { presets.value = (await api.presets()).items } catch { presets.value = [] } }
     tags.value = tagData.items
     plans.value = planData.items
     trend.value = history.points
+    agenda.value = scheduleData
     if (todayData.bodies.length) bodyScore.value = todayData.bodies[todayData.bodies.length - 1].score
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' }
 }
 async function refreshToday() { try { data.value = normalize(await api.today()) } catch (cause) { error.value = cause instanceof Error ? cause.message : '读取失败' } }
+async function refreshAgenda() { try { agenda.value = await api.scheduleAgenda() } catch (cause) { error.value = cause instanceof Error ? cause.message : '课表读取失败' } }
 async function recordMood() {
   if (!selectedTags.value.length) return
   try { await api.addMood(selectedTags.value, moodNote.value.trim(), props.secret); selectedTags.value = []; moodNote.value = ''; await refreshToday(); editingMetric.value = null } catch (cause) { error.value = cause instanceof Error ? cause.message : '保存失败' }
@@ -116,7 +122,7 @@ async function recordBody() {
   try {
     await api.addBody(bodyScore.value, bodyNote.value.trim(), props.secret)
     bodyNote.value = ''
-    const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today, -6), today)])
+    const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today.value, -6), today.value)])
     data.value = normalize(todayData)
     trend.value = history.points
     editingMetric.value = null
@@ -129,7 +135,7 @@ async function deleteLastState(kind: 'mood' | 'body') {
   deletingMetric.value = true
   try {
     await api.deleteLastState(kind, props.secret)
-    const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today, -6), today)])
+    const [todayData, history] = await Promise.all([api.today(), api.history(addDaysISO(today.value, -6), today.value)])
     data.value = normalize(todayData)
     trend.value = history.points
     if (kind === 'body') bodyScore.value = todayData.bodies.at(-1)?.score ?? 70
@@ -146,6 +152,9 @@ async function toggleTask(task: Task) {
   task.done = next
   try { await api.setTaskDone(task.id, next, task.taskDate) } catch (cause) { task.done = !next; error.value = cause instanceof Error ? cause.message : '更新失败' }
 }
+async function toggleTaskProgress(task: Task) { if (task.done || taskBusy.value) return; taskBusy.value = true; try { const updated = await api.setTaskInProgress(task.id, !task.inProgress, task.taskDate); const index = data.value.tasks.findIndex(item => item.id === task.id); if (index >= 0) data.value.tasks[index] = updated; if (selectedTask.value?.id === task.id) selectedTask.value = updated } catch (cause) { error.value = cause instanceof Error ? cause.message : '进行状态更新失败' } finally { taskBusy.value = false } }
+function activeSeconds(task: Task) { const live = task.inProgress && task.inProgressSince ? Math.max(0, Math.floor((now.value.getTime() - new Date(task.inProgressSince).getTime()) / 1000)) : 0; return task.accumulatedActiveSeconds + live }
+function activeDuration(task: Task) { const seconds = activeSeconds(task); if (seconds < 60) return '不足 1 分钟'; const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60); return hours ? `${hours}小时 ${String(minutes).padStart(2, '0')}分` : `${minutes}分钟` }
 async function addTask() {
   const title = newTask.value.trim()
   if (!title) return
@@ -220,8 +229,8 @@ function startResize(event: PointerEvent) {
   event.preventDefault()
 }
 watch(() => props.secret, () => { error.value = '' })
-onMounted(() => { clock = window.setInterval(() => { now.value = beijingNow() }, 1000); load() })
-onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTimeout(saveTimer) })
+onMounted(() => { clock = window.setInterval(() => { now.value = beijingNow(); const nextDay = todayISO(); if (nextDay !== dayKey) { dayKey = nextDay; refreshToday(); refreshAgenda() } }, 1000); agendaTimer = window.setInterval(refreshAgenda, 30000); load() })
+onBeforeUnmount(() => { if (clock) clearInterval(clock); if (agendaTimer) clearInterval(agendaTimer); if (saveTimer) clearTimeout(saveTimer) })
 </script>
 
 <template>
@@ -314,19 +323,21 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
       <div class="divider-v now-divider" :class="{ dragging }" role="separator" aria-orientation="vertical" aria-label="拖动调整左右栏宽度" @pointerdown="startResize" />
 
       <aside v-stagger class="now-right">
+        <ScheduleNowCard :agenda="agenda" :now="now" />
         <section class="task-head">
           <h2 class="card-title">待办<small>{{ Math.round(pendingDisplay) }} 项未完成</small></h2>
           <form class="task-add" @submit.prevent="addTask"><input v-model="newTask" placeholder="添加今天的待办，回车保存" maxlength="120" aria-label="新待办" /><button class="icon-button" type="submit" aria-label="添加" :disabled="!newTask.trim()"><AppIcon name="plus" /></button></form>
         </section>
         <section class="card tasks-card">
           <TransitionGroup v-if="sortedTasks.length" name="list" tag="ul" class="today-tasks">
-            <li v-for="task in sortedTasks" :key="task.id" :class="{ done: task.done, [`priority-${task.priority}`]: true }">
+            <li v-for="task in sortedTasks" :key="task.id" :class="{ done: task.done, 'in-progress': task.inProgress, [`priority-${task.priority}`]: true }">
               <div class="task-row" role="button" tabindex="0" @click="openTask(task)" @keydown.enter="openTask(task)">
                 <input type="checkbox" :checked="task.done" :aria-label="`${task.title}完成状态`" @click.stop @change="toggleTask(task)" />
                 <span class="task-body">
                   <span class="task-title" :class="{ done: task.done }">{{ task.title }}</span>
-                  <small class="task-meta faint"><span>{{ task.taskDate }}</span><span>{{ task.priority === 'high' ? '高优先级' : task.priority === 'low' ? '低优先级' : '普通' }}</span></small>
+                  <small class="task-meta faint"><span>{{ task.taskDate }}</span><span>{{ task.priority === 'high' ? '高优先级' : task.priority === 'low' ? '低优先级' : '普通' }}</span><span v-if="task.inProgress || task.accumulatedActiveSeconds">已进行 {{ activeDuration(task) }}</span></small>
                 </span>
+                <button v-if="!task.done" class="task-progress-button" :class="{ active: task.inProgress }" type="button" :aria-label="task.inProgress ? `停止${task.title}的进行计时` : `开始${task.title}的进行计时`" @click.stop="toggleTaskProgress(task)"><AppIcon name="target" :size="17" /></button>
                 <AppIcon name="chevron-right" :size="15" class="task-open-icon" />
               </div>
             </li>
@@ -343,6 +354,8 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock); if (saveTimer) clearTim
               <div class="drawer-content">
                 <div class="task-drawer-status">
                   <span class="task-priority-label" :class="`priority-${selectedTask.priority}`">{{ selectedTask.priority === 'high' ? '高优先级' : selectedTask.priority === 'low' ? '低优先级' : '普通优先级' }}</span>
+                  <span v-if="selectedTask.inProgress || selectedTask.accumulatedActiveSeconds" class="faint mono">已进行 {{ activeDuration(selectedTask) }}</span>
+                  <button v-if="!selectedTask.done" class="text-button" @click="toggleTaskProgress(selectedTask)"><AppIcon name="target" :size="14" />{{ selectedTask.inProgress ? '停止计时' : '开始计时' }}</button>
                   <button class="text-button" @click="toggleTaskFromDrawer"><AppIcon :name="selectedTask.done ? 'repeat' : 'check'" :size="14" />{{ selectedTask.done ? '标记未完成' : '标记完成' }}</button>
                 </div>
                 <template v-if="taskEditing">
