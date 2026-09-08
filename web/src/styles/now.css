@@ -157,6 +157,9 @@
   .now-page .page-error { position: absolute; z-index: 3; top: var(--page-pad); left: var(--page-inline-pad); right: var(--page-inline-pad); }
   .now-layout { height: 100%; min-height: 0; align-items: stretch; }
   .now-left, .now-right { min-height: 0; overflow: auto; scrollbar-width: none; }
+  .now-left { display: flex; flex-direction: column; overflow: hidden; }
+  .now-left > :not(.diary-card) { flex: 0 0 auto; }
+  .now-left .diary-card { flex: 1 1 0; min-height: 0; overflow: auto; }
   .now-left::-webkit-scrollbar, .now-right::-webkit-scrollbar { display: none; }
   .now-left, .now-right { gap: 12px; }
   .now-clock { gap: 10px; padding: 12px 0 4px; }
