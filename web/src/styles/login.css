@@ -51,6 +51,20 @@
 .login-key-input:focus { outline: 0; border-color: rgba(118, 222, 210, .66); box-shadow: 0 0 0 1px rgba(118, 222, 210, .08), 0 0 18px rgba(118, 222, 210, .1); }
 .login-key-ring { position: absolute; right: 0; bottom: -1px; left: 0; height: 1px; pointer-events: none; background: linear-gradient(90deg, transparent, var(--login-accent), transparent); transform: scaleX(0); transform-origin: center; transition: transform .45s var(--ease-out); }
 .login-key:focus-within .login-key-ring { transform: scaleX(1); }
+.login-lyrics {
+  display: grid; gap: 3px; width: 100%; margin: 4px 0 0; color: rgba(255, 255, 255, .75);
+  font-size: 14px; line-height: 1.65; letter-spacing: .08em; text-align: left; white-space: pre-wrap;
+}
+.login-lyrics-line { display: block; min-height: 1.65em; }
+.login-lyrics-glyph {
+  display: inline-block; min-width: .08em; opacity: 0; filter: blur(8px); transform: translateY(2px);
+  animation: login-lyric-reveal 420ms var(--ease-out) var(--lyrics-delay) forwards;
+  will-change: opacity, filter, transform;
+}
+@keyframes login-lyric-reveal {
+  from { opacity: 0; filter: blur(8px); transform: translateY(2px); }
+  to { opacity: 1; filter: blur(0); transform: translateY(0); }
+}
 .login-error { min-height: 18px; margin: 0; color: #e8aa86; font: 11px/1.5 var(--font-mono); }
 .login-node-caption { color: rgba(240, 210, 155, .72); font-size: 11px; }
 .login-greeting { position: relative; color: #f4fffc; font-size: clamp(40px, 4.5vw, 64px); font-weight: 900; line-height: 1.06; letter-spacing: -.025em; -webkit-text-stroke: .35px currentColor; text-shadow: 0 8px 30px rgba(0, 0, 0, .62); }
@@ -77,6 +91,8 @@
   .login-interface { width: min(390px, calc(100vw - 32px)); margin: -12vh 16px 0; }
   .login-brand-image { width: min(360px, 100%); }
   .login-form-orbital { width: min(330px, 100%); }
+  .login-lyrics { font-size: 13px; line-height: 1.6; letter-spacing: .04em; }
+  .login-lyrics-line { min-height: 1.6em; }
   .login-welcome { width: calc(100vw - 32px); justify-items: center; gap: 9px; text-align: center; transform-origin: center top; transform: translate3d(calc(var(--node-screen-x, 50vw) - 50% + var(--node-copy-exit-x, 0px)), calc(var(--node-screen-y, 50vh) + clamp(92px, 15vh, 150px) + var(--node-copy-exit-y, 0px)), 0) scale(var(--node-copy-scale, 1)) scale(var(--node-copy-exit-scale, 1)); }
   .login-node-caption { font-size: 8px; }
   .login-greeting { font-size: clamp(28px, 8vw, 42px); }

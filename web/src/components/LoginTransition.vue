@@ -22,6 +22,26 @@ const scrambling = ref(false)
 const scramblePositioned = ref(false)
 const greetingGlyphs = ref<ScrambleGlyph[]>([])
 const quoteGlyphs = ref<ScrambleGlyph[]>([])
+const lyrics = [
+  '执念的鱼',
+  '孤独着闯过自然的甄选',
+  '文明岸边 无需誓言',
+  '我的心像重启的旧母舰',
+  '去星云巅',
+  '永别啊 我曾凝望',
+  '曾是航向的日出，末路残烛',
+  '容我吹熄 藏起火种',
+  '向宇宙远渡',
+]
+const lyricChars = lyrics.map((line, lineIndex) => ({
+  id: `lyric-line-${lineIndex}`,
+  chars: Array.from(line).map((character, characterIndex) => ({
+    id: `lyric-${lineIndex}-${characterIndex}`,
+    character,
+    delay: Math.random(),
+  })),
+}))
+const lyricsLabel = lyrics.join('\n')
 let scene: ReturnType<typeof createLoginTransition> | undefined
 let scrambleFrame = 0
 
@@ -257,6 +277,16 @@ defineExpose({
           />
           <i class="login-key-ring" aria-hidden="true" />
         </label>
+        <p class="login-lyrics" :aria-label="lyricsLabel">
+          <span v-for="line in lyricChars" :key="line.id" class="login-lyrics-line" aria-hidden="true">
+            <span
+              v-for="glyph in line.chars"
+              :key="glyph.id"
+              class="login-lyrics-glyph"
+              :style="{ '--lyrics-delay': `${glyph.delay}s` }"
+            >{{ glyph.character }}</span>
+          </span>
+        </p>
       </form>
       <p class="login-error" role="alert" aria-live="polite">{{ error }}</p>
     </section>
