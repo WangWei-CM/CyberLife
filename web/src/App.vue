@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { authState, displayName, isAdmin, isWriter, logout, restoreSession, signIn } from './stores/auth'
 import { ui } from './stores/ui'
-import { type Actor, type Notice } from './api/client'
+import { api, type Actor, type Notice, type UISettings } from './api/client'
 import { DUR, reducedMotion, transitionTheme } from './lib/motion'
 import { isDaytime } from './lib/dates'
 import AppIcon from './components/AppIcon.vue'
@@ -11,7 +11,6 @@ import NotificationCenter from './components/NotificationCenter.vue'
 import LoginView from './views/LoginView.vue'
 import AdminLoginView from './views/AdminLoginView.vue'
 import AdminView from './views/AdminView.vue'
-import NowView from './views/NowView.vue'
 import ReaderView from './views/ReaderView.vue'
 import PastView from './views/PastView.vue'
 import FutureView from './views/FutureView.vue'
@@ -41,6 +40,10 @@ const navPosition = ref<NavPosition>((localStorage.getItem('cyberlife-nav-positi
 const appearance = ref<Appearance>(initialAppearance)
 const storedPageInset = Number(localStorage.getItem('cyberlife-page-inset'))
 const pageInset = ref(Number.isFinite(storedPageInset) ? Math.min(20, Math.max(0, storedPageInset)) : 5)
+const storedVolume = Number(localStorage.getItem('cyberlife-volume'))
+const volume = ref(Number.isFinite(storedVolume) ? Math.min(100, Math.max(0, storedVolume)) : 70)
+const storedCarouselSeconds = Math.round(Number(localStorage.getItem('now-plan-carousel-ms')) / 1000)
+const carouselSeconds = ref(Number.isFinite(storedCarouselSeconds) ? Math.min(120, Math.max(2, storedCarouselSeconds)) : 6)
 const secretMode = ref(localStorage.getItem('cyberlife-secret-mode') === 'true')
 const isAdminPath = window.location.pathname === '/admin'
 const shell = ref<HTMLElement>()
@@ -52,6 +55,8 @@ const entering = ref(false)
 let minuteTimer: number | undefined
 let enterTimer: number | undefined
 let navObserver: ResizeObserver | undefined
+let settingsSaveTimer: number | undefined
+let applyingRemoteSettings = false
 
 const resolvedAppearance = computed<'dark' | 'light'>(() => {
   void minute.value
@@ -76,10 +81,12 @@ function navigate(next: Screen) {
   const current = pageTheme.value
   const target = next === 'settings' ? 'now' : next
   const apply = () => { screen.value = next }
-  const doc = document as Document & { startViewTransition?: (callback: () => void) => { finished: Promise<void> } }
+  const doc = document as Document & { startViewTransition?: (callback: () => void | Promise<void>) => { finished: Promise<void> } }
   if (doc.startViewTransition && current !== target && !reducedMotion()) {
     document.documentElement.dataset.transition = `from-${current}-to-${target}`
-    doc.startViewTransition(apply).finished.finally(() => { delete document.documentElement.dataset.transition })
+    // Vue 会把响应式 DOM 更新批量推迟到微任务；等待 nextTick 后再让浏览器捕获新页面。
+    // 否则 View Transition 的回调会过早完成，真实页面先切换，动画才随后出现。
+    doc.startViewTransition(async () => { apply(); await nextTick() }).finished.finally(() => { delete document.documentElement.dataset.transition })
   } else apply()
 }
 function step(direction: -1 | 1) {
@@ -115,10 +122,49 @@ function onLoginTransitionComplete(actor: Actor) {
   signIn(actor)
 }
 
-watch(appearance, value => localStorage.setItem('cyberlife-theme', value))
-watch(pageInset, value => localStorage.setItem('cyberlife-page-inset', String(value)))
+function settingsSnapshot(): UISettings {
+  return { appearance: appearance.value, navPosition: navPosition.value, pageInset: pageInset.value, volume: volume.value, carouselSeconds: carouselSeconds.value }
+}
+function cacheSettings() {
+  localStorage.setItem('cyberlife-theme', appearance.value)
+  localStorage.setItem('cyberlife-nav-position', navPosition.value)
+  localStorage.setItem('cyberlife-page-inset', String(pageInset.value))
+  localStorage.setItem('cyberlife-volume', String(volume.value))
+  localStorage.setItem('now-plan-carousel-ms', String(carouselSeconds.value * 1000))
+}
+function scheduleSettingsSave() {
+  cacheSettings()
+  if (applyingRemoteSettings || !authState.actor || isAdmin.value) return
+  if (settingsSaveTimer) window.clearTimeout(settingsSaveTimer)
+  settingsSaveTimer = window.setTimeout(() => {
+    settingsSaveTimer = undefined
+    api.saveUISettings(settingsSnapshot()).catch(() => undefined)
+  }, 300)
+}
+async function loadSettings() {
+  if (!authState.actor || isAdmin.value) return
+  try {
+    const remote = await api.uiSettings()
+    applyingRemoteSettings = true
+    appearance.value = remote.appearance
+    navPosition.value = remote.navPosition
+    pageInset.value = remote.pageInset
+    volume.value = remote.volume
+    carouselSeconds.value = remote.carouselSeconds
+    cacheSettings()
+  } catch {
+    // 本地缓存仅作为离线回退；下一次成功同步会以服务端设置为准。
+  } finally {
+    applyingRemoteSettings = false
+  }
+}
+
+watch(appearance, scheduleSettingsSave)
+watch(pageInset, scheduleSettingsSave)
+watch(volume, scheduleSettingsSave)
+watch(carouselSeconds, scheduleSettingsSave)
 watch(secretMode, value => localStorage.setItem('cyberlife-secret-mode', String(value)))
-watch(navPosition, value => { localStorage.setItem('cyberlife-nav-position', value); nextTick(updateIndicator) })
+watch(navPosition, () => { scheduleSettingsSave(); nextTick(updateIndicator) })
 watch(screen, () => nextTick(updateIndicator))
 watch([screen, resolvedAppearance], ([currentScreen, currentAppearance]) => {
   sessionStorage.setItem('cyberlife-underlay-screen', currentScreen)
@@ -126,6 +172,7 @@ watch([screen, resolvedAppearance], ([currentScreen, currentAppearance]) => {
 }, { immediate: true })
 watch(() => authState.actor, actor => {
   if (!actor) { navObserver?.disconnect(); navObserver = undefined; return }
+  void loadSettings()
   if (authState.justLoggedIn) {
     entering.value = true
     if (enterTimer) clearTimeout(enterTimer)
@@ -144,7 +191,7 @@ onMounted(() => {
   minuteTimer = window.setInterval(() => { minute.value = Date.now() }, 60_000)
   window.addEventListener('keydown', onKey)
 })
-onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTimer) clearTimeout(enterTimer); navObserver?.disconnect(); window.removeEventListener('keydown', onKey) })
+onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTimer) clearTimeout(enterTimer); if (settingsSaveTimer) clearTimeout(settingsSaveTimer); navObserver?.disconnect(); window.removeEventListener('keydown', onKey) })
 </script>
 
 <template>
@@ -154,6 +201,11 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
   <div v-else ref="shell" class="app-shell" :class="shellClass" :style="shellStyle" @dragover.prevent @dragleave="dropTarget = false" @drop.prevent="onDrop">
     <header class="topbar">
       <span class="topbar-grip" draggable="true" title="拖到屏幕边缘可改变位置" @dragstart="onGripDrag" @dragend="dropTarget = false"><AppIcon name="grip" :size="16" /></span>
+      <div class="brand-lockup">
+        <button class="brand-arrow" type="button" :disabled="!canGoBack" aria-label="切换到过去" @click="step(-1)"><AppIcon name="chevron-left" :size="28" /></button>
+        <button class="brand-mark" type="button" :aria-label="`当前页面：${pageTheme}`" @click="navigate('now')"><strong>{{ pageTheme === 'now' ? '现在' : pageTheme === 'past' ? '过去' : '未来' }}</strong></button>
+        <button class="brand-arrow" type="button" :disabled="!canGoForward" aria-label="切换到未来" @click="step(1)"><AppIcon name="chevron-right" :size="28" /></button>
+      </div>
       <div v-if="!isAdmin" class="topbar-center">
         <button class="topbar-arrow" :disabled="!canGoBack" aria-label="上一页" @click="step(-1)"><AppIcon name="chevron-left" :size="20" /></button>
         <nav ref="nav" class="screen-nav" aria-label="页面导航">
@@ -163,7 +215,7 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
         <button class="topbar-arrow" :disabled="!canGoForward" aria-label="下一页" @click="step(1)"><AppIcon name="chevron-right" :size="20" /></button>
       </div>
       <div class="topbar-tools">
-        <MusicControl v-if="!isAdmin" :page="musicPage" />
+        <MusicControl v-if="!isAdmin" :page="musicPage" :volume="volume" @update:volume="volume = $event" />
         <button v-glow class="icon-button" :aria-label="resolvedAppearance === 'dark' ? '切换为亮色' : '切换为暗色'" @click="toggleAppearance">
           <span class="icon-morph"><AppIcon name="sun" :class="{ on: resolvedAppearance === 'light' }" /><AppIcon name="moon" :class="{ on: resolvedAppearance === 'dark' }" /></span>
         </button>
@@ -180,9 +232,8 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
       <AdminView v-if="isAdmin" />
       <PastView v-else-if="screen === 'past'" :secret="secretActive" />
       <FutureView v-else-if="screen === 'future'" />
-      <SettingsView v-else-if="screen === 'settings'" :appearance="appearance" :nav-position="navPosition" :page-inset="pageInset" @update:appearance="setAppearance" @update:nav-position="navPosition = $event" @update:page-inset="pageInset = $event" @logout="logout" />
-      <NowView v-else-if="isWriter" :secret="secretActive" @navigate-future="navigate('future')" />
-      <ReaderView v-else />
+      <SettingsView v-else-if="screen === 'settings'" :appearance="appearance" :nav-position="navPosition" :page-inset="pageInset" :volume="volume" :carousel-seconds="carouselSeconds" @update:appearance="setAppearance" @update:nav-position="navPosition = $event" @update:page-inset="pageInset = $event" @update:volume="volume = $event" @update:carousel-seconds="carouselSeconds = $event" @logout="logout" />
+      <ReaderView v-else :writer="isWriter" :secret="secretActive" />
     </div>
   </div>
 </template>
