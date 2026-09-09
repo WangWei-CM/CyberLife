@@ -11,6 +11,7 @@ import NotificationCenter from './components/NotificationCenter.vue'
 import LoginView from './views/LoginView.vue'
 import AdminLoginView from './views/AdminLoginView.vue'
 import AdminView from './views/AdminView.vue'
+import NowView from './views/NowView.vue'
 import ReaderView from './views/ReaderView.vue'
 import PastView from './views/PastView.vue'
 import FutureView from './views/FutureView.vue'
@@ -233,7 +234,8 @@ onBeforeUnmount(() => { if (minuteTimer) clearInterval(minuteTimer); if (enterTi
       <PastView v-else-if="screen === 'past'" :secret="secretActive" />
       <FutureView v-else-if="screen === 'future'" />
       <SettingsView v-else-if="screen === 'settings'" :appearance="appearance" :nav-position="navPosition" :page-inset="pageInset" :volume="volume" :carousel-seconds="carouselSeconds" @update:appearance="setAppearance" @update:nav-position="navPosition = $event" @update:page-inset="pageInset = $event" @update:volume="volume = $event" @update:carousel-seconds="carouselSeconds = $event" @logout="logout" />
-      <ReaderView v-else :writer="isWriter" :secret="secretActive" />
+      <NowView v-else-if="isWriter" :secret="secretActive" @navigate-future="navigate('future')" />
+      <ReaderView v-else />
     </div>
   </div>
 </template>

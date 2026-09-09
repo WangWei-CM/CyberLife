@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
 import { api, type Comment, type Milestone, type NowData } from '../api/client'
 import { beijingNow, lunarLabel, monthDayLabel, timeLabel, weekdayLabel } from '../lib/dates'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 
-const props = withDefaults(defineProps<{ writer?: boolean; secret?: boolean }>(), { writer: false, secret: false })
-const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, secretDiary: { id: '', entryDate: '', content: '', secret: true, commentable: false }, moods: [], bodies: [], tasks: [] })
+const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, moods: [], bodies: [], tasks: [] })
 const comments = ref<Comment[]>([])
 const milestones = ref<Milestone[]>([])
 const error = ref('')
@@ -21,17 +20,11 @@ const lunar = computed(() => lunarLabel(now.value))
 const hhmm = computed(() => timeLabel(now.value))
 const seconds = computed(() => String(now.value.getSeconds()).padStart(2, '0'))
 const theme = computed(() => (document.querySelector('.app-shell')?.classList.contains('light') ? 'light' : 'dark') as 'light' | 'dark')
-const activeDiary = computed(() => {
-  if (!props.writer || !props.secret) return data.value.diary
-  return data.value.secretDiary ?? { ...data.value.diary, id: '', content: '', secret: true, commentable: false }
-})
-
 async function load() {
   try {
-    data.value = props.writer ? await api.today() : await api.visibleToday()
-    const diary = activeDiary.value
-    if (diary.id) {
-      const [commentResult, milestoneResult] = await Promise.all([api.comments('diary', diary.id), api.milestones('diary', diary.id)])
+    data.value = await api.visibleToday()
+    if (data.value.diary.id) {
+      const [commentResult, milestoneResult] = await Promise.all([api.comments('diary', data.value.diary.id), api.milestones('diary', data.value.diary.id)])
       comments.value = commentResult.items
       milestones.value = milestoneResult.items
     } else { comments.value = []; milestones.value = [] }
@@ -39,10 +32,9 @@ async function load() {
 }
 async function addComment() {
   const text = comment.value.trim()
-  if (!activeDiary.value.id || !text) return
-  try { await api.addComment('diary', activeDiary.value.id, text); comment.value = ''; comments.value = (await api.comments('diary', activeDiary.value.id)).items } catch (cause) { error.value = cause instanceof Error ? cause.message : '评论失败' }
+  if (!data.value.diary.id || !text) return
+  try { await api.addComment('diary', data.value.diary.id, text); comment.value = ''; comments.value = (await api.comments('diary', data.value.diary.id)).items } catch (cause) { error.value = cause instanceof Error ? cause.message : '评论失败' }
 }
-watch(() => [props.writer, props.secret], () => { comment.value = ''; void load() })
 onMounted(() => { load(); clock = window.setInterval(() => { now.value = beijingNow() }, 1000) })
 onBeforeUnmount(() => { if (clock) clearInterval(clock) })
 </script>
@@ -56,17 +48,17 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock) })
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
     <div v-stagger class="reader-grid">
       <article class="card reader-diary">
-        <header class="card-head"><h2>今日日记</h2><small class="faint mono">{{ activeDiary.entryDate }}</small></header>
+        <header class="card-head"><h2>今日日记</h2><small class="faint mono">{{ data.diary.entryDate }}</small></header>
         <div v-if="milestones.length" class="monument">
           <span class="milestone-badge"><AppIcon name="medal" :size="14" />里程碑</span>
           <h2 v-for="item in milestones" :key="item.id" class="monument-title">{{ item.description }}<small v-if="item.detail">{{ item.detail }}</small></h2>
         </div>
-        <MarkdownPreview v-if="activeDiary.id" :editor-id="props.secret ? 'reader-diary-secret' : 'reader-diary'" :model-value="activeDiary.content" :theme="theme" theme-class="theme-now" />
+        <MarkdownPreview v-if="data.diary.id" editor-id="reader-diary" :model-value="data.diary.content" :theme="theme" theme-class="theme-now" />
         <EmptyState v-else icon="book" text="今天没有你可以查看的日记" />
-        <section v-if="activeDiary.id && (comments.length || activeDiary.commentable)" class="past-comments">
+        <section v-if="data.diary.id && (comments.length || data.diary.commentable)" class="past-comments">
           <h3 class="card-title">评论<small v-if="comments.length">{{ comments.length }}</small></h3>
           <ul class="comment-list"><li v-for="item in comments" :key="item.id"><p>{{ item.content }}</p><small class="mono faint">{{ timeLabel(item.createdAt) }}</small></li></ul>
-          <form v-if="activeDiary.commentable" class="comment-form" @submit.prevent="addComment"><input v-model="comment" placeholder="写下评论" maxlength="500" /><button class="icon-button" type="submit" aria-label="发送" :disabled="!comment.trim()"><AppIcon name="send" :size="16" /></button></form>
+          <form v-if="data.diary.commentable" class="comment-form" @submit.prevent="addComment"><input v-model="comment" placeholder="写下评论" maxlength="500" /><button class="icon-button" type="submit" aria-label="发送" :disabled="!comment.trim()"><AppIcon name="send" :size="16" /></button></form>
         </section>
       </article>
       <div class="reader-side">
