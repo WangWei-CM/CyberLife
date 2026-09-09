@@ -373,7 +373,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   warmLight.position.set(-4, -3, 4)
   scene.add(ambient, keyLight, rimLight, warmLight)
 
-  const starCount = mobile ? 650 : 1_450
+  const starCount = mobile ? 1_050 : 2_600
   const starPositions = new Float32Array(starCount * 3)
   const starColors = new Float32Array(starCount * 3)
   for (let index = 0; index < starCount; index += 1) {
@@ -391,12 +391,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const starGeometry = new THREE.BufferGeometry()
   starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
   starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
-  const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .05 : .065, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true }))
+  const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .045 : .058, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true }))
   scene.add(stars)
 
   // A second, finer dust layer drifts at a different speed to keep the black
   // background alive without turning it into a dense star field.
-  const dustCount = mobile ? 180 : 420
+  const dustCount = mobile ? 420 : 950
   const dustPositions = new Float32Array(dustCount * 3)
   const dustColors = new Float32Array(dustCount * 3)
   for (let index = 0; index < dustCount; index += 1) {
@@ -416,7 +416,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   dustGeometry.setAttribute('color', new THREE.BufferAttribute(dustColors, 3))
   const driftingStars = new THREE.Points(
     dustGeometry,
-    new THREE.PointsMaterial({ size: mobile ? .028 : .04, vertexColors: true, transparent: true, opacity: .86, sizeAttenuation: true }),
+    new THREE.PointsMaterial({ size: mobile ? .025 : .034, vertexColors: true, transparent: true, opacity: .92, sizeAttenuation: true }),
   )
   scene.add(driftingStars)
 
@@ -449,7 +449,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const surfaceGlowMaterial = new THREE.MeshBasicMaterial({
     color: 0x2cff9a,
     transparent: true,
-    opacity: .14,
+    opacity: .18,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   })
@@ -459,6 +459,21 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   )
   surfaceGlow.rotation.z = -.22
   earthGroup.add(surfaceGlow)
+  const surfaceHaloMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    side: THREE.BackSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { uOpacity: { value: .08 } },
+    vertexShader: `varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ vec4 worldPosition = modelMatrix * vec4(position, 1.0); vWorldNormal = normalize(mat3(modelMatrix) * normal); vViewDirection = normalize(cameraPosition - worldPosition.xyz); gl_Position = projectionMatrix * viewMatrix * worldPosition; }`,
+    fragmentShader: `uniform float uOpacity; varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ float edge = 1.0 - abs(dot(normalize(vWorldNormal), normalize(vViewDirection))); float rim = pow(clamp(edge, 0.0, 1.0), 2.4); gl_FragColor = vec4(0.12, 0.92, 0.42, rim * uOpacity); }`,
+  })
+  const surfaceHalo = new THREE.Mesh(
+    new THREE.SphereGeometry(earthRadius * 1.034, sphereSegments, sphereSegments),
+    surfaceHaloMaterial,
+  )
+  surfaceHalo.rotation.z = -.22
+  earthGroup.add(surfaceHalo)
   let earthTextureDisposed = false
   new THREE.TextureLoader().load('/textures/earth-day-blue-marble.jpg', texture => {
     if (earthTextureDisposed) { texture.dispose(); return }
@@ -710,6 +725,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     driftingStars.rotation.x = time * .000003
     earth.rotation.y = time * .000035
     surfaceGlow.rotation.y = -time * .000042
+    surfaceHalo.rotation.y = -time * .00003
     clouds.visible = true
     cloudHighlight.visible = true
     clouds.rotation.y = time * .000052
@@ -729,7 +745,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       earthGroup.visible = gatherProgress < .68
       const earthFade = 1 - clamp(gatherProgress / .68)
       ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
-      surfaceGlowMaterial.opacity = .14 * earthFade
+      surfaceGlowMaterial.opacity = .18 * earthFade
+      surfaceHaloMaterial.uniforms.uOpacity.value = .08 * earthFade
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
       atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
@@ -840,7 +857,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       nodeGlow.intensity = 0
       earthGroup.visible = true
       ;(earth.material as THREE.MeshStandardMaterial).opacity = 1
-      surfaceGlowMaterial.opacity = .14
+      surfaceGlowMaterial.opacity = .18
+      surfaceHaloMaterial.uniforms.uOpacity.value = .08
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
       atmosphereMaterial.uniforms.uOpacity.value = .16
