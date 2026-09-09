@@ -391,7 +391,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const starGeometry = new THREE.BufferGeometry()
   starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
   starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
-  const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .035 : .045, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true }))
+  const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .105 : .135, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true }))
   scene.add(stars)
 
   // A second, finer dust layer drifts at a different speed to keep the black
@@ -416,7 +416,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   dustGeometry.setAttribute('color', new THREE.BufferAttribute(dustColors, 3))
   const driftingStars = new THREE.Points(
     dustGeometry,
-    new THREE.PointsMaterial({ size: mobile ? .02 : .028, vertexColors: true, transparent: true, opacity: .92, sizeAttenuation: true }),
+    new THREE.PointsMaterial({ size: mobile ? .06 : .084, vertexColors: true, transparent: true, opacity: .92, sizeAttenuation: true }),
   )
   scene.add(driftingStars)
 
@@ -451,12 +451,12 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     side: THREE.BackSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { uOpacity: { value: .28 } },
+    uniforms: { uOpacity: { value: .38 } },
     vertexShader: `varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ vec4 worldPosition = modelMatrix * vec4(position, 1.0); vWorldNormal = normalize(mat3(modelMatrix) * normal); vViewDirection = normalize(cameraPosition - worldPosition.xyz); gl_Position = projectionMatrix * viewMatrix * worldPosition; }`,
-    fragmentShader: `uniform float uOpacity; varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ float edge = 1.0 - abs(dot(normalize(vWorldNormal), normalize(vViewDirection))); float rim = pow(clamp(edge, 0.0, 1.0), 2.4); gl_FragColor = vec4(0.12, 0.92, 0.42, rim * uOpacity); }`,
+    fragmentShader: `uniform float uOpacity; varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ float edge = 1.0 - abs(dot(normalize(vWorldNormal), normalize(vViewDirection))); float innerFade = smoothstep(0.08, 0.36, edge); float outerFade = 1.0 - smoothstep(0.72, 1.0, edge); float rim = innerFade * outerFade; gl_FragColor = vec4(0.12, 0.92, 0.42, rim * uOpacity); }`,
   })
   const surfaceHalo = new THREE.Mesh(
-    new THREE.SphereGeometry(earthRadius * 1.018, sphereSegments, sphereSegments),
+    new THREE.SphereGeometry(earthRadius * 1.054, sphereSegments, sphereSegments),
     surfaceHaloMaterial,
   )
   surfaceHalo.rotation.z = -.22
@@ -731,7 +731,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       earthGroup.visible = gatherProgress < .68
       const earthFade = 1 - clamp(gatherProgress / .68)
       ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
-      surfaceHaloMaterial.uniforms.uOpacity.value = .28 * earthFade
+      surfaceHaloMaterial.uniforms.uOpacity.value = .38 * earthFade
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
       atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
@@ -842,7 +842,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       nodeGlow.intensity = 0
       earthGroup.visible = true
       ;(earth.material as THREE.MeshStandardMaterial).opacity = 1
-      surfaceHaloMaterial.uniforms.uOpacity.value = .28
+      surfaceHaloMaterial.uniforms.uOpacity.value = .38
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
       atmosphereMaterial.uniforms.uOpacity.value = .16
