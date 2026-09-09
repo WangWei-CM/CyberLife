@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
-import { api, type Comment, type Milestone, type NowData, type Task } from '../api/client'
+import { api, type Comment, type Milestone, type NowData, type ScheduleAgenda, type Task } from '../api/client'
 import { beijingNow, fullDateLabel, lunarLabel, timeLabel, weekdayLabel } from '../lib/dates'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
+import ScheduleNowCard from '../components/ScheduleNowCard.vue'
 
 const data = ref<NowData>({ diary: { id: '', entryDate: '', content: '', secret: false, commentable: false }, moods: [], bodies: [], tasks: [] })
 const comments = ref<Comment[]>([])
 const milestones = ref<Milestone[]>([])
+const agenda = ref<ScheduleAgenda | null>(null)
 const error = ref('')
 const comment = ref('')
 const now = ref(beijingNow())
@@ -38,7 +40,9 @@ function activeDuration(task: Task) {
 
 async function load() {
   try {
-    data.value = await api.visibleToday()
+    const [todayData, scheduleData] = await Promise.all([api.visibleToday(), api.scheduleAgenda().catch(() => null)])
+    data.value = todayData
+    agenda.value = scheduleData
     if (data.value.diary.id) {
       const [commentResult, milestoneResult] = await Promise.all([api.comments('diary', data.value.diary.id), api.milestones('diary', data.value.diary.id)])
       comments.value = commentResult.items
@@ -113,12 +117,7 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock) })
       <div class="divider-v now-divider" role="separator" aria-orientation="vertical" aria-label="左右栏分隔" />
 
       <aside v-stagger class="now-right reader-writer-right">
-        <section v-if="milestones.length" class="card reader-milestones-card">
-          <header class="card-title"><span class="card-title-main">里程碑</span><small>{{ milestones.length }} 项</small></header>
-          <ul class="reader-list">
-            <li v-for="item in milestones" :key="item.id"><span class="milestone-badge"><AppIcon name="medal" :size="14" /></span><span><b>{{ item.description }}</b><small v-if="item.detail" class="faint">{{ item.detail }}</small></span></li>
-          </ul>
-        </section>
+        <ScheduleNowCard :agenda="agenda" :now="now" />
         <section v-if="activeTasks.length" class="task-progress-section">
           <header class="task-head task-progress-head"><h2 class="card-title">进行中<small>{{ activeTasks.length }} 项正在进行</small></h2></header>
           <section class="card tasks-card task-progress-card reader-tasks-card">
@@ -131,6 +130,12 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock) })
               </li>
             </ul>
           </section>
+        </section>
+        <section v-if="milestones.length" class="card reader-milestones-card">
+          <header class="card-title"><span class="card-title-main">里程碑</span><small>{{ milestones.length }} 项</small></header>
+          <ul class="reader-list">
+            <li v-for="item in milestones" :key="item.id"><span class="milestone-badge"><AppIcon name="medal" :size="14" /></span><span><b>{{ item.description }}</b><small v-if="item.detail" class="faint">{{ item.detail }}</small></span></li>
+          </ul>
         </section>
         <section class="task-head"><h2 class="card-title">待办<small>{{ todoTasks.filter(task => !task.done).length }} 项未完成</small></h2></section>
         <section class="card tasks-card reader-tasks-card">
