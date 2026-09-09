@@ -394,6 +394,22 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const starMaterial = new THREE.PointsMaterial({ size: mobile ? .105 : .135, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true })
   const stars = new THREE.Points(starGeometry, starMaterial)
   scene.add(stars)
+  const starBasePositions = starPositions.slice()
+  const starSpreadDirections = new Float32Array(starCount * 2)
+  for (let index = 0; index < starCount; index += 1) {
+    const x = starBasePositions[index * 3]
+    const y = starBasePositions[index * 3 + 1]
+    const length = Math.hypot(x, y)
+    if (length > .001) {
+      starSpreadDirections[index * 2] = x / length
+      starSpreadDirections[index * 2 + 1] = y / length
+    } else {
+      const angle = seeded(index + 1_120) * TAU
+      starSpreadDirections[index * 2] = Math.cos(angle)
+      starSpreadDirections[index * 2 + 1] = Math.sin(angle)
+    }
+  }
+  const starPositionAttribute = starGeometry.getAttribute('position') as THREE.BufferAttribute
 
   // A second, finer dust layer drifts at a different speed to keep the black
   // background alive without turning it into a dense star field.
@@ -421,6 +437,22 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     dustMaterial,
   )
   scene.add(driftingStars)
+  const dustBasePositions = dustPositions.slice()
+  const dustSpreadDirections = new Float32Array(dustCount * 2)
+  for (let index = 0; index < dustCount; index += 1) {
+    const x = dustBasePositions[index * 3]
+    const y = dustBasePositions[index * 3 + 1]
+    const length = Math.hypot(x, y)
+    if (length > .001) {
+      dustSpreadDirections[index * 2] = x / length
+      dustSpreadDirections[index * 2 + 1] = y / length
+    } else {
+      const angle = seeded(index + 2_120) * TAU
+      dustSpreadDirections[index * 2] = Math.cos(angle)
+      dustSpreadDirections[index * 2 + 1] = Math.sin(angle)
+    }
+  }
+  const dustPositionAttribute = dustGeometry.getAttribute('position') as THREE.BufferAttribute
 
   // Keep the procedural fallback light; the high-resolution public-domain map
   // below replaces it as soon as the browser finishes loading the asset.
@@ -648,6 +680,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   let stage: LoginTransitionStage = 'orbital-login'
   let stageStarted = performance.now()
   let completionTimer: number | undefined
+  let starSpreadProgress = -1
   const transitionRoot = canvas.closest<HTMLElement>('.login-transition')
   const nodeScreenPosition = new THREE.Vector3()
   const nodeAngularVelocity = new THREE.Vector3()
@@ -707,11 +740,24 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const chipExitProgress = clamp(fallLinear * 2)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
     const pageProgress = easeOutCubic(elapsed / PAGE_ENTER_MS)
-    const starFade = stage === 'node-fall'
-      ? Math.pow(1 - fallProgress, 1.35)
-      : stage === 'page-enter' || stage === 'complete' ? 0 : 1
-    starMaterial.opacity = starFade
-    dustMaterial.opacity = .92 * starFade
+    const nextStarSpreadProgress = stage === 'node-fall'
+      ? easeOutCubic(fallProgress)
+      : stage === 'page-enter' || stage === 'complete' ? 1 : 0
+    if (nextStarSpreadProgress !== starSpreadProgress) {
+      const starSpread = nextStarSpreadProgress * (mobile ? 18 : 28)
+      const dustSpread = nextStarSpreadProgress * (mobile ? 22 : 34)
+      for (let index = 0; index < starCount; index += 1) {
+        starPositionAttribute.array[index * 3] = starBasePositions[index * 3] + starSpreadDirections[index * 2] * starSpread
+        starPositionAttribute.array[index * 3 + 1] = starBasePositions[index * 3 + 1] + starSpreadDirections[index * 2 + 1] * starSpread
+      }
+      for (let index = 0; index < dustCount; index += 1) {
+        dustPositionAttribute.array[index * 3] = dustBasePositions[index * 3] + dustSpreadDirections[index * 2] * dustSpread
+        dustPositionAttribute.array[index * 3 + 1] = dustBasePositions[index * 3 + 1] + dustSpreadDirections[index * 2 + 1] * dustSpread
+      }
+      starPositionAttribute.needsUpdate = true
+      dustPositionAttribute.needsUpdate = true
+      starSpreadProgress = nextStarSpreadProgress
+    }
 
     stars.rotation.y = time * .000008
     stars.rotation.x = Math.sin(time * .000015) * .012
