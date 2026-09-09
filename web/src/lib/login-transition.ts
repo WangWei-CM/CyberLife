@@ -451,9 +451,9 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     side: THREE.BackSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-    uniforms: { uOpacity: { value: .38 } },
+    uniforms: { uOpacity: { value: .3 } },
     vertexShader: `varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ vec4 worldPosition = modelMatrix * vec4(position, 1.0); vWorldNormal = normalize(mat3(modelMatrix) * normal); vViewDirection = normalize(cameraPosition - worldPosition.xyz); gl_Position = projectionMatrix * viewMatrix * worldPosition; }`,
-    fragmentShader: `uniform float uOpacity; varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ float edge = 1.0 - abs(dot(normalize(vWorldNormal), normalize(vViewDirection))); float innerFade = smoothstep(0.08, 0.36, edge); float outerFade = 1.0 - smoothstep(0.72, 1.0, edge); float rim = innerFade * outerFade; gl_FragColor = vec4(0.12, 0.92, 0.42, rim * uOpacity); }`,
+    fragmentShader: `uniform float uOpacity; varying vec3 vWorldNormal; varying vec3 vViewDirection; void main(){ float edge = 1.0 - abs(dot(normalize(vWorldNormal), normalize(vViewDirection))); float innerFade = smoothstep(0.28, 0.68, edge); float outerFade = 1.0 - smoothstep(0.72, 1.0, edge); float rim = innerFade * outerFade; gl_FragColor = vec4(0.12, 0.92, 0.42, rim * uOpacity); }`,
   })
   const surfaceHalo = new THREE.Mesh(
     new THREE.SphereGeometry(earthRadius * 1.054, sphereSegments, sphereSegments),
@@ -731,7 +731,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       earthGroup.visible = gatherProgress < .68
       const earthFade = 1 - clamp(gatherProgress / .68)
       ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
-      surfaceHaloMaterial.uniforms.uOpacity.value = .38 * earthFade
+      surfaceHaloMaterial.uniforms.uOpacity.value = .3 * earthFade
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
       atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
@@ -842,7 +842,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       nodeGlow.intensity = 0
       earthGroup.visible = true
       ;(earth.material as THREE.MeshStandardMaterial).opacity = 1
-      surfaceHaloMaterial.uniforms.uOpacity.value = .38
+      surfaceHaloMaterial.uniforms.uOpacity.value = .3
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
       atmosphereMaterial.uniforms.uOpacity.value = .16
