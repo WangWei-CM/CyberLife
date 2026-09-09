@@ -394,6 +394,32 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .035 : .045, vertexColors: true, transparent: true, opacity: .82, sizeAttenuation: true }))
   scene.add(stars)
 
+  // A second, finer dust layer drifts at a different speed to keep the black
+  // background alive without turning it into a dense star field.
+  const dustCount = mobile ? 180 : 420
+  const dustPositions = new Float32Array(dustCount * 3)
+  const dustColors = new Float32Array(dustCount * 3)
+  for (let index = 0; index < dustCount; index += 1) {
+    const radius = 20 + seeded(index + 620) * 30
+    const theta = seeded(index + 720) * TAU
+    const phi = Math.acos(2 * seeded(index + 820) - 1)
+    dustPositions[index * 3] = radius * Math.sin(phi) * Math.cos(theta)
+    dustPositions[index * 3 + 1] = radius * Math.cos(phi)
+    dustPositions[index * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta)
+    const tint = .46 + seeded(index + 920) * .34
+    dustColors[index * 3] = tint * .62
+    dustColors[index * 3 + 1] = tint
+    dustColors[index * 3 + 2] = tint * .88
+  }
+  const dustGeometry = new THREE.BufferGeometry()
+  dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3))
+  dustGeometry.setAttribute('color', new THREE.BufferAttribute(dustColors, 3))
+  const driftingStars = new THREE.Points(
+    dustGeometry,
+    new THREE.PointsMaterial({ size: mobile ? .018 : .026, vertexColors: true, transparent: true, opacity: .58, sizeAttenuation: true }),
+  )
+  scene.add(driftingStars)
+
   // Keep the procedural fallback light; the high-resolution public-domain map
   // below replaces it as soon as the browser finishes loading the asset.
   const textureQuality = mobile ? 512 : 768
@@ -420,6 +446,19 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   )
   earth.rotation.z = -.22
   earthGroup.add(earth)
+  const surfaceGlowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x2cff9a,
+    transparent: true,
+    opacity: .065,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+  const surfaceGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(earthRadius * 1.008, sphereSegments, sphereSegments),
+    surfaceGlowMaterial,
+  )
+  surfaceGlow.rotation.z = -.22
+  earthGroup.add(surfaceGlow)
   let earthTextureDisposed = false
   new THREE.TextureLoader().load('/textures/earth-day-blue-marble.jpg', texture => {
     if (earthTextureDisposed) { texture.dispose(); return }
@@ -666,7 +705,11 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const pageProgress = easeOutCubic(elapsed / PAGE_ENTER_MS)
 
     stars.rotation.y = time * .000008
+    stars.rotation.x = Math.sin(time * .000015) * .012
+    driftingStars.rotation.y = -time * .000012
+    driftingStars.rotation.x = time * .000003
     earth.rotation.y = time * .000035
+    surfaceGlow.rotation.y = -time * .000042
     clouds.visible = true
     cloudHighlight.visible = true
     clouds.rotation.y = time * .000052
@@ -686,6 +729,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       earthGroup.visible = gatherProgress < .68
       const earthFade = 1 - clamp(gatherProgress / .68)
       ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
+      surfaceGlowMaterial.opacity = .065 * earthFade
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
       atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
@@ -796,6 +840,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       nodeGlow.intensity = 0
       earthGroup.visible = true
       ;(earth.material as THREE.MeshStandardMaterial).opacity = 1
+      surfaceGlowMaterial.opacity = .065
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
       atmosphereMaterial.uniforms.uOpacity.value = .16
