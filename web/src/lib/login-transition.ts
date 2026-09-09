@@ -391,7 +391,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const starGeometry = new THREE.BufferGeometry()
   starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
   starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
-  const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .035 : .045, vertexColors: true, transparent: true, opacity: .82, sizeAttenuation: true }))
+  const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .05 : .065, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true }))
   scene.add(stars)
 
   // A second, finer dust layer drifts at a different speed to keep the black
@@ -416,7 +416,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   dustGeometry.setAttribute('color', new THREE.BufferAttribute(dustColors, 3))
   const driftingStars = new THREE.Points(
     dustGeometry,
-    new THREE.PointsMaterial({ size: mobile ? .018 : .026, vertexColors: true, transparent: true, opacity: .58, sizeAttenuation: true }),
+    new THREE.PointsMaterial({ size: mobile ? .028 : .04, vertexColors: true, transparent: true, opacity: .86, sizeAttenuation: true }),
   )
   scene.add(driftingStars)
 
@@ -449,7 +449,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const surfaceGlowMaterial = new THREE.MeshBasicMaterial({
     color: 0x2cff9a,
     transparent: true,
-    opacity: .065,
+    opacity: .14,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
   })
@@ -729,7 +729,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       earthGroup.visible = gatherProgress < .68
       const earthFade = 1 - clamp(gatherProgress / .68)
       ;(earth.material as THREE.MeshStandardMaterial).opacity = earthFade
-      surfaceGlowMaterial.opacity = .065 * earthFade
+      surfaceGlowMaterial.opacity = .14 * earthFade
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82 * earthFade
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25 * earthFade
       atmosphereMaterial.uniforms.uOpacity.value = .16 * earthFade
@@ -840,7 +840,7 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
       nodeGlow.intensity = 0
       earthGroup.visible = true
       ;(earth.material as THREE.MeshStandardMaterial).opacity = 1
-      surfaceGlowMaterial.opacity = .065
+      surfaceGlowMaterial.opacity = .14
       ;(clouds.material as THREE.MeshPhongMaterial).opacity = .82
       ;(cloudHighlight.material as THREE.MeshBasicMaterial).opacity = .25
       atmosphereMaterial.uniforms.uOpacity.value = .16
