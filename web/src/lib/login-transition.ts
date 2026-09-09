@@ -391,7 +391,8 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const starGeometry = new THREE.BufferGeometry()
   starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
   starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3))
-  const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ size: mobile ? .105 : .135, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true }))
+  const starMaterial = new THREE.PointsMaterial({ size: mobile ? .105 : .135, vertexColors: true, transparent: true, opacity: 1, sizeAttenuation: true })
+  const stars = new THREE.Points(starGeometry, starMaterial)
   scene.add(stars)
 
   // A second, finer dust layer drifts at a different speed to keep the black
@@ -414,9 +415,10 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
   const dustGeometry = new THREE.BufferGeometry()
   dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3))
   dustGeometry.setAttribute('color', new THREE.BufferAttribute(dustColors, 3))
+  const dustMaterial = new THREE.PointsMaterial({ size: mobile ? .06 : .084, vertexColors: true, transparent: true, opacity: .92, sizeAttenuation: true })
   const driftingStars = new THREE.Points(
     dustGeometry,
-    new THREE.PointsMaterial({ size: mobile ? .06 : .084, vertexColors: true, transparent: true, opacity: .92, sizeAttenuation: true }),
+    dustMaterial,
   )
   scene.add(driftingStars)
 
@@ -705,6 +707,11 @@ export function createLoginTransition(canvas: HTMLCanvasElement, options: SceneO
     const chipExitProgress = clamp(fallLinear * 2)
     const fallProgress = easeInOutCubic(elapsed / NODE_FALL_MS)
     const pageProgress = easeOutCubic(elapsed / PAGE_ENTER_MS)
+    const starFade = stage === 'node-fall'
+      ? Math.pow(1 - fallProgress, 1.35)
+      : stage === 'page-enter' || stage === 'complete' ? 0 : 1
+    starMaterial.opacity = starFade
+    dustMaterial.opacity = .92 * starFade
 
     stars.rotation.y = time * .000008
     stars.rotation.x = Math.sin(time * .000015) * .012
