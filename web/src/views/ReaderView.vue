@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
 import { api, type Comment, type Milestone, type NowData } from '../api/client'
-import { beijingNow, lunarLabel, monthDayLabel, timeLabel, weekdayLabel } from '../lib/dates'
+import { beijingNow, fullDateLabel, lunarLabel, timeLabel, weekdayLabel } from '../lib/dates'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 
@@ -14,12 +14,14 @@ const comment = ref('')
 const now = ref(beijingNow())
 let clock: number | undefined
 
-const dateLabel = computed(() => monthDayLabel(now.value))
+const dateLabel = computed(() => fullDateLabel(now.value))
 const weekday = computed(() => weekdayLabel(now.value))
 const lunar = computed(() => lunarLabel(now.value))
 const hhmm = computed(() => timeLabel(now.value))
 const seconds = computed(() => String(now.value.getSeconds()).padStart(2, '0'))
+const dayProgress = computed(() => ((now.value.getHours() * 60 + now.value.getMinutes()) / 1440) * 100)
 const theme = computed(() => (document.querySelector('.app-shell')?.classList.contains('light') ? 'light' : 'dark') as 'light' | 'dark')
+
 async function load() {
   try {
     data.value = await api.visibleToday()
@@ -40,50 +42,105 @@ onBeforeUnmount(() => { if (clock) clearInterval(clock) })
 </script>
 
 <template>
-  <main class="page now-page reader-page">
-    <section class="now-clock">
-      <strong class="clock-date">{{ dateLabel }}</strong><span class="clock-week">{{ weekday }}</span><span class="clock-lunar">{{ lunar }}</span>
-      <time class="clock-time mono">{{ hhmm }}<Transition name="fade" mode="out-in"><small :key="seconds" class="clock-seconds">{{ seconds }}</small></Transition></time>
-    </section>
+  <main class="page now-page reader-writer-page">
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
-    <div v-stagger class="reader-grid">
-      <article class="card reader-diary">
-        <header class="card-head"><h2>今日日记</h2><small class="faint mono">{{ data.diary.entryDate }}</small></header>
-        <div v-if="milestones.length" class="monument">
-          <span class="milestone-badge"><AppIcon name="medal" :size="14" />里程碑</span>
-          <h2 v-for="item in milestones" :key="item.id" class="monument-title">{{ item.description }}<small v-if="item.detail">{{ item.detail }}</small></h2>
-        </div>
-        <MarkdownPreview v-if="data.diary.id" editor-id="reader-diary" :model-value="data.diary.content" :theme="theme" theme-class="theme-now" />
-        <EmptyState v-else icon="book" text="今天没有你可以查看的日记" />
-        <section v-if="data.diary.id && (comments.length || data.diary.commentable)" class="past-comments">
-          <h3 class="card-title">评论<small v-if="comments.length">{{ comments.length }}</small></h3>
-          <ul class="comment-list"><li v-for="item in comments" :key="item.id"><p>{{ item.content }}</p><small class="mono faint">{{ timeLabel(item.createdAt) }}</small></li></ul>
-          <form v-if="data.diary.commentable" class="comment-form" @submit.prevent="addComment"><input v-model="comment" placeholder="写下评论" maxlength="500" /><button class="icon-button" type="submit" aria-label="发送" :disabled="!comment.trim()"><AppIcon name="send" :size="16" /></button></form>
+    <section class="now-layout reader-writer-layout">
+      <div v-stagger class="now-left reader-writer-left">
+        <section class="now-clock" aria-live="off" style="order: 0">
+          <div class="clock-display">
+            <time class="clock-time mono" :datetime="now.toISOString()">
+              <span class="clock-main">{{ hhmm }}</span><Transition name="fade" mode="out-in"><small :key="seconds" class="clock-seconds">{{ seconds }}</small></Transition>
+            </time>
+            <div class="clock-meta">
+              <Transition name="fade" mode="out-in"><strong :key="dateLabel" class="clock-date">{{ dateLabel }}</strong></Transition>
+              <Transition name="fade" mode="out-in"><span :key="lunar" class="clock-lunar">{{ lunar }}</span></Transition>
+              <span class="clock-week">{{ weekday }}</span>
+            </div>
+          </div>
+          <i class="day-progress" :title="`今天已过去 ${Math.round(dayProgress)}%`" aria-hidden="true"><b :style="{ width: `${dayProgress}%` }" /></i>
         </section>
-      </article>
-      <div class="reader-side">
-        <article class="card">
-          <h2 class="card-title">心情<small v-if="data.moods.length">{{ data.moods.length }} 条</small></h2>
-          <ul v-if="data.moods.length" class="reader-list">
-            <li v-for="item in data.moods" :key="item.id"><span class="emoji">{{ item.tags.map(tag => tag.emoji).join(' ') }}</span><span>{{ item.tags.map(tag => tag.name).join('、') }}<small v-if="item.note" class="faint"> · {{ item.note }}</small></span><span class="when">{{ timeLabel(item.recordedAt) }}</span></li>
-          </ul>
-          <EmptyState v-else icon="smile" text="今天没有可查看的心情记录" compact />
+
+        <article class="card metrics-card reader-metrics-card" style="order: 1">
+          <div class="metrics-grid">
+            <section class="metric-panel">
+              <header class="card-title metric-panel-head"><span class="card-title-main">心情 <small>今天 {{ data.moods.length ? `${data.moods.length} 次` : '' }}</small></span></header>
+              <ul v-if="data.moods.length" class="reader-list reader-metric-list">
+                <li v-for="item in data.moods" :key="item.id"><span class="emoji">{{ item.tags.map(tag => tag.emoji).join(' ') }}</span><span>{{ item.tags.map(tag => tag.name).join('、') }}<small v-if="item.note" class="faint"> · {{ item.note }}</small></span><span class="when">{{ timeLabel(item.recordedAt) }}</span></li>
+              </ul>
+              <EmptyState v-else icon="smile" text="今天还没有心情记录" compact />
+            </section>
+            <section class="metric-panel">
+              <header class="card-title metric-panel-head"><span class="card-title-main">身体 <small>今天 {{ data.bodies.length ? `${data.bodies.length} 次` : '' }}</small></span></header>
+              <ul v-if="data.bodies.length" class="reader-list reader-metric-list">
+                <li v-for="item in data.bodies" :key="item.id"><span class="reader-score">{{ item.score }}</span><span>{{ item.note || '' }}</span><span class="when">{{ timeLabel(item.recordedAt) }}</span></li>
+              </ul>
+              <EmptyState v-else icon="pulse" text="今天还没有身体记录" compact />
+            </section>
+          </div>
         </article>
-        <article class="card">
-          <h2 class="card-title">身体</h2>
-          <ul v-if="data.bodies.length" class="reader-list">
-            <li v-for="item in data.bodies" :key="item.id"><span class="reader-score">{{ item.score }}</span><span>{{ item.note || '' }}</span><span class="when">{{ timeLabel(item.recordedAt) }}</span></li>
-          </ul>
-          <EmptyState v-else icon="pulse" text="今天没有可查看的身体记录" compact />
-        </article>
-        <article class="card">
-          <h2 class="card-title">今日任务<small v-if="data.tasks.length">{{ data.tasks.filter(task => task.done).length }} / {{ data.tasks.length }}</small></h2>
-          <ul v-if="data.tasks.length" class="past-tasks">
-            <li v-for="task in data.tasks" :key="task.id" :class="{ done: task.done }"><i class="task-state"><AppIcon v-if="task.done" name="check" :size="12" :stroke-width="2.5" /></i><div><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><small v-if="task.description" class="faint">{{ task.description }}</small></div></li>
-          </ul>
-          <EmptyState v-else icon="check" text="今天没有可查看的任务" compact />
+
+        <article class="card diary-card reader-diary writer-readonly-diary">
+          <header class="card-head">
+            <h2><span class="card-title-main">日记</span></h2>
+            <small class="faint mono">{{ data.diary.entryDate }}</small>
+          </header>
+          <div v-if="data.diary.id" class="writer-readonly-preview">
+            <MarkdownPreview editor-id="reader-diary" :model-value="data.diary.content" :theme="theme" theme-class="theme-now" />
+          </div>
+          <EmptyState v-else icon="book" text="今天没有你可以查看的日记" />
+          <section v-if="data.diary.id && (comments.length || data.diary.commentable)" class="past-comments">
+            <h3 class="card-title">评论<small v-if="comments.length">{{ comments.length }}</small></h3>
+            <ul class="comment-list"><li v-for="item in comments" :key="item.id"><p>{{ item.content }}</p><small class="mono faint">{{ timeLabel(item.createdAt) }}</small></li></ul>
+            <form v-if="data.diary.commentable" class="comment-form" @submit.prevent="addComment"><input v-model="comment" placeholder="写下评论" maxlength="500" /><button class="icon-button" type="submit" aria-label="发送" :disabled="!comment.trim()"><AppIcon name="send" :size="16" /></button></form>
+          </section>
         </article>
       </div>
-    </div>
+
+      <div class="divider-v now-divider" role="separator" aria-orientation="vertical" aria-label="左右栏分隔" />
+
+      <aside v-stagger class="now-right reader-writer-right">
+        <section v-if="milestones.length" class="card reader-milestones-card">
+          <header class="card-title"><span class="card-title-main">里程碑</span><small>{{ milestones.length }} 项</small></header>
+          <ul class="reader-list">
+            <li v-for="item in milestones" :key="item.id"><span class="milestone-badge"><AppIcon name="medal" :size="14" /></span><span><b>{{ item.description }}</b><small v-if="item.detail" class="faint">{{ item.detail }}</small></span></li>
+          </ul>
+        </section>
+        <section class="task-head"><h2 class="card-title">待办<small>{{ data.tasks.filter(task => !task.done).length }} 项未完成</small></h2></section>
+        <section class="card tasks-card reader-tasks-card">
+          <ul v-if="data.tasks.length" class="today-tasks">
+            <li v-for="task in data.tasks" :key="task.id" :class="{ done: task.done, [`priority-${task.priority}`]: true }">
+              <div class="task-row reader-task-row">
+                <input type="checkbox" :checked="task.done" disabled :aria-label="`${task.title}完成状态`" />
+                <span class="task-body"><span class="task-title" :class="{ done: task.done }">{{ task.title }}</span><small v-if="task.description" class="task-meta faint">{{ task.description }}</small></span>
+                <span class="task-meta faint">{{ task.taskDate }}</span>
+              </div>
+            </li>
+          </ul>
+          <EmptyState v-else icon="check" text="今天还没有待办" />
+        </section>
+      </aside>
+    </section>
   </main>
 </template>
+
+<style scoped>
+.reader-writer-page .reader-metrics-card { order: 1; }
+.reader-metric-list { max-height: 150px; overflow: auto; scrollbar-width: thin; }
+.reader-metric-list li { min-width: 0; }
+.reader-metric-list li > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.writer-readonly-diary { order: 2; }
+.writer-readonly-preview { min-height: 0; overflow: auto; scrollbar-width: thin; }
+.writer-readonly-preview :deep(.md-editor) { min-height: 0; border: 0 !important; background: transparent !important; }
+.writer-readonly-preview :deep(.md-editor-preview-wrapper) { padding: 0 !important; }
+.writer-readonly-diary > .empty-state { min-height: 180px; }
+.reader-milestones-card .reader-list li { align-items: flex-start; }
+.reader-milestones-card .reader-list li > span:last-child { display: grid; gap: 3px; min-width: 0; }
+.reader-milestones-card .reader-list li small { display: block; }
+.reader-task-row { cursor: default; }
+.reader-task-row input[type="checkbox"] { cursor: default; }
+
+@media (min-width: 901px) {
+  .reader-writer-page .writer-readonly-diary { min-height: 0; }
+  .reader-writer-page .writer-readonly-diary > .writer-readonly-preview { height: 100%; }
+}
+</style>
