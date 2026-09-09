@@ -50,7 +50,7 @@
 .rule-list li:last-child { box-shadow: none; }
 .rule-list .task-row { padding: 9px 0; }
 .key-list { display: grid; }
-.key-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px 16px; align-items: center; padding: 10px 0; box-shadow: inset 0 -1px 0 var(--divider); }
+.key-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 6px 16px; align-items: center; padding: 10px 0; box-shadow: inset 0 -1px 0 var(--divider); }
 .key-list li:last-child { box-shadow: none; }
 .key-list li.revoked { opacity: .55; }
 .key-main { display: grid; gap: 2px; min-width: 0; }
@@ -88,6 +88,12 @@
 .reader-list .emoji { font-size: 18px; line-height: 1.2; }
 .reader-list .when { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); white-space: nowrap; }
 .reader-score { font-family: var(--font-mono); font-size: 18px; color: var(--accent); min-width: 34px; }
+
+@media (max-width: 700px) {
+  .key-list li { grid-template-columns: minmax(0, 1fr) auto; }
+  .key-list .key-meta { grid-column: 1 / -1; }
+  .key-list .key-status, .key-list .text-button { justify-self: end; }
+}
 
 @media (max-width: 900px) {
   .presets, .admin-grid, .reader-grid { grid-template-columns: 1fr; }

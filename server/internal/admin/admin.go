@@ -138,8 +138,8 @@ func (s *Service) ListReaderKeys(ctx context.Context, lifeID string) ([]ReaderKe
 	return items, rows.Err()
 }
 
-func (s *Service) RevokeReaderKey(ctx context.Context, id string) error {
-	result, err := s.db.ExecContext(ctx, "UPDATE reader_keys SET revoked_at=?,key_version=key_version+1 WHERE id=? AND revoked_at IS NULL", time.Now().UTC().Format(time.RFC3339Nano), id)
+func (s *Service) RevokeReaderKey(ctx context.Context, lifeID, id string) error {
+	result, err := s.db.ExecContext(ctx, "UPDATE reader_keys SET revoked_at=?,key_version=key_version+1 WHERE id=? AND life_id=? AND revoked_at IS NULL", time.Now().UTC().Format(time.RFC3339Nano), id, lifeID)
 	if err != nil {
 		return err
 	}

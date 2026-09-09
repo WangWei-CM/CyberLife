@@ -8,7 +8,7 @@
 - `global.db` 初始化：Admin、Writer、Life、ReaderKey、Session、月库索引。
 - 首次启动使用 `CYBERLIFE_ADMIN_PASSWORD` 初始化唯一管理员；密码只保存 Argon2id 哈希。
 - Admin 创建 Writer，服务端生成并仅在响应中返回一次主密钥，同时创建对应人生和当月数据库。
-- Admin 为指定人生创建、列出、作废 ReaderKey；作废即提升 key version，使既有会话失效。
+- Writer 在设置页为自己的人生创建、列出、作废 ReaderKey；作废即提升 key version，使既有会话失效。
 - Writer/Reader 主密钥登录、Admin 独立密码登录（`/admin`）、HttpOnly Cookie 会话、登出。
 - SQLite WAL、外键、busy timeout 与 life 月库初始化。
 - Now：北京时间时钟、进行中规划横幅轮播、身体/心情曲线与记录、Markdown 日记（自动保存、图片上传、图片放大、删除备份）、日历即待办。
@@ -16,7 +16,7 @@
 - Future：规划列表 / 详情（双进度条、进度标记）、自研连续缩放待办日历（7 天 → 100 年，规划横条落位）。
 - ACL：阅读者遵循 **绝密 → 创建日锚点 → 权限预设** 的服务端过滤链；无规则的预设默认拒绝。
 - 评论与里程碑：评论要求目标先开启评论且经 ACL 可读；里程碑和其标志均独立经过 ACL 过滤。
-- 设置页：歌单（三页独立、默认音频、上传）、权限预设、主题三档、顶栏位置、阅读密钥状态；通知中心；绝密模式；音乐真实播放与断点续播。
+- 设置页：歌单（三页独立、默认音频、上传）、权限预设、主题三档、顶栏位置、阅读密钥签发/作废；通知中心；绝密模式；音乐真实播放与断点续播。
 - `android/` 提供原生 Kotlin WorkManager 轮询客户端骨架；备份与部署要求见 [部署与备份.md](部署与备份.md)。
 
 ## 前端结构
@@ -69,8 +69,8 @@ pnpm dev
 | POST | `/api/v1/auth/logout` | 当前会话登出 |
 | GET | `/api/v1/auth/me` | 当前身份与能力 |
 | GET/POST | `/api/v1/admin/writers` | 管理员列出/创建 Writer |
-| GET/POST | `/api/v1/admin/writers/:lifeID/reader-keys` | 列出/创建阅读密钥 |
-| POST | `/api/v1/admin/reader-keys/:id/revoke` | 作废阅读密钥 |
+| GET/POST | `/api/v1/now/reader-keys` | 书写者列出/创建自己的阅读密钥 |
+| POST | `/api/v1/now/reader-keys/:id/revoke` | 书写者作废自己的阅读密钥 |
 | GET | `/api/v1/now` | 书写者读取今日记录 |
 | GET/POST | `/api/v1/now/mood-tags` | 列出/创建心情标签 |
 | POST | `/api/v1/now/moods` | 按服务端标签值记录心情 |

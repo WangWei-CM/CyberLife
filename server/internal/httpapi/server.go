@@ -111,6 +111,8 @@ func (s *Server) Router() *gin.Engine {
 	writer.GET("/mood-tags", s.moodTags)
 	writer.POST("/mood-tags", s.addMoodTag)
 	writer.GET("/reader-keys", s.writerReaderKeys)
+	writer.POST("/reader-keys", s.createWriterReaderKey)
+	writer.POST("/reader-keys/:id/revoke", s.revokeWriterReaderKey)
 	writer.GET("/presets", s.listPresets)
 	writer.POST("/presets", s.createPreset)
 	writer.PUT("/presets/:id/rules", s.replacePresetRules)
@@ -143,9 +145,6 @@ func (s *Server) Router() *gin.Engine {
 	adminGroup.Use(s.requireAdmin())
 	adminGroup.GET("/writers", s.listWriters)
 	adminGroup.POST("/writers", s.createWriter)
-	adminGroup.GET("/writers/:lifeID/reader-keys", s.listReaderKeys)
-	adminGroup.POST("/writers/:lifeID/reader-keys", s.createReaderKey)
-	adminGroup.POST("/reader-keys/:id/revoke", s.revokeReaderKey)
 	return r
 }
 func (s *Server) cors() gin.HandlerFunc {
@@ -245,15 +244,8 @@ func (s *Server) createWriter(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, gin.H{"writer": item, "master_key": key})
 }
-func (s *Server) listReaderKeys(c *gin.Context) {
-	items, err := s.admin.ListReaderKeys(c.Request.Context(), c.Param("lifeID"))
-	if err != nil {
-		internal(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
-}
-func (s *Server) createReaderKey(c *gin.Context) {
+func (s *Server) createWriterReaderKey(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
 	var request struct {
 		Nickname  string  `json:"nickname"`
 		Note      string  `json:"note"`
@@ -271,15 +263,16 @@ func (s *Server) createReaderKey(c *gin.Context) {
 		}
 		expires = &parsed
 	}
-	item, key, err := s.admin.CreateReaderKey(c.Request.Context(), c.Param("lifeID"), strings.TrimSpace(request.Nickname), strings.TrimSpace(request.Note), expires)
+	item, key, err := s.admin.CreateReaderKey(c.Request.Context(), a.LifeID, strings.TrimSpace(request.Nickname), strings.TrimSpace(request.Note), expires)
 	if err != nil {
 		fail(c, http.StatusBadRequest, "validation_failed", err.Error())
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"reader_key": item, "key": key})
 }
-func (s *Server) revokeReaderKey(c *gin.Context) {
-	if err := s.admin.RevokeReaderKey(c.Request.Context(), c.Param("id")); err != nil {
+func (s *Server) revokeWriterReaderKey(c *gin.Context) {
+	a := c.MustGet("actor").(auth.Actor)
+	if err := s.admin.RevokeReaderKey(c.Request.Context(), a.LifeID, c.Param("id")); err != nil {
 		fail(c, http.StatusNotFound, "not_found", "阅读密钥不存在或已作废")
 		return
 	}
@@ -1456,7 +1449,7 @@ func bind(c *gin.Context, value any) bool {
 }
 func capabilities(actor auth.Actor) []string {
 	if actor.Type == "admin" {
-		return []string{"admin:manage_writers", "admin:manage_reader_keys"}
+		return []string{"admin:manage_writers"}
 	}
 	if actor.Type == "writer" {
 		return []string{"content:write", "keys:manage"}

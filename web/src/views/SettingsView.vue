@@ -28,6 +28,11 @@ const selectedPreset = ref<Preset | null>(null)
 const draftRules = ref<Record<string, boolean>>({})
 const presetName = ref('')
 const busy = ref(false)
+const keyBusy = ref(false)
+const readerNickname = ref('')
+const readerNote = ref('')
+const issued = ref<{ title: string; key: string } | null>(null)
+const copied = ref(false)
 
 const appearanceOptions = [{ value: 'dark', label: '始终黑色' }, { value: 'light', label: '始终白色' }, { value: 'auto', label: '日出日落' }]
 const navOptions = [{ value: 'top', label: '顶部' }, { value: 'left', label: '左侧' }, { value: 'right', label: '右侧' }, { value: 'bottom', label: '底部' }]
@@ -63,6 +68,10 @@ async function loadPresets() {
   if (!isWriter.value) return
   try { const [presetResult, keyResult] = await Promise.all([api.presets(), api.readerKeysForWriter()]); presets.value = presetResult.items; readerKeys.value = keyResult.items; if (selectedPreset.value) selectPreset(presets.value.find(item => item.id === selectedPreset.value?.id) ?? null) } catch (cause) { fail(cause, '读取权限预设失败') }
 }
+async function loadReaderKeys() {
+  if (!isWriter.value) return
+  try { readerKeys.value = (await api.readerKeysForWriter()).items } catch (cause) { fail(cause, '读取阅读密钥失败') }
+}
 function selectPreset(preset: Preset | null) {
   selectedPreset.value = preset
   const rules: Record<string, boolean> = {}
@@ -72,8 +81,30 @@ function selectPreset(preset: Preset | null) {
 function rulesFromDraft(): PresetRule[] { return Object.entries(draftRules.value).map(([readerKeyId, allowed]) => ({ readerKeyId, allowed })) }
 async function saveRules() { if (!selectedPreset.value || busy.value) return; busy.value = true; try { await api.replacePresetRules(selectedPreset.value.id, rulesFromDraft()); await loadPresets() } catch (cause) { fail(cause, '保存失败') } finally { busy.value = false } }
 async function createPreset() { const name = presetName.value.trim(); if (!name || busy.value) return; busy.value = true; try { const preset = await api.createPreset(name, []); presetName.value = ''; await loadPresets(); selectPreset(presets.value.find(item => item.id === preset.id) ?? preset) } catch (cause) { fail(cause, '创建失败') } finally { busy.value = false } }
+async function createReaderKey() {
+  const name = readerNickname.value.trim()
+  if (!name || keyBusy.value) return
+  keyBusy.value = true
+  try {
+    const result = await api.createReaderKey({ nickname: name, note: readerNote.value.trim() })
+    issued.value = { title: `阅读者「${result.reader_key.nickname}」的密钥`, key: result.key }
+    copied.value = false
+    readerNickname.value = ''
+    readerNote.value = ''
+    await loadPresets()
+  } catch (cause) { fail(cause, '签发失败') } finally { keyBusy.value = false }
+}
+async function revokeReaderKey(key: ReaderKey) {
+  if (keyStatus(key) !== '有效' || !confirm(`确认作废「${key.nickname}」的阅读密钥？已有会话会立即失效。`)) return
+  keyBusy.value = true
+  try { await api.revokeReaderKey(key.id); await loadPresets() } catch (cause) { fail(cause, '作废失败') } finally { keyBusy.value = false }
+}
+async function copyIssuedKey() {
+  if (!issued.value) return
+  try { await navigator.clipboard.writeText(issued.value.key); copied.value = true; setTimeout(() => { copied.value = false }, 2000) } catch { /* 剪贴板不可用时用户可手动选择复制 */ }
+}
 function keyStatus(key: ReaderKey) { if (key.revoked_at) return '已作废'; if (key.expires_at && new Date(key.expires_at) < new Date()) return '已过期'; return '有效' }
-watch(tab, value => { if (value === 'presets') loadPresets() })
+watch(tab, value => { if (value === 'presets') loadPresets(); if (value === 'keys') loadReaderKeys() })
 onMounted(() => { loadPlaylists(); if (isWriter.value) loadPresets() })
 </script>
 
@@ -84,6 +115,14 @@ onMounted(() => { loadPlaylists(); if (isWriter.value) loadPresets() })
       <button class="text-button danger" @click="emit('logout')"><AppIcon name="logout" :size="16" />登出</button>
     </header>
     <Transition name="fade"><p v-if="error" class="error page-error" role="alert">{{ error }}<button class="text-button" @click="error = ''"><AppIcon name="close" :size="14" /></button></p></Transition>
+    <Transition name="fade-slide">
+      <section v-if="issued" class="key-reveal" role="alert">
+        <b>{{ issued.title }}</b>
+        <p>只显示这一次，请立即保存并交给持有人。</p>
+        <code>{{ issued.key }}</code>
+        <div class="form-row"><button class="text-button" @click="copyIssuedKey"><AppIcon :name="copied ? 'check' : 'copy'" :size="14" />{{ copied ? '已复制' : '复制' }}</button><button class="text-button" @click="issued = null"><AppIcon name="close" :size="14" />关闭</button></div>
+      </section>
+    </Transition>
     <Transition name="tab" mode="out-in">
       <section v-if="tab === 'music'" key="music" v-stagger class="settings-panel">
         <template v-if="isWriter">
@@ -162,12 +201,18 @@ onMounted(() => { loadPlaylists(); if (isWriter.value) loadPresets() })
 
       <section v-else key="keys" v-stagger class="settings-panel">
         <article class="card">
-          <h2 class="card-title">阅读密钥<small>由管理员在 /admin 签发与作废</small></h2>
+          <h2 class="card-title">阅读密钥<small>由你签发与作废</small></h2>
+          <form class="reader-form" @submit.prevent="createReaderKey">
+            <input v-model="readerNickname" placeholder="阅读者昵称" maxlength="30" required />
+            <input v-model="readerNote" placeholder="备注（可选）" maxlength="60" />
+            <button class="primary" type="submit" :disabled="keyBusy || !readerNickname.trim()">签发密钥</button>
+          </form>
           <ul v-if="readerKeys.length" class="key-list">
             <li v-for="key in readerKeys" :key="key.id" :class="{ revoked: key.revoked_at }">
               <span class="key-main"><b>{{ key.nickname }}</b><small class="faint">{{ key.note || '无备注' }}</small></span>
               <span class="key-meta mono faint">锚点 {{ key.anchor_local_date }}<template v-if="key.expires_at"> · 到期 {{ key.expires_at.slice(0, 10) }}</template></span>
               <span class="key-status" :class="keyStatus(key) === '有效' ? 'ok' : 'off'">{{ keyStatus(key) }}</span>
+              <button v-if="keyStatus(key) === '有效'" class="text-button danger" :disabled="keyBusy" @click="revokeReaderKey(key)">作废</button>
             </li>
           </ul>
           <EmptyState v-else icon="key" text="还没有签发阅读密钥" />
